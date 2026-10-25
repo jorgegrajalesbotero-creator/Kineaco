@@ -1,9 +1,12 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { Download } from "lucide-react";
 import { supabase } from "@/lib/supabaseClient";
 import { localDateString } from "@/lib/dates";
 import { BADGE_GROUPS, computeBadges, loadBadgeData } from "@/lib/badges";
+import { downloadReportPdf } from "@/lib/planPdf";
+import { currentOrNextPlan, loadSchedule } from "@/lib/trainingPlan";
 import { PanelLayout } from "./PanelLayout";
 import { Skeleton } from "@/components/ui/Skeleton";
 
@@ -12,6 +15,19 @@ export function ComparePanel({ student, onClose }) {
   const [comparisonData, setComparisonData] = useState([]);
   const [coachBadges, setCoachBadges] = useState([]);
   const [loadingComparison, setLoadingComparison] = useState(true);
+  const [pdfBusy, setPdfBusy] = useState(false);
+
+  // Informe completo del alumno en PDF: progreso, medidas, nutrición y entrenamientos (con o sin plan)
+  const downloadReport = async () => {
+    setPdfBusy(true);
+    try {
+      const { plans, fixed } = await loadSchedule(supabase, student.id, "id, title");
+      await downloadReportPdf({ supabase, userId: student.id, plan: currentOrNextPlan(plans), fixed, studentName: student.name });
+    } catch (e) {
+      alert("No se pudo generar el PDF: " + e.message);
+    }
+    setPdfBusy(false);
+  };
 
   useEffect(() => {
     async function load() {
@@ -74,6 +90,15 @@ export function ComparePanel({ student, onClose }) {
 
   return (
     <PanelLayout title="Peso sugerido vs. real" subtitle={student.name} onClose={onClose} width="max-w-2xl">
+      <div className="bg-card rounded-xl p-4 mb-4 flex items-center justify-between gap-3">
+        <div className="min-w-0">
+          <p className="text-ink text-sm font-medium">Informe completo en PDF</p>
+          <p className="text-muted text-xs mt-0.5">Progreso, medidas, nutrición y entrenamientos.</p>
+        </div>
+        <button onClick={downloadReport} disabled={pdfBusy} className="bg-accent text-app text-sm font-semibold rounded-lg px-4 py-2.5 flex items-center gap-2 shrink-0 disabled:opacity-60">
+          <Download size={15} /> {pdfBusy ? "Generando..." : "Descargar"}
+        </button>
+      </div>
       {loadingComparison ? (
         <Skeleton />
       ) : comparisonData.length === 0 ? (

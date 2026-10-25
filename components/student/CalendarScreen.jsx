@@ -7,7 +7,7 @@ import { blockTypeLabel } from "@/lib/blocks";
 import { localDateString } from "@/lib/dates";
 import { appLocale, dayLetters, tr } from "@/lib/i18n";
 import { addDays, currentOrNextPlan, dayLabelOf, loadSchedule, mondayOf, planFor, planLastDay, planStart, planWeekOf, routinesForDate } from "@/lib/trainingPlan";
-import { downloadPlanPdf, downloadRoutinePdf, loadRoutineDetails } from "@/lib/planPdf";
+import { downloadReportPdf, downloadRoutinePdf, loadRoutineDetails } from "@/lib/planPdf";
 
 const card = "rounded-2xl bg-gradient-to-b from-card to-deep border border-white/[0.06]";
 
@@ -71,10 +71,10 @@ export function CalendarScreen({ userId, studentName, healthConsent, onClose, on
   const monthTitle = cap(month.toLocaleDateString(locale, { month: "long", year: "numeric" }));
   const fmt = (d, opts) => d.toLocaleDateString(locale, opts);
 
-  const planPdf = async () => {
+  const reportPdf = async () => {
     setBusy("plan");
     try {
-      await downloadPlanPdf({ supabase, userId, plan, studentName, t: tr, locale, includeHealth: healthConsent });
+      await downloadReportPdf({ supabase, userId, plan, fixed, studentName, t: tr, locale, includeHealth: healthConsent });
     } catch (e) {
       alert(tr("No se pudo generar el PDF: ") + e.message);
     }
@@ -102,6 +102,14 @@ export function CalendarScreen({ userId, studentName, healthConsent, onClose, on
         <h1 className="text-ink text-xl font-semibold tracking-tight">{tr("Calendario")}</h1>
       </div>
 
+      {/* Descargar todo: siempre disponible, con o sin plan */}
+      <div className={`${card} p-4 mb-4`}>
+        <button onClick={reportPdf} disabled={busy === "plan"} className="w-full flex items-center justify-center gap-2 bg-accent text-app text-sm font-semibold rounded-xl py-3 disabled:opacity-60">
+          <Download size={16} /> {busy === "plan" ? tr("Generando PDF...") : tr("Descargar todo en PDF")}
+        </button>
+        <p className="text-muted text-[11px] mt-2 text-center">{tr("Incluye su progreso, medidas, nutrición y sus entrenamientos.")}</p>
+      </div>
+
       {plan && (
         <div className={`${card} p-4 mb-4`}>
           <p className="text-muted text-[11px] font-medium uppercase tracking-[0.14em] mb-1">{tr("Mi plan")}</p>
@@ -122,10 +130,6 @@ export function CalendarScreen({ userId, studentName, healthConsent, onClose, on
           ) : (
             <p className="text-accent text-xs mt-2">{tr("Empieza el {p0}", { p0: fmt(planStart(plan), { weekday: "long", day: "numeric", month: "long" }) })}</p>
           )}
-          <button onClick={planPdf} disabled={busy === "plan"} className="mt-4 w-full flex items-center justify-center gap-2 bg-accent text-app text-sm font-semibold rounded-xl py-2.5 disabled:opacity-60">
-            <Download size={15} /> {busy === "plan" ? tr("Generando PDF...") : tr("Descargar mi plan en PDF")}
-          </button>
-          <p className="text-muted text-[11px] mt-2 text-center">{tr("Incluye su progreso, medidas, nutrición y todas las rutinas.")}</p>
         </div>
       )}
 
