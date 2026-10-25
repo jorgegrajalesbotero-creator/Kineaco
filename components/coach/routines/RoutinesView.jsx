@@ -1,12 +1,14 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { ChevronRight, Clock, GitMerge, GripVertical, Pencil, Plus, Trash2, X } from "lucide-react";
+import { Check, ChevronRight, Clock, Copy, Download, GitMerge, GripVertical, Pencil, Plus, Trash2, UserPlus, X } from "lucide-react";
 import { matchesSearch } from "@/lib/search";
 import { supabase } from "@/lib/supabaseClient";
+import { downloadRoutinePdf } from "@/lib/planPdf";
 import { BlockEditor } from "@/components/coach/routines/BlockEditor";
 import { autoRoutineTitle, catalogOptions, loadRoutineContent, mergeRoutineContent, switchRoutineMode, writeRoutineContent } from "@/components/coach/routines/routineHelpers";
 import { ExerciseItemEditor } from "@/components/coach/routines/ExerciseItemEditor";
+import { AssignRoutineModal } from "@/components/coach/routines/AssignRoutineModal";
 import { RoutineModeToggle } from "@/components/coach/routines/RoutineModeToggle";
 import { SearchInput, SearchSelect } from "@/components/ui/Search";
 
@@ -77,6 +79,11 @@ export function RoutinesView() {
   const [mergeBusy, setMergeBusy] = useState(false);
   const [mergedFrom, setMergedFrom] = useState([]); // rutinas ya fusionadas en esta edición
   const [deleteMerged, setDeleteMerged] = useState(false);
+  const [busyId, setBusyId] = useState(null); // rutina de la lista en la que se está trabajando (duplicar/PDF/eliminar)
+  const [assignRoutine, setAssignRoutine] = useState(null); // rutina que se está asignando a un alumno
+  const [selectMode, setSelectMode] = useState(false); // modo "marcar varias"
+  const [selected, setSelected] = useState([]); // ids marcados
+  const [bulkDeleting, setBulkDeleting] = useState(false);
 
   async function loadRoutines() {
     setLoading(true);
@@ -301,6 +308,79 @@ export function RoutinesView() {
     loadRoutines();
   };
 
+  // Eliminar una rutina directo desde la lista (sin abrirla)
+  const deleteFromList = async (r) => {
+    if (!confirm(`¿Eliminar la rutina "${r.title}"? También se quita de los alumnos y programas que la tengan. El historial de entrenamientos se conserva.`)) return;
+    setBusyId(r.id);
+    const { error } = await supabase.from("routines").delete().eq("id", r.id);
+    setBusyId(null);
+    if (error) {
+      alert(
+        error.code === "23503"
+          ? "No se pudo eliminar: la rutina todavía está conectada al historial de entrenamientos. Falta correr el SQL de arreglo en Supabase."
+          : "No se pudo eliminar la rutina: " + error.message
+      );
+      return;
+    }
+    setSelected((s) => s.filter((id) => id !== r.id));
+    loadRoutines();
+  };
+
+  // Duplicar una rutina (copia el título, los datos, los bloques y los ejercicios)
+  const duplicateRoutine = async (r) => {
+    setBusyId(r.id);
+    const { data: { user } } = await supabase.auth.getUser();
+    const content = await loadRoutineContent(r.id);
+    const { data: nr, error } = await supabase
+      .from("routines")
+      .insert({ title: `${r.title} (copia)`, level: r.level, goal: r.goal, duration_minutes: r.duration_minutes || 0, created_by: user?.id })
+      .select("id")
+      .single();
+    if (error || !nr) {
+      setBusyId(null);
+      return alert("No se pudo duplicar la rutina: " + (error?.message || "error desconocido"));
+    }
+    const strip = (arr) => arr.map((e) => ({ ...e, itemKey: null }));
+    const list = strip(content.list);
+    const blocks = content.blocks.map((b) => ({ ...b, exercises: strip(b.exercises) }));
+    const cErr = await writeRoutineContent(nr.id, content.mode, list, blocks);
+    setBusyId(null);
+    if (cErr) alert("La copia se creó, pero hubo un error al copiar sus ejercicios: " + cErr.message);
+    loadRoutines();
+  };
+
+  // Descargar una rutina en PDF desde la lista
+  const pdfFromList = async (r) => {
+    setBusyId(r.id);
+    try {
+      await downloadRoutinePdf({ supabase, routineIds: [r.id] });
+    } catch (e) {
+      alert("No se pudo generar el PDF: " + e.message);
+    }
+    setBusyId(null);
+  };
+
+  const toggleSelected = (id) => setSelected((s) => (s.includes(id) ? s.filter((x) => x !== id) : [...s, id]));
+  const exitSelectMode = () => { setSelectMode(false); setSelected([]); };
+
+  const bulkDelete = async () => {
+    if (selected.length === 0) return;
+    if (!confirm(`¿Eliminar ${selected.length} ${selected.length === 1 ? "rutina" : "rutinas"}? También se quitan de los alumnos y programas que las tengan. El historial se conserva.`)) return;
+    setBulkDeleting(true);
+    const { error } = await supabase.from("routines").delete().in("id", selected);
+    setBulkDeleting(false);
+    if (error) {
+      alert(
+        error.code === "23503"
+          ? "No se pudieron eliminar: alguna todavía está conectada al historial. Falta correr el SQL de arreglo en Supabase."
+          : "No se pudieron eliminar: " + error.message
+      );
+      return;
+    }
+    exitSelectMode();
+    loadRoutines();
+  };
+
   if (creating) {
     return (
       <div className="p-4 md:p-8 max-w-2xl">
@@ -497,6 +577,9 @@ export function RoutinesView() {
     );
   }
 
+  const visible = routines.filter((r) => matchesSearch(routineSearch, r.title, r.level, r.goal));
+  const quickBtn = "flex items-center gap-1 text-xs rounded-lg px-2.5 py-1.5 bg-field text-soft hover:text-ink disabled:opacity-40";
+
   return (
     <div className="p-4 md:p-8">
       <div className="flex items-center justify-between gap-3 flex-wrap mb-6">
@@ -504,31 +587,77 @@ export function RoutinesView() {
           <h2 className="text-ink text-xl font-semibold">Rutinas</h2>
           <p className="text-muted text-sm">{loading ? "Cargando..." : `${routines.length} rutinas creadas`}</p>
         </div>
-        <button onClick={() => setCreating(true)} className="bg-accent text-app font-semibold px-4 py-2 rounded-lg text-sm flex items-center gap-2"><Plus size={16} /> Nueva rutina</button>
+        <div className="flex items-center gap-2">
+          {routines.length > 0 && (
+            selectMode ? (
+              <button onClick={exitSelectMode} className="text-soft text-sm px-3 py-2">Cancelar</button>
+            ) : (
+              <button onClick={() => setSelectMode(true)} className="bg-field text-soft text-sm font-medium px-3 py-2 rounded-lg">Seleccionar</button>
+            )
+          )}
+          <button onClick={() => setCreating(true)} className="bg-accent text-app font-semibold px-4 py-2 rounded-lg text-sm flex items-center gap-2"><Plus size={16} /> Nueva rutina</button>
+        </div>
       </div>
 
+      {selectMode && (
+        <div className="flex items-center justify-between gap-3 flex-wrap bg-card rounded-xl px-4 py-3 mb-4">
+          <p className="text-soft text-sm">{selected.length === 0 ? "Marque las rutinas que quiere eliminar." : `${selected.length} ${selected.length === 1 ? "rutina marcada" : "rutinas marcadas"}.`}</p>
+          <div className="flex items-center gap-2">
+            <button onClick={() => setSelected(visible.map((r) => r.id))} className="text-accent text-xs">Marcar todas</button>
+            <button onClick={bulkDelete} disabled={selected.length === 0 || bulkDeleting} className="bg-danger text-app text-xs font-semibold rounded-lg px-3 py-2 flex items-center gap-1.5 disabled:opacity-40">
+              <Trash2 size={14} /> {bulkDeleting ? "Eliminando..." : `Eliminar${selected.length ? ` (${selected.length})` : ""}`}
+            </button>
+          </div>
+        </div>
+      )}
+
       <SearchInput value={routineSearch} onChange={setRoutineSearch} placeholder="Buscar rutina por nombre, nivel u objetivo..." className="mb-4 max-w-md" />
-      {routineSearch && routines.filter((r) => matchesSearch(routineSearch, r.title, r.level, r.goal)).length === 0 && (
+      {routineSearch && visible.length === 0 && (
         <p className="text-muted text-sm mb-4">No hay rutinas que coincidan con "{routineSearch}".</p>
       )}
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        {routines.filter((r) => matchesSearch(routineSearch, r.title, r.level, r.goal)).map((r) => (
-          <div key={r.id} className="bg-card rounded-xl p-4">
-            <div className="flex items-start justify-between mb-3">
-              <div>
-                <h3 className="text-ink font-medium">{r.title}</h3>
-                <p className="text-muted text-xs mt-0.5">{r.level} · {r.goal}</p>
+        {visible.map((r) => {
+          const busy = busyId === r.id;
+          const checked = selected.includes(r.id);
+          return (
+            <div
+              key={r.id}
+              className={`bg-card rounded-xl p-4 ${selectMode ? "cursor-pointer" : ""} ${checked ? "ring-1 ring-accent" : ""}`}
+              onClick={selectMode ? () => toggleSelected(r.id) : undefined}
+            >
+              <div className="flex items-start gap-3 mb-3">
+                {selectMode && (
+                  <span className={`w-5 h-5 rounded-md shrink-0 mt-0.5 flex items-center justify-center ${checked ? "bg-accent" : "border border-field-strong"}`}>
+                    {checked && <Check size={13} strokeWidth={3} className="text-app" />}
+                  </span>
+                )}
+                <div className="flex-1 min-w-0">
+                  <h3 className="text-ink font-medium truncate">{r.title}</h3>
+                  <p className="text-muted text-xs mt-0.5">{r.level}{r.goal ? ` · ${r.goal}` : ""}</p>
+                </div>
+                <span className="flex items-center gap-1 text-muted text-xs shrink-0"><Clock size={12} /> {r.duration_minutes} min</span>
               </div>
-              <span className="flex items-center gap-1 text-muted text-xs"><Clock size={12} /> {r.duration_minutes} min</span>
+
+              <div className="flex items-center justify-between gap-2 mb-3">
+                <span className="text-muted text-xs">{r.routine_blocks?.length ? `${r.routine_blocks.length} bloques · ` : ""}{r.routine_exercises?.length || 0} ejercicios</span>
+                {!selectMode && <button onClick={() => openDetail(r)} className="text-accent text-xs flex items-center gap-0.5 shrink-0">Ver detalle <ChevronRight size={13} /></button>}
+              </div>
+
+              {!selectMode && (
+                <div className="flex items-center gap-1.5 flex-wrap pt-3 border-t border-white/[0.05]">
+                  <button onClick={() => setAssignRoutine(r)} disabled={busy} className={quickBtn}><UserPlus size={13} /> Asignar</button>
+                  <button onClick={() => duplicateRoutine(r)} disabled={busy} className={quickBtn}><Copy size={13} /> Duplicar</button>
+                  <button onClick={() => pdfFromList(r)} disabled={busy} className={quickBtn}><Download size={13} /> PDF</button>
+                  <button onClick={() => deleteFromList(r)} disabled={busy} className={`${quickBtn} hover:text-danger ml-auto`}><Trash2 size={13} /> Eliminar</button>
+                </div>
+              )}
             </div>
-            <div className="flex items-center justify-between">
-              <span className="text-muted text-xs">{r.routine_blocks?.length ? `${r.routine_blocks.length} bloques · ` : ""}{r.routine_exercises?.length || 0} ejercicios</span>
-              <button onClick={() => openDetail(r)} className="text-accent text-xs flex items-center gap-0.5">Ver detalle <ChevronRight size={13} /></button>
-            </div>
-          </div>
-        ))}
+          );
+        })}
       </div>
+
+      {assignRoutine && <AssignRoutineModal routine={assignRoutine} onClose={() => setAssignRoutine(null)} />}
     </div>
   );
 }

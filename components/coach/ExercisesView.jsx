@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Pencil, Play, Plus, Trash2 } from "lucide-react";
+import { Copy, Pencil, Play, Plus, Trash2 } from "lucide-react";
 import { matchesSearch } from "@/lib/search";
 import { supabase } from "@/lib/supabaseClient";
 import { SearchInput } from "@/components/ui/Search";
@@ -49,6 +49,13 @@ export function ExercisesView() {
   const startEdit = (ex) => {
     setEditingId(ex.id);
     setForm({ name: ex.name, group: ex.muscle_group || "", videoUrl: ex.video_url || "" });
+    try { window.scrollTo({ top: 0, behavior: "smooth" }); } catch (e) { }
+  };
+
+  const duplicateExercise = async (ex) => {
+    const { error } = await supabase.from("exercises").insert({ name: `${ex.name} (copia)`, muscle_group: ex.muscle_group, video_url: ex.video_url });
+    if (error) return alert("No se pudo duplicar el ejercicio: " + error.message);
+    loadExercises();
   };
 
   const cancelEdit = () => {
@@ -96,7 +103,7 @@ export function ExercisesView() {
       <SearchInput value={exerciseSearch} onChange={setExerciseSearch} placeholder="Buscar ejercicio por nombre o grupo muscular..." className="mb-3 max-w-md" />
 
       <div className="bg-card rounded-xl overflow-hidden">
-        <div className="hidden md:grid grid-cols-[1fr_140px_1fr_70px] gap-2 px-4 py-2.5 text-muted text-xs border-b border-field">
+        <div className="hidden md:grid grid-cols-[1fr_140px_1fr_104px] gap-2 px-4 py-2.5 text-muted text-xs border-b border-field">
           <span>Nombre</span><span>Grupo</span><span>Video</span><span></span>
         </div>
         {loading ? (
@@ -104,7 +111,7 @@ export function ExercisesView() {
         ) : exercises.filter((ex) => matchesSearch(exerciseSearch, ex.name, ex.muscle_group)).length === 0 ? (
           <p className="text-muted text-sm px-4 py-4">{exerciseSearch ? `No hay ejercicios que coincidan con "${exerciseSearch}".` : "Todavía no hay ejercicios."}</p>
         ) : exercises.filter((ex) => matchesSearch(exerciseSearch, ex.name, ex.muscle_group)).map((ex) => (
-          <div key={ex.id} className="grid grid-cols-[1fr_auto] md:grid-cols-[1fr_140px_1fr_70px] gap-2 px-4 py-3 items-center border-b border-field last:border-0">
+          <div key={ex.id} className="grid grid-cols-[1fr_auto] md:grid-cols-[1fr_140px_1fr_104px] gap-2 px-4 py-3 items-center border-b border-field last:border-0">
             <span className="text-ink text-sm min-w-0">
               {ex.name}
               <span className="md:hidden block text-muted text-xs">{ex.muscle_group || "Sin grupo"} · {ex.video_url ? "Con video" : "Sin video"}</span>
@@ -112,8 +119,9 @@ export function ExercisesView() {
             <span className="hidden md:block text-soft text-xs">{ex.muscle_group}</span>
             {ex.video_url ? <span className="hidden md:flex text-accent text-xs items-center gap-1 truncate min-w-0"><Play size={11} /> <span className="truncate">{ex.video_url}</span></span> : <span className="hidden md:block text-muted text-xs italic">Sin video</span>}
             <div className="flex gap-1 md:gap-2 justify-end">
-              <button onClick={() => startEdit(ex)} className="text-muted hover:text-accent p-2 md:p-0"><Pencil size={14} /></button>
-              <button onClick={() => deleteExercise(ex)} className="text-muted hover:text-danger p-2 md:p-0"><Trash2 size={14} /></button>
+              <button onClick={() => startEdit(ex)} aria-label="Editar" className="text-muted hover:text-accent p-2 md:p-1"><Pencil size={14} /></button>
+              <button onClick={() => duplicateExercise(ex)} aria-label="Duplicar" className="text-muted hover:text-ink p-2 md:p-1"><Copy size={14} /></button>
+              <button onClick={() => deleteExercise(ex)} aria-label="Eliminar" className="text-muted hover:text-danger p-2 md:p-1"><Trash2 size={14} /></button>
             </div>
           </div>
         ))}
