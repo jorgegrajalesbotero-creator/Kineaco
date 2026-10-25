@@ -4,43 +4,22 @@ import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabaseClient";
 import { intakeHasAlert } from "@/lib/intake";
 import { matchesSearch } from "@/lib/search";
+import { ChevronRight, MessageCircle } from "lucide-react";
 import { SearchInput } from "@/components/ui/Search";
-import { AccessPanel } from "./AccessPanel";
-import { CheckinPanel } from "./CheckinPanel";
-import { ComparePanel } from "./ComparePanel";
-import { DaysPanel } from "./DaysPanel";
-import { MeasurementsPanel } from "./MeasurementsPanel";
-import { MessagesPanel } from "./MessagesPanel";
-import { NutritionPanel } from "./NutritionPanel";
-import { PhotosPanel } from "./PhotosPanel";
-import { PlanPanel } from "./PlanPanel";
+import { StudentDetail } from "./StudentDetail";
 import { planWeekOf } from "@/lib/trainingPlan";
 import { localDateString } from "@/lib/dates";
-import { ProgressionPanel } from "./ProgressionPanel";
 import { Skeleton } from "@/components/ui/Skeleton";
 
-const PANELS = {
-  checkin: CheckinPanel,
-  days: DaysPanel,
-  plan: PlanPanel,
-  compare: ComparePanel,
-  nutrition: NutritionPanel,
-  progression: ProgressionPanel,
-  photos: PhotosPanel,
-  access: AccessPanel,
-  messages: MessagesPanel,
-  measurements: MeasurementsPanel,
-};
-
-// Nombres que usan las notificaciones para abrir directamente una sección
+// Nombres que usan las notificaciones para abrir directamente una sección de la ficha
 const ACTION_TO_PANEL = { messages: "messages", progress: "compare", nutrition: "nutrition", access: "access", photos: "photos", progression: "progression", checkin: "checkin", measurements: "measurements" };
 
-// Lista de alumnos del coach; cada botón abre el detalle correspondiente
+// Lista de alumnos del coach; cada tarjeta abre la ficha del alumno
 export function StudentsView({ initialAction, onInitialActionDone }) {
   const [query, setQuery] = useState("");
   const [students, setStudents] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [panel, setPanel] = useState(null); // { type, student }
+  const [open, setOpen] = useState(null); // { student, initialPanel }
 
   async function loadData() {
     const [{ data: profiles }, { data: assignments }, { data: unreadMessages }, { data: intakeRows }, { data: painRows }, { data: planRows }, { data: dailyRows }] = await Promise.all([
@@ -86,18 +65,16 @@ export function StudentsView({ initialAction, onInitialActionDone }) {
 
   useEffect(() => { loadData(); }, []);
 
-  // Abrir una sección directamente desde una notificación o el reporte semanal
+  // Abrir la ficha (y una sección puntual) desde una notificación o el reporte semanal
   useEffect(() => {
     if (!initialAction || students.length === 0) return;
     const target = students.find((s) => s.id === initialAction.id);
-    const type = ACTION_TO_PANEL[initialAction.action];
-    if (target && type) setPanel({ type, student: target });
+    if (target) setOpen({ student: target, initialPanel: ACTION_TO_PANEL[initialAction.action] || null });
     onInitialActionDone?.();
   }, [initialAction, students]);
 
-  if (panel) {
-    const Panel = PANELS[panel.type];
-    return <Panel student={panel.student} onClose={() => setPanel(null)} onChanged={loadData} />;
+  if (open) {
+    return <StudentDetail student={open.student} initialPanel={open.initialPanel} onClose={() => setOpen(null)} onChanged={loadData} />;
   }
 
   const filtered = students.filter((s) => matchesSearch(query, s.name));
@@ -105,7 +82,7 @@ export function StudentsView({ initialAction, onInitialActionDone }) {
   return (
     <div className="p-4 md:p-8">
       <h2 className="text-ink text-xl font-semibold mb-1">Alumnos</h2>
-      <p className="text-muted text-sm mb-6">Asignales una rutina distinta para cada día de la semana.</p>
+      <p className="text-muted text-sm mb-6">Toque un alumno para abrir su ficha: entrenamiento, progreso, nutrición y más.</p>
 
       <SearchInput value={query} onChange={setQuery} placeholder="Buscar alumno..." className="mb-4 max-w-md" />
 
@@ -115,8 +92,12 @@ export function StudentsView({ initialAction, onInitialActionDone }) {
         <>
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
             {filtered.map((s) => (
-              <div key={s.id} className="bg-card rounded-xl p-4">
-                <div className="flex items-start justify-between gap-3 mb-3">
+              <div
+                key={s.id}
+                onClick={() => setOpen({ student: s, initialPanel: null })}
+                className="bg-card rounded-xl p-4 cursor-pointer active:scale-[0.99] transition-transform"
+              >
+                <div className="flex items-start justify-between gap-3">
                   <div className="min-w-0">
                     <p className="text-ink text-sm font-medium flex items-center gap-1.5 flex-wrap">
                       {s.name}
@@ -125,40 +106,32 @@ export function StudentsView({ initialAction, onInitialActionDone }) {
                       ) : s.intakeAlert ? (
                         <span className="text-[10px] text-danger bg-danger/10 rounded px-1.5 py-0.5">⚠ Ficha</span>
                       ) : null}
+                      {s.checkinAlert && <span className="text-[10px] text-danger bg-danger/10 rounded px-1.5 py-0.5">⚠ Dolor</span>}
                     </p>
                     <p className="text-muted text-xs mt-0.5">
                       {s.planLabel ? <span className="text-accent">{s.planLabel}</span> : `${s.daysAssigned} / 7 días con rutina`}
+                      {" · "}
+                      <span className={s.accessActive ? "text-accent" : "text-danger"}>{s.accessLabel}</span>
                     </p>
                   </div>
-                  <button onClick={() => setPanel({ type: "access", student: s })} className={`text-xs shrink-0 ${s.accessActive ? "text-accent" : "text-danger"}`}>{s.accessLabel}</button>
+                  <ChevronRight size={18} className="text-muted shrink-0 mt-0.5" />
                 </div>
-                <div className="grid grid-cols-3 gap-2 mb-2">
-                  <button onClick={() => setPanel({ type: "messages", student: s })} className="flex items-center justify-center gap-2 bg-field text-accent text-sm font-medium rounded-lg py-2.5">
-                    Mensajes
+                <div className="flex items-center gap-2 mt-3">
+                  <button
+                    onClick={(e) => { e.stopPropagation(); setOpen({ student: s, initialPanel: "messages" }); }}
+                    className="flex items-center justify-center gap-2 bg-field text-accent text-sm font-medium rounded-lg py-2 px-4"
+                  >
+                    <MessageCircle size={15} /> Mensajes
                     {s.unreadCount > 0 && (
                       <span className="bg-danger text-app text-[10px] font-semibold rounded-full min-w-4 h-4 px-1 flex items-center justify-center">{s.unreadCount}</span>
                     )}
                   </button>
-                  <button onClick={() => setPanel({ type: "checkin", student: s })} className="flex items-center justify-center gap-2 bg-field text-accent text-sm font-medium rounded-lg py-2.5">
-                    Check-in
-                    {s.checkinAlert && <span className="text-danger text-xs">⚠</span>}
+                  <button
+                    onClick={(e) => { e.stopPropagation(); setOpen({ student: s, initialPanel: null }); }}
+                    className="flex-1 bg-accent text-app text-sm font-semibold rounded-lg py-2"
+                  >
+                    Abrir ficha
                   </button>
-                  <button onClick={() => setPanel({ type: "measurements", student: s })} className="flex items-center justify-center gap-2 bg-field text-accent text-sm font-medium rounded-lg py-2.5">
-                    Medidas
-                  </button>
-                </div>
-                <div className="grid grid-cols-4 gap-2">
-                  {[
-                    ["Plan", "plan"],
-                    ["Días", "days"],
-                    ["Progreso", "compare"],
-                    ["Nutrición", "nutrition"],
-                    ["ATR", "progression"],
-                    ["Fotos", "photos"],
-                    ["Acceso", "access"],
-                  ].map(([label, type]) => (
-                    <button key={label} onClick={() => setPanel({ type, student: s })} className="bg-field text-soft text-xs rounded-lg py-2">{label}</button>
-                  ))}
                 </div>
               </div>
             ))}

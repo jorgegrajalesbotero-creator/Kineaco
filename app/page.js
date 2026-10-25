@@ -667,7 +667,7 @@ export default function App() {
   } else if (tab === "messages") {
     content = <MessagesScreen userId={userId} onMessagesRead={() => { setUnreadMessageCount(0); setNotifKey((k) => k + 1); }} />;
   } else if (tab === "progress") {
-    content = <ProgressScreen healthConsent={healthConsent} onOpenCheckin={() => setShowCheckin(true)} onOpenMeasure={() => setShowMeasure(true)} streak={streak} bestStreak={bestStreak} totalCompleted={totalCompleted} weekStats={weekStats} recentActivity={recentActivity} bodyWeightLogs={bodyWeightLogs} weightProgress={weightProgress} onAddWeight={addBodyWeight} onUpdateWeight={updateBodyWeight} onDeleteWeight={deleteBodyWeight} userId={userId} />;
+    content = <ProgressScreen healthConsent={healthConsent} onOpenCheckin={() => setShowCheckin(true)} onOpenMeasure={() => setShowMeasure(true)} streak={streak} bestStreak={bestStreak} totalCompleted={totalCompleted} weekStats={weekStats} recentActivity={recentActivity} bodyWeightLogs={bodyWeightLogs} weightProgress={weightProgress} onAddWeight={addBodyWeight} onUpdateWeight={updateBodyWeight} onDeleteWeight={deleteBodyWeight} userId={userId} fullName={fullName} />;
   } else {
     content = tab === "profile" ? (
       <ProfileScreen

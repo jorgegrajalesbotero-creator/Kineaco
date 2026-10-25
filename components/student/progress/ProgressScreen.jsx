@@ -1,8 +1,11 @@
 "use client";
 
 import { useState } from "react";
-import { Check, Flame, TrendingUp } from "lucide-react";
+import { Check, Download, Flame, TrendingUp } from "lucide-react";
 import { appLocale, tr } from "@/lib/i18n";
+import { supabase } from "@/lib/supabaseClient";
+import { downloadReportPdf } from "@/lib/planPdf";
+import { currentOrNextPlan, loadSchedule } from "@/lib/trainingPlan";
 import { CountUp } from "@/components/ui/CountUp";
 import { BadgesSection } from "@/components/student/progress/BadgesSection";
 import { BodyWeightSection } from "@/components/student/progress/BodyWeightSection";
@@ -11,9 +14,22 @@ import { MeasurementsSection } from "@/components/student/progress/MeasurementsS
 import { ProgressPhotosSection } from "@/components/student/progress/ProgressPhotosSection";
 import { WeightProgressChart } from "@/components/student/progress/WeightProgressChart";
 
-export function ProgressScreen({ streak, bestStreak, totalCompleted, weekStats, recentActivity, bodyWeightLogs, weightProgress, onAddWeight, onUpdateWeight, onDeleteWeight, userId, onOpenCheckin, onOpenMeasure, healthConsent = true }) {
+export function ProgressScreen({ streak, bestStreak, totalCompleted, weekStats, recentActivity, bodyWeightLogs, weightProgress, onAddWeight, onUpdateWeight, onDeleteWeight, userId, fullName, onOpenCheckin, onOpenMeasure, healthConsent = true }) {
   const maxCount = Math.max(1, ...weekStats.map((d) => d.count));
   const [selectedExerciseId, setSelectedExerciseId] = useState(null);
+  const [pdfBusy, setPdfBusy] = useState(false);
+
+  // Descargar todo el informe en PDF: progreso, medidas, nutrición y entrenamientos
+  const downloadReport = async () => {
+    setPdfBusy(true);
+    try {
+      const { plans, fixed } = await loadSchedule(supabase, userId, "id, title");
+      await downloadReportPdf({ supabase, userId, plan: currentOrNextPlan(plans), fixed, studentName: fullName, t: tr, locale: appLocale(), includeHealth: healthConsent });
+    } catch (e) {
+      alert(tr("No se pudo generar el PDF: ") + e.message);
+    }
+    setPdfBusy(false);
+  };
 
   const latest = bodyWeightLogs[0];
   const exerciseOptions = [];
@@ -41,7 +57,12 @@ export function ProgressScreen({ streak, bestStreak, totalCompleted, weekStats, 
 
   return (
     <div className="flex-1 overflow-y-auto px-5 pt-6 pb-4">
-      <h1 className="text-ink text-2xl font-semibold tracking-tight mb-6">{tr("Su progreso")}</h1>
+      <h1 className="text-ink text-2xl font-semibold tracking-tight mb-4">{tr("Su progreso")}</h1>
+
+      <button onClick={downloadReport} disabled={pdfBusy} className="w-full flex items-center justify-center gap-2 bg-accent text-app text-sm font-semibold rounded-2xl py-3 mb-2 disabled:opacity-60">
+        <Download size={16} /> {pdfBusy ? tr("Generando PDF...") : tr("Descargar todo en PDF")}
+      </button>
+      <p className="text-muted text-[11px] text-center mb-7">{tr("Incluye su progreso, medidas, nutrición y sus entrenamientos.")}</p>
 
       <div className="grid grid-cols-3 gap-2.5 mb-7">
         {[
