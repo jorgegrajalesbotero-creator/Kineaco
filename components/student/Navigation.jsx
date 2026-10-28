@@ -28,7 +28,7 @@ export function SideNav({ active, onSelect, unreadCount, fullName, avatarUrl, on
         </div>
       </div>
       <nav className="flex-1 px-3 py-4 space-y-1">
-        {STUDENT_NAV_ITEMS.map(({ key, label, icon: Icon }) => (
+        {STUDENT_NAV_ITEMS.filter((i) => !(isCoach && i.key === "messages")).map(({ key, label, icon: Icon }) => (
           <button
             key={key}
             onClick={() => onSelect(key)}
@@ -56,8 +56,8 @@ export function SideNav({ active, onSelect, unreadCount, fullName, avatarUrl, on
   );
 }
 
-export function BottomNav({ active, onSelect, unreadCount }) {
-  const items = STUDENT_NAV_ITEMS;
+export function BottomNav({ active, onSelect, unreadCount, isCoach }) {
+  const items = isCoach ? STUDENT_NAV_ITEMS.filter((i) => i.key !== "messages") : STUDENT_NAV_ITEMS;
   return (
     <nav className="pointer-events-auto mx-3 flex items-center gap-1 p-1.5 rounded-full bg-card/85 backdrop-blur-xl border border-white/[0.06] shadow-[0_10px_30px_rgba(0,0,0,0.5)]">
       {items.map(({ key, label, icon: Icon }) => {

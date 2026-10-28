@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabaseClient";
 import { intakeHasAlert } from "@/lib/intake";
 import { matchesSearch } from "@/lib/search";
-import { ChevronRight, MessageCircle } from "lucide-react";
+import { ChevronRight, Dumbbell, MessageCircle } from "lucide-react";
 import { SearchInput } from "@/components/ui/Search";
 import { StudentDetail } from "./StudentDetail";
 import { planWeekOf } from "@/lib/trainingPlan";
@@ -22,8 +22,10 @@ export function StudentsView({ initialAction, onInitialActionDone }) {
   const [open, setOpen] = useState(null); // { student, initialPanel }
 
   async function loadData() {
+    const { data: { user } } = await supabase.auth.getUser();
+    const myId = user?.id || "00000000-0000-0000-0000-000000000000";
     const [{ data: profiles }, { data: assignments }, { data: unreadMessages }, { data: intakeRows }, { data: painRows }, { data: planRows }, { data: dailyRows }] = await Promise.all([
-      supabase.from("profiles").select("id, full_name, access_until").eq("role", "alumno"),
+      supabase.from("profiles").select("id, full_name, access_until, role").or(`role.eq.alumno,id.eq.${myId}`),
       supabase.from("routine_assignments").select("user_id, day_label"),
       supabase.from("messages").select("user_id").eq("read_by_coach", false),
       supabase.from("intake_forms").select("user_id, current_injury, medical_restriction"),
@@ -43,15 +45,17 @@ export function StudentsView({ initialAction, onInitialActionDone }) {
         const until = p.access_until ? new Date(p.access_until) : null;
         const accessActive = !!(until && until > new Date());
         const activePlan = (planRows || []).find((pl) => pl.user_id === p.id && planWeekOf(pl, new Date()));
+        const isSelf = p.id === myId && p.role === "coach";
         return {
           id: p.id,
+          isSelf,
           name: p.full_name || "Sin nombre",
           daysAssigned: new Set(mine.map((a) => a.day_label)).size,
           accessUntil: p.access_until,
-          accessActive,
-          accessLabel: !until ? "Sin acceso" : accessActive ? `Hasta ${until.toLocaleDateString()}` : "Vencido",
+          accessActive: isSelf || accessActive,
+          accessLabel: isSelf ? "Coach" : !until ? "Sin acceso" : accessActive ? `Hasta ${until.toLocaleDateString()}` : "Vencido",
           unreadCount: unreadCounts[p.id] || 0,
-          hasIntake: !!intakeMap[p.id],
+          hasIntake: isSelf || !!intakeMap[p.id],
           intakeAlert: intakeHasAlert(intakeMap[p.id]),
           checkinAlert:
             (painRows || []).some((r) => r.user_id === p.id) ||
@@ -77,12 +81,31 @@ export function StudentsView({ initialAction, onInitialActionDone }) {
     return <StudentDetail student={open.student} initialPanel={open.initialPanel} onClose={() => setOpen(null)} onChanged={loadData} />;
   }
 
-  const filtered = students.filter((s) => matchesSearch(query, s.name));
+  const me = students.find((s) => s.isSelf);
+  const filtered = students.filter((s) => !s.isSelf && matchesSearch(query, s.name));
 
   return (
     <div className="p-4 md:p-8">
       <h2 className="text-ink text-xl font-semibold mb-1">Alumnos</h2>
       <p className="text-muted text-sm mb-6">Toque un alumno para abrir su ficha: entrenamiento, progreso, nutrición y más.</p>
+
+      {me && (
+        <div className="bg-card rounded-xl p-4 mb-6 border border-accent/25 lg:max-w-[calc(50%-0.375rem)]">
+          <p className="text-accent text-[11px] font-medium uppercase tracking-[0.14em] mb-1">Mi entrenamiento</p>
+          <p className="text-ink text-sm font-medium">{me.name}</p>
+          <p className="text-muted text-xs mt-0.5">
+            {me.planLabel ? <span className="text-accent">{me.planLabel}</span> : `${me.daysAssigned} / 7 días con rutina`} · No cuenta en el reporte ni en los anuncios
+          </p>
+          <div className="flex items-center gap-2 mt-3">
+            <a href="/" className="flex items-center justify-center gap-2 bg-field text-accent text-sm font-medium rounded-lg py-2 px-4">
+              <Dumbbell size={15} /> Entrenar
+            </a>
+            <button onClick={() => setOpen({ student: me, initialPanel: null })} className="flex-1 bg-accent text-app text-sm font-semibold rounded-lg py-2">
+              Planearme
+            </button>
+          </div>
+        </div>
+      )}
 
       <SearchInput value={query} onChange={setQuery} placeholder="Buscar alumno..." className="mb-4 max-w-md" />
 

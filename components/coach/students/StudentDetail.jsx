@@ -70,7 +70,7 @@ export function StudentDetail({ student, onClose, onChanged, initialPanel = null
           <ArrowLeft size={18} />
         </button>
         <div className="min-w-0">
-          <h2 className="text-ink text-xl font-semibold truncate">{student.name}</h2>
+          <h2 className="text-ink text-xl font-semibold truncate">{student.isSelf ? "Mi entrenamiento" : student.name}</h2>
           <p className="text-muted text-sm truncate">
             {student.planLabel || `${student.daysAssigned} / 7 días con rutina`} · <span className={student.accessActive ? "text-accent" : "text-danger"}>{student.accessLabel}</span>
           </p>
@@ -87,6 +87,12 @@ export function StudentDetail({ student, onClose, onChanged, initialPanel = null
 
       {/* Lo más usado */}
       <div className="grid grid-cols-2 gap-2.5 mb-6">
+        {student.isSelf ? (
+          <a href="/" className={tile}>
+            <span className="w-9 h-9 rounded-xl bg-accent/15 flex items-center justify-center"><Dumbbell size={17} className="text-accent" /></span>
+            <span className="text-ink text-sm font-medium">Entrenar (mi vista)</span>
+          </a>
+        ) : (
         <button onClick={() => setPanel("messages")} className={tile}>
           <span className="w-9 h-9 rounded-xl bg-accent/15 flex items-center justify-center"><MessageCircle size={17} className="text-accent" /></span>
           <span className="text-ink text-sm font-medium flex items-center gap-2">
@@ -94,6 +100,7 @@ export function StudentDetail({ student, onClose, onChanged, initialPanel = null
             {student.unreadCount > 0 && <span className="bg-danger text-app text-[10px] font-semibold rounded-full min-w-4 h-4 px-1 flex items-center justify-center">{student.unreadCount}</span>}
           </span>
         </button>
+        )}
         <button onClick={() => setPanel("plan")} className={tile}>
           <span className="w-9 h-9 rounded-xl bg-accent/15 flex items-center justify-center"><Calendar size={17} className="text-accent" /></span>
           <span className="text-ink text-sm font-medium">Entrenamiento</span>
@@ -108,7 +115,7 @@ export function StudentDetail({ student, onClose, onChanged, initialPanel = null
         </button>
       </div>
 
-      {GROUPS.map((g) => (
+      {GROUPS.filter((g) => !(student.isSelf && g.title === "Cuenta")).map((g) => (
         <div key={g.title} className="mb-5">
           <p className="text-muted text-[11px] font-medium uppercase tracking-[0.14em] mb-2">{g.title}</p>
           <div className="space-y-2">

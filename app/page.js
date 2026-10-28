@@ -763,7 +763,7 @@ export default function App() {
         )}
         {!accessBlocked && !needsConsent && (
           <div className="md:hidden absolute inset-x-0 bottom-[max(0.75rem,calc(env(safe-area-inset-bottom)-0.5rem))] z-40 pointer-events-none">
-            <BottomNav active={tab} onSelect={selectTab} unreadCount={unreadMessageCount} />
+            <BottomNav active={tab} onSelect={selectTab} unreadCount={unreadMessageCount} isCoach={isCoach} />
           </div>
         )}
       </div>

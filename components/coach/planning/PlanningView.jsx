@@ -216,8 +216,10 @@ export default function PlanningView({ onOpenProgression }) {
 
   async function loadData() {
     setLoading(true);
+    const { data: { user } } = await supabase.auth.getUser();
+    const myId = user?.id || "00000000-0000-0000-0000-000000000000";
     const [{ data: profiles }, { data: planRows }, { data: templateRows }] = await Promise.all([
-      supabase.from("profiles").select("id, full_name").eq("role", "alumno"),
+      supabase.from("profiles").select("id, full_name, role").or(`role.eq.alumno,id.eq.${myId}`),
       supabase.from("student_plans").select("id, user_id, name, start_date, student_plan_phases(phase_type, name, weeks, order_index)"),
       supabase.from("plan_templates").select("id, name, created_at, plan_template_phases(phase_type, name, weeks, order_index)").order("created_at", { ascending: true }),
     ]);
@@ -225,7 +227,13 @@ export default function PlanningView({ onOpenProgression }) {
     (planRows || []).forEach((p) => {
       map[p.user_id] = { id: p.id, user_id: p.user_id, name: p.name, start_date: p.start_date, phases: sortPhases(p.student_plan_phases) };
     });
-    setStudents((profiles || []).map((p) => ({ id: p.id, name: p.full_name || "Sin nombre" })).sort((a, b) => a.name.localeCompare(b.name)));
+    // El coach también se puede planear: aparece primero como "Yo"
+    const isMe = (p) => p.id === myId && p.role === "coach";
+    setStudents(
+      (profiles || [])
+        .map((p) => ({ id: p.id, name: isMe(p) ? `Yo (${p.full_name || "coach"})` : p.full_name || "Sin nombre", isSelf: isMe(p) }))
+        .sort((a, b) => (a.isSelf ? -1 : b.isSelf ? 1 : a.name.localeCompare(b.name)))
+    );
     setPlans(map);
     setTemplates((templateRows || []).map((t) => ({ id: t.id, name: t.name, phases: sortPhases(t.plan_template_phases) })));
     setLoading(false);

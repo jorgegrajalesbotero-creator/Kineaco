@@ -36,7 +36,7 @@ export function Sidebar({ active, onSelect, email, fullName, onLogout, bell }) {
       </nav>
       <div className="px-3 pb-[max(1rem,env(safe-area-inset-bottom))] space-y-1">
         <a href="/" className="block w-full text-left px-3 py-2.5 rounded-lg text-sm text-accent bg-card hover:bg-field">
-          Ver como alumno
+          Mi entrenamiento (vista de alumno)
         </a>
         <button onClick={onLogout} className="w-full text-left px-3 py-2.5 rounded-lg text-sm text-danger hover:bg-card/60">
           Cerrar sesión
