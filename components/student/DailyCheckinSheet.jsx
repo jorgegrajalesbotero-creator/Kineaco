@@ -47,7 +47,7 @@ export function DailyCheckinSheet({ userId, healthConsent = true, onDone }) {
     };
     const { error: e } = await supabase.from("daily_checkins").upsert(row, { onConflict: "user_id,check_date" });
     setSaving(false);
-    if (e) return setError(tr("No se pudo guardar: ") + e.message);
+    if (e) return setError(tr("No se pudo guardar: "));
     remember();
     onDone();
   };

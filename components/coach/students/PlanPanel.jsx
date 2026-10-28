@@ -99,12 +99,12 @@ export function PlanPanel({ student, onClose }) {
     let planId = editing.id;
     if (planId) {
       const { error } = await supabase.from("training_plans").update(row).eq("id", planId);
-      if (error) { setSaving(false); return alert("No se pudo guardar el plan: " + error.message); }
+      if (error) { setSaving(false); return alert("No se pudo guardar el plan: "); }
       const { error: delErr } = await supabase.from("training_plan_days").delete().eq("plan_id", planId);
-      if (delErr) { setSaving(false); return alert("No se pudieron actualizar los días: " + delErr.message); }
+      if (delErr) { setSaving(false); return alert("No se pudieron actualizar los días: "); }
     } else {
       const { data, error } = await supabase.from("training_plans").insert(row).select("id").single();
-      if (error || !data) { setSaving(false); return alert("No se pudo crear el plan: " + (error?.message || "")); }
+      if (error || !data) { setSaving(false); return alert("No se pudo crear el plan."); }
       planId = data.id;
     }
     const rows = [];
@@ -115,7 +115,7 @@ export function PlanPanel({ student, onClose }) {
     });
     if (rows.length > 0) {
       const { error } = await supabase.from("training_plan_days").insert(rows);
-      if (error) { setSaving(false); return alert("El plan se guardó, pero hubo un error con los días: " + error.message); }
+      if (error) { setSaving(false); return alert("El plan se guardó, pero hubo un error con los días: "); }
     }
     setSaving(false);
     setEditing(null);
@@ -125,7 +125,7 @@ export function PlanPanel({ student, onClose }) {
   const remove = async (plan) => {
     if (!confirm(`¿Eliminar el plan del ${fmtDay(planStart(plan))} al ${fmtDay(planLastDay(plan), true)}? El alumno vuelve a ver sus días fijos en esas fechas. Su historial de entrenamientos se conserva.`)) return;
     const { error } = await supabase.from("training_plans").delete().eq("id", plan.id);
-    if (error) return alert("No se pudo eliminar: " + error.message);
+    if (error) return alert("No se pudo eliminar: ");
     load();
   };
 
@@ -134,7 +134,7 @@ export function PlanPanel({ student, onClose }) {
     try {
       await downloadPlanPdf({ supabase, userId: student.id, plan, studentName: student.name });
     } catch (e) {
-      alert("No se pudo generar el PDF: " + e.message);
+      alert("No se pudo generar el PDF: ");
     }
     setPdfBusy(null);
   };

@@ -9,6 +9,7 @@ import { fetchAllRows } from "@/lib/fetchAll";
 import { appLocale, dayLetters, detectLang, rememberLang, setLang, tr } from "@/lib/i18n";
 import { NotificationBell, addNotifications } from "@/lib/notifications";
 import { supabase } from "@/lib/supabaseClient";
+import { signedAvatarUrl } from "@/lib/avatars";
 import { HomeScreen } from "@/components/student/HomeScreen";
 import { IntakeScreen } from "@/components/student/IntakeScreen";
 import { CheckinScreen } from "@/components/student/CheckinScreen";
@@ -83,7 +84,7 @@ export default function App() {
     if (!kg) return;
     const { error } = await supabase.from("body_weight_logs").insert({ user_id: userId, weight_kg: Number(kg) });
     if (error) {
-      alert(tr("No se pudo guardar el peso: ") + error.message);
+      alert(tr("No se pudo guardar el peso: "));
       return;
     }
     loadBodyWeight(userId);
@@ -91,13 +92,13 @@ export default function App() {
 
   const updateBodyWeight = async (id, kg) => {
     const { error } = await supabase.from("body_weight_logs").update({ weight_kg: Number(kg) }).eq("id", id);
-    if (error) alert(tr("No se pudo guardar el peso: ") + error.message);
+    if (error) alert(tr("No se pudo guardar el peso: "));
     loadBodyWeight(userId);
   };
 
   const deleteBodyWeight = async (id) => {
     const { error } = await supabase.from("body_weight_logs").delete().eq("id", id);
-    if (error) alert(tr("No se pudo borrar: ") + error.message);
+    if (error) alert(tr("No se pudo borrar: "));
     loadBodyWeight(userId);
   };
 
@@ -524,7 +525,7 @@ export default function App() {
         setLangState(langRow.language);
         rememberLang(langRow.language);
       }
-      setAvatarUrl(profile?.avatar_url || "");
+      setAvatarUrl(await signedAvatarUrl(profile?.avatar_url));
       setUserEmail(user?.email || "");
 
       let healthOk = true;

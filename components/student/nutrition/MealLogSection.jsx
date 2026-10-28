@@ -104,7 +104,7 @@ export function MealLogSection({ userId }) {
       : await supabase.from("meal_logs").insert({ ...values, user_id: userId, log_date: selectedDate, meal_type: formType });
     setSavingMeal(false);
     if (error) {
-      alert(tr("No se pudo guardar la comida: ") + error.message);
+      alert(tr("No se pudo guardar la comida: "));
       return;
     }
     closeForm();
@@ -115,7 +115,7 @@ export function MealLogSection({ userId }) {
     if (!window.confirm(tr("¿Borrar \"{p0}\"?", { p0: meal.description }))) return;
     const { error } = await supabase.from("meal_logs").delete().eq("id", meal.id);
     if (error) {
-      alert(tr("No se pudo borrar: ") + error.message);
+      alert(tr("No se pudo borrar: "));
       return;
     }
     if (editingId === meal.id) closeForm();

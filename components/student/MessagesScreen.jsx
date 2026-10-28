@@ -62,7 +62,7 @@ export function MessagesScreen({ userId, onMessagesRead }) {
     });
     setSending(false);
     if (error) {
-      alert(tr("No se pudo enviar el mensaje: ") + error.message);
+      alert(tr("No se pudo enviar el mensaje: "));
       return;
     }
     setNewMessage("");

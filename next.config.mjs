@@ -8,6 +8,12 @@ const supabaseHost = supabaseUrl.replace(/^https?:\/\//, "").replace(/\/$/, "");
 
 // Política de contenido: el navegador solo carga scripts, imágenes y conexiones
 // desde la propia app y desde Supabase. Bloquea código inyectado desde otros sitios.
+//
+// SEG-M6 (riesgo aceptado): se mantiene 'unsafe-inline' en script-src. Quitarlo
+// exigiría nonces por petición (middleware), lo que forzaría render dinámico y
+// perdería el prerender estático actual. Dado que no hay vector XSS en la app
+// (sin dangerouslySetInnerHTML/innerHTML/eval; React escapa el contenido), el
+// riesgo real es bajo. Revisar si en el futuro se añade HTML dinámico de usuario.
 const contentSecurityPolicy = [
   "default-src 'self'",
   `script-src 'self' 'unsafe-inline'${isDev ? " 'unsafe-eval'" : ""}`,

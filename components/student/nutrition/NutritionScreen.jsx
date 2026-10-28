@@ -57,9 +57,11 @@ export function NutritionScreen({ userId, onFirstRoutineAssigned }) {
   const bmr = gender === "hombre"
     ? 10 * (Number(weight) || 0) + 6.25 * (Number(height) || 0) - 5 * (Number(age) || 0) + 5
     : 10 * (Number(weight) || 0) + 6.25 * (Number(height) || 0) - 5 * (Number(age) || 0) - 161;
-  const factor = ACTIVITY_LEVELS.find((a) => a.key === activity).factor;
+  // Fallbacks por si `activity`/`goal` traen un valor no contemplado (datos legados o enum
+  // ampliado): sin ellos, find() devolvería undefined y la pantalla crashearía en el render.
+  const factor = (ACTIVITY_LEVELS.find((a) => a.key === activity) ?? ACTIVITY_LEVELS[0]).factor;
   const tdee = bmr * factor;
-  const goalObj = GOALS.find((g) => g.key === goal);
+  const goalObj = GOALS.find((g) => g.key === goal) ?? GOALS[1]; // por defecto: mantener
   const target = Math.round(tdee * (1 + goalObj.pct));
   const protein = Math.round((Number(weight) || 0) * 2);
 
@@ -84,7 +86,7 @@ export function NutritionScreen({ userId, onFirstRoutineAssigned }) {
     );
     setSaving(false);
     if (error) {
-      alert(tr("No se pudo guardar: ") + error.message);
+      alert(tr("No se pudo guardar: "));
       return;
     }
 

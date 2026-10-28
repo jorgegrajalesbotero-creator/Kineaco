@@ -7,6 +7,7 @@ import { currentWeekStartISO } from "@/lib/dates";
 import { appLocale, tr } from "@/lib/i18n";
 import { downloadRoutinePdf } from "@/lib/planPdf";
 import { supabase } from "@/lib/supabaseClient";
+import { safeHttpUrl } from "@/lib/url";
 import { Confetti } from "@/components/ui/Confetti";
 import { RestTimer } from "@/components/student/RestTimer";
 import { SetLogger } from "@/components/student/SetLogger";
@@ -23,7 +24,7 @@ export function RoutineScreen({ routine, userId, onClose, onToggle, onProgressCh
       const ids = (routine.parts || [routine]).map((p) => p.id);
       await downloadRoutinePdf({ supabase, routineIds: ids, dayTitle: tr(routine.day_label), t: tr, locale: appLocale() });
     } catch (e) {
-      alert(tr("No se pudo generar el PDF: ") + e.message);
+      alert(tr("No se pudo generar el PDF: "));
     }
     setPdfBusy(false);
   };
@@ -54,7 +55,7 @@ export function RoutineScreen({ routine, userId, onClose, onToggle, onProgressCh
       weight_kg: bestWeight,
     });
     if (error) {
-      alert(tr("No se pudo guardar su progreso: ") + error.message);
+      alert(tr("No se pudo guardar su progreso: "));
       onToggle(i, false);
     } else {
       onProgressChange();
@@ -75,7 +76,7 @@ export function RoutineScreen({ routine, userId, onClose, onToggle, onProgressCh
     deleteQuery = ex.byItem && ex.itemKey ? deleteQuery.eq("item_key", ex.itemKey) : deleteQuery.eq("exercise_id", ex.exerciseId);
     const { error } = await deleteQuery;
     if (error) {
-      alert(tr("No se pudo actualizar su progreso: ") + error.message);
+      alert(tr("No se pudo actualizar su progreso: "));
       onToggle(i, true);
     } else {
       onProgressChange();
@@ -222,8 +223,8 @@ export function RoutineScreen({ routine, userId, onClose, onToggle, onProgressCh
             {detail.restMinutes != null && (
               <p className="text-soft text-sm mb-4">{tr("Descanso:")} {detail.restMinutes} {tr("min")}</p>
             )}
-            {detail.videoUrl ? (
-              <a href={detail.videoUrl} target="_blank" rel="noopener noreferrer" className="flex items-center justify-center gap-2 bg-accent text-app font-semibold py-3 rounded-xl">
+            {safeHttpUrl(detail.videoUrl) ? (
+              <a href={safeHttpUrl(detail.videoUrl)} target="_blank" rel="noopener noreferrer" className="flex items-center justify-center gap-2 bg-accent text-app font-semibold py-3 rounded-xl">
                 <Play size={16} fill="#0F1512" /> {tr("Ver video")}
               </a>
             ) : (

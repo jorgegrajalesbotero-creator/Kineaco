@@ -59,7 +59,9 @@ export function MeasurementWizard({ userId, onClose, t = plain, coachMode = fals
       setLoading(false);
     }
     load();
-  }, [userId]);
+    // Incluimos `date` para recargar el borrador cuando el coach cambia la fecha;
+    // sin esto se conservaban valores de otra fecha y el upsert borraba las medidas previas.
+  }, [userId, date]);
 
   const set = (k, v) => setDraft((d) => ({ ...d, [k]: v }));
 
@@ -120,7 +122,7 @@ export function MeasurementWizard({ userId, onClose, t = plain, coachMode = fals
     const { error: err } = await supabase.from("body_measurements").upsert(row, { onConflict: "user_id,measured_on" });
     if (err) {
       setSaving(false);
-      return setError(t("No se pudieron guardar las medidas: ") + err.message);
+      return setError(t("No se pudieron guardar las medidas: "));
     }
     // El peso pasa solo al historial de peso corporal del alumno (lo hace la base de datos)
     setSaving(false);

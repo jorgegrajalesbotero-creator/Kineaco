@@ -69,7 +69,7 @@ export function MessagesPanel({ student, onClose, onChanged }) {
       read_by_alumno: false,
     });
     setSendingMessage(false);
-    if (error) return alert("No se pudo enviar el mensaje: " + error.message);
+    if (error) return alert("No se pudo enviar el mensaje: ");
     setNewMessage("");
     loadMessages(messageTopic);
   };

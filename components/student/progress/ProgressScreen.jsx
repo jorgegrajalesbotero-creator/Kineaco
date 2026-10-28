@@ -26,7 +26,7 @@ export function ProgressScreen({ streak, bestStreak, totalCompleted, weekStats, 
       const { plans, fixed } = await loadSchedule(supabase, userId, "id, title");
       await downloadReportPdf({ supabase, userId, plan: currentOrNextPlan(plans), fixed, studentName: fullName, t: tr, locale: appLocale(), includeHealth: healthConsent });
     } catch (e) {
-      alert(tr("No se pudo generar el PDF: ") + e.message);
+      alert(tr("No se pudo generar el PDF: "));
     }
     setPdfBusy(false);
   };

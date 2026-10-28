@@ -10,6 +10,9 @@ export function formatShortDate(date) {
 export function WeightProgressChart({ points }) {
   const [hoverIdx, setHoverIdx] = useState(null);
 
+  // Defensa: sin puntos, Math.min(...[]) e points[0] romperían el render.
+  if (!points?.length) return null;
+
   const width = 300;
   const height = 140;
   const padX = 14;

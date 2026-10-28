@@ -40,7 +40,7 @@ export function AssignRoutineModal({ routine, onClose }) {
     const rows = days.map((d) => ({ user_id: studentId, routine_id: routine.id, day_label: d, order_index: (maxByDay[d] ?? -1) + 1 }));
     const { error } = await supabase.from("routine_assignments").insert(rows);
     setSaving(false);
-    if (error) return alert("No se pudo asignar: " + error.message);
+    if (error) return alert("No se pudo asignar: ");
     setDone(true);
   };
 

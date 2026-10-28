@@ -40,7 +40,7 @@ export function AccessPanel({ student, onClose, onChanged }) {
       .update({ access_until: until ? until.toISOString() : null })
       .eq("id", student.id);
     setSavingAccess(false);
-    if (error) return alert("No se pudo guardar el acceso: " + error.message);
+    if (error) return alert("No se pudo guardar el acceso: ");
     onChanged?.();
     onClose();
   };

@@ -21,7 +21,7 @@ export function ConsentScreen({ userId, onAccepted, onSignOut }) {
     const record = { ...consentRecord(consent, getLang()), user_id: userId };
     const { error: dbError } = await supabase.from("legal_consents").insert(record);
     setSaving(false);
-    if (dbError) return setError(tr("No se pudo guardar: ") + dbError.message);
+    if (dbError) return setError(tr("No se pudo guardar: "));
     onAccepted(record.health_data_consent);
   };
 

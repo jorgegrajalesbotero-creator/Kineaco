@@ -96,7 +96,7 @@ export function ProgressionPanel({ student, onClose }) {
       .select()
       .single();
     setSavingProgression(false);
-    if (error) return alert("Error al crear la progresión: " + error.message);
+    if (error) return alert("Error al crear la progresión: ");
     setProgression(data);
     setEditingWeek(1);
   };
@@ -128,7 +128,7 @@ export function ProgressionPanel({ student, onClose }) {
       .update({ current_week: week, updated_at: new Date().toISOString() })
       .eq("id", progression.id);
     setSavingProgression(false);
-    if (error) return alert("No se pudo cambiar la semana: " + error.message);
+    if (error) return alert("No se pudo cambiar la semana: ");
     setProgression((p) => ({ ...p, current_week: week }));
   };
 
@@ -164,7 +164,7 @@ export function ProgressionPanel({ student, onClose }) {
 
     if (rows.length > 0) {
       const { error } = await supabase.from("load_progression_items").insert(rows);
-      if (error) alert("Error al guardar la semana: " + error.message);
+      if (error) alert("Error al guardar la semana: ");
     }
     setSavingProgression(false);
   };
@@ -175,7 +175,7 @@ export function ProgressionPanel({ student, onClose }) {
     setSavingProgression(true);
     const { error } = await supabase.from("load_progressions").delete().eq("id", progression.id);
     setSavingProgression(false);
-    if (error) return alert("No se pudo eliminar la progresión: " + error.message);
+    if (error) return alert("No se pudo eliminar la progresión: ");
     onClose();
   };
 

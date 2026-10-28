@@ -77,14 +77,14 @@ export function ProgramsView() {
       .single();
 
     if (error || !upserted) {
-      alert("Error al guardar el programa: " + error?.message);
+      alert("Error al guardar el programa.");
       setSaving(false);
       return;
     }
 
     const { error: delDaysErr } = await supabase.from("program_days").delete().eq("program_id", upserted.id);
     if (delDaysErr) {
-      alert("Error al guardar los días del programa: " + delDaysErr.message);
+      alert("Error al guardar los días del programa: ");
       setSaving(false);
       return;
     }
@@ -101,7 +101,7 @@ export function ProgramsView() {
     if (rows.length > 0) {
       const { error: insDaysErr } = await supabase.from("program_days").insert(rows);
       if (insDaysErr) {
-        alert("Error al guardar los días del programa: " + insDaysErr.message);
+        alert("Error al guardar los días del programa: ");
         setSaving(false);
         loadAll();
         return;
