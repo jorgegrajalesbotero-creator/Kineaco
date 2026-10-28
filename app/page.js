@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { computeBadges, loadBadgeData } from "@/lib/badges";
 import { blockUsesProgression } from "@/lib/blocks";
 import { WEEK_DAYS, currentWeekStartISO, localDateString, todayDayLabel } from "@/lib/dates";
@@ -503,14 +503,22 @@ export default function App() {
     setRecentActivity(data || []);
   };
 
+  const loadedDayRef = useRef(null);
+  const uidRef = useRef(null);
+  const [routineReady, setRoutineReady] = useState(false);
+
+  // Arranque: se ejecuta UNA sola vez al montar. Antes, con deps [selectedDay],
+  // se repetía TODO (auth, perfil, consentimientos, nutrición, mensajes, avisos)
+  // cada vez que el alumno cambiaba de día (BUG-B5).
   useEffect(() => {
-    async function loadData() {
+    async function bootstrap() {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) {
         window.location.href = "/login";
         return;
       }
 
+      uidRef.current = user.id;
       setUserId(user.id);
 
       const { data: profile } = await supabase
@@ -562,9 +570,15 @@ export default function App() {
         return;
       }
 
-      const todayRoutine = await buildDay(user.id, selectedDay);
+      // Rutina del día actual (al montar, el día seleccionado es hoy).
+      const today = todayDayLabel();
+      const todayRoutine = await buildDay(user.id, today);
       setRoutine(todayRoutine);
+      loadedDayRef.current = today;
+      setLoadingRoutine(false);
+
       if (profile?.role !== "coach") {
+        // Los avisos usan SIEMPRE la rutina de hoy, no la del día que se esté mirando.
         createStudentNotices(user.id, profile, todayRoutine, healthOk).catch(() => { });
       }
 
@@ -584,11 +598,20 @@ export default function App() {
       setUnreadMessageCount((unreadMsgs || []).length);
       loadBodyWeight(user.id);
       loadWeightProgress(user.id);
-      setLoadingRoutine(false);
+
+      setRoutineReady(true);
     }
 
-    loadData();
-  }, [selectedDay]);
+    bootstrap();
+  }, []);
+
+  // Recarga SOLO la rutina cuando cambia el día seleccionado (sin repetir el arranque).
+  useEffect(() => {
+    if (!routineReady || accessBlocked) return;
+    if (loadedDayRef.current === selectedDay) return; // ya cargada (incluida la de hoy al montar)
+    loadedDayRef.current = selectedDay;
+    refreshRoutine(uidRef.current, selectedDay);
+  }, [routineReady, selectedDay, accessBlocked]);
   const handleSelectTab = (key) => {
     setShowRoutine(false);
     setShowCheckin(false);
