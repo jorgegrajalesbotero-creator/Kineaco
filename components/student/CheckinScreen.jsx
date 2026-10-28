@@ -101,7 +101,7 @@ export function CheckinScreen({ userId, onClose, healthConsent = true }) {
       ? await supabase.from("weekly_checkins").update(values).eq("id", existing.id)
       : await supabase.from("weekly_checkins").insert(values);
     setSaving(false);
-    if (err) return setError(tr("No se pudo guardar el check-in: ") + err.message);
+    if (err) return setError(tr("No se pudo guardar el check-in: "));
     // El peso del check-in pasa solo a su historial de peso corporal (lo hace la base de datos)
     onClose(true);
   };

@@ -40,7 +40,7 @@ export function ExercisesView() {
         video_url: form.videoUrl,
       }));
     }
-    if (error) return alert("No se pudo guardar el ejercicio: " + error.message);
+    if (error) return alert("No se pudo guardar el ejercicio: ");
     setEditingId(null);
     setForm({ name: "", group: "", videoUrl: "" });
     loadExercises();
@@ -54,7 +54,7 @@ export function ExercisesView() {
 
   const duplicateExercise = async (ex) => {
     const { error } = await supabase.from("exercises").insert({ name: `${ex.name} (copia)`, muscle_group: ex.muscle_group, video_url: ex.video_url });
-    if (error) return alert("No se pudo duplicar el ejercicio: " + error.message);
+    if (error) return alert("No se pudo duplicar el ejercicio: ");
     loadExercises();
   };
 
@@ -75,7 +75,7 @@ export function ExercisesView() {
       alert(
         error.code === "23503"
           ? "No se pudo eliminar: el ejercicio todavía está conectado al historial de entrenamientos. Falta correr el SQL de arreglo en Supabase."
-          : "No se pudo eliminar el ejercicio: " + error.message
+          : "No se pudo eliminar el ejercicio: "
       );
       return;
     }

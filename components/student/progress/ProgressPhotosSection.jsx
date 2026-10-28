@@ -105,7 +105,7 @@ export function ProgressPhotosSection({ userId, latestWeight }) {
         .single();
       if (error) {
         setSaving(false);
-        alert(tr("No se pudo crear el registro: ") + error.message);
+        alert(tr("No se pudo crear el registro: "));
         return;
       }
       setId = created.id;
@@ -126,7 +126,7 @@ export function ProgressPhotosSection({ userId, latestWeight }) {
         .from("progress-photos")
         .upload(path, blob, { contentType: "image/jpeg" });
       if (upErr) {
-        alert(tr("No se pudo subir la foto de {p0}: ", { p0: angle }) + upErr.message);
+        alert(tr("No se pudo subir la foto de {p0}: ", { p0: angle }));
         continue;
       }
       const { error: rowErr } = await supabase
@@ -134,7 +134,7 @@ export function ProgressPhotosSection({ userId, latestWeight }) {
         .insert({ set_id: setId, user_id: userId, angle, storage_path: path });
       if (rowErr) {
         await supabase.storage.from("progress-photos").remove([path]);
-        alert(tr("No se pudo guardar la foto de {p0}: ", { p0: angle }) + rowErr.message);
+        alert(tr("No se pudo guardar la foto de {p0}: ", { p0: angle }));
         continue;
       }
       uploaded++;
@@ -157,14 +157,14 @@ export function ProgressPhotosSection({ userId, latestWeight }) {
       const { error: rmErr } = await supabase.storage.from("progress-photos").remove(paths);
       if (rmErr) {
         setDeletingId(null);
-        alert(tr("No se pudieron borrar las fotos: ") + rmErr.message);
+        alert(tr("No se pudieron borrar las fotos: "));
         return;
       }
     }
     const { error } = await supabase.from("progress_photo_sets").delete().eq("id", set.id);
     setDeletingId(null);
     if (error) {
-      alert(tr("No se pudo borrar el registro: ") + error.message);
+      alert(tr("No se pudo borrar el registro: "));
       return;
     }
     loadPhotos();

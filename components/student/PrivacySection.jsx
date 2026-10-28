@@ -32,7 +32,7 @@ export function PrivacySection({ userId, healthConsent, onHealthChange }) {
     const { id, created_at, user_email, ...rest } = last;
     const { error: e } = await supabase.from("legal_consents").insert({ ...rest, health_data_consent: next, user_agent: navigator.userAgent.slice(0, 300) });
     setBusy(false);
-    if (e) return alert(tr("No se pudo guardar: ") + e.message);
+    if (e) return alert(tr("No se pudo guardar: "));
     onHealthChange(next);
   };
 
@@ -49,7 +49,7 @@ export function PrivacySection({ userId, healthConsent, onHealthChange }) {
     const { error: e } = await supabase.rpc("delete_my_account");
     if (e) {
       setBusy(false);
-      return setError(tr("No se pudo eliminar la cuenta: ") + e.message);
+      return setError(tr("No se pudo eliminar la cuenta: "));
     }
     await supabase.auth.signOut();
     window.location.href = "/login?eliminada=1";

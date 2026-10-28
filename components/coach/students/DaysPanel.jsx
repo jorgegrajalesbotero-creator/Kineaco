@@ -72,7 +72,7 @@ export function DaysPanel({ student, onClose, onChanged }) {
         .insert(list.map((routineId, i) => ({ user_id: student.id, routine_id: routineId, day_label: day, order_index: i })));
       insError = error;
     }
-    if (delError || insError) alert("No se pudo guardar el día: " + (delError || insError).message);
+    if (delError || insError) alert("No se pudo guardar el día.");
 
     setSavingDay("");
     onChanged?.();
@@ -88,7 +88,7 @@ export function DaysPanel({ student, onClose, onChanged }) {
           .from("student_exercise_weights")
           .upsert({ user_id: student.id, exercise_id: exerciseId, target_weight_kg: weight }, { onConflict: "user_id,exercise_id" });
     setSavingWeightId("");
-    if (error) return alert("No se pudo guardar el peso personalizado: " + error.message);
+    if (error) return alert("No se pudo guardar el peso personalizado: ");
     setCustomWeights((m) => ({ ...m, [exerciseId]: weight }));
   };
 

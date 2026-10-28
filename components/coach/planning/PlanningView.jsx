@@ -256,16 +256,16 @@ export default function PlanningView({ onOpenProgression }) {
     let id = editingTemplate.id;
     if (id) {
       const { error } = await supabase.from("plan_templates").update({ name: editingTemplate.name.trim() }).eq("id", id);
-      if (error) { setSaving(false); return alert("Error al guardar: " + error.message); }
+      if (error) { setSaving(false); return alert("Error al guardar: "); }
       await supabase.from("plan_template_phases").delete().eq("template_id", id);
     } else {
       const { data, error } = await supabase.from("plan_templates").insert({ name: editingTemplate.name.trim() }).select("id").single();
-      if (error) { setSaving(false); return alert("Error al guardar: " + error.message); }
+      if (error) { setSaving(false); return alert("Error al guardar: "); }
       id = data.id;
     }
     const { error: phErr } = await supabase.from("plan_template_phases").insert(phases.map((p) => ({ ...p, template_id: id })));
     setSaving(false);
-    if (phErr) return alert("Error al guardar las fases: " + phErr.message);
+    if (phErr) return alert("Error al guardar las fases: ");
     setEditingTemplate(null);
     loadData();
   };
@@ -296,10 +296,10 @@ export default function PlanningView({ onOpenProgression }) {
       .insert({ user_id: selectedStudentId, name: template?.name || null, start_date: newPlanStart })
       .select("id")
       .single();
-    if (error) { setSaving(false); return alert("Error al crear el plan: " + error.message); }
+    if (error) { setSaving(false); return alert("Error al crear el plan: "); }
     const phErr = await writePlanPhases(data.id, phases);
     setSaving(false);
-    if (phErr) alert("Error al guardar las fases: " + phErr.message);
+    if (phErr) alert("Error al guardar las fases: ");
     await loadData();
     if (!template) {
       setEditingPlan({ name: "", start_date: newPlanStart, phases: toEditablePhases(phases) });
@@ -316,10 +316,10 @@ export default function PlanningView({ onOpenProgression }) {
       .from("student_plans")
       .update({ name: editingPlan.name.trim() || null, start_date: editingPlan.start_date, updated_at: new Date().toISOString() })
       .eq("id", plan.id);
-    if (error) { setSaving(false); return alert("Error al guardar: " + error.message); }
+    if (error) { setSaving(false); return alert("Error al guardar: "); }
     const phErr = await writePlanPhases(plan.id, phases);
     setSaving(false);
-    if (phErr) return alert("Error al guardar las fases: " + phErr.message);
+    if (phErr) return alert("Error al guardar las fases: ");
     setEditingPlan(null);
     loadData();
   };
@@ -342,7 +342,7 @@ export default function PlanningView({ onOpenProgression }) {
       await supabase.from("plan_template_phases").insert(cleanPhases(toEditablePhases(plan.phases)).map((p) => ({ ...p, template_id: data.id })));
     }
     setSaving(false);
-    if (error) return alert("Error: " + error.message);
+    if (error) return alert("Error: ");
     alert("Plantilla guardada.");
     loadData();
   };

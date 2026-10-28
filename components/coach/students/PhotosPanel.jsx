@@ -23,7 +23,7 @@ export function PhotosPanel({ student, onClose }) {
         .order("taken_on", { ascending: false })
         .order("created_at", { ascending: false });
       if (error) {
-        alert("No se pudieron cargar las fotos: " + error.message);
+        alert("No se pudieron cargar las fotos: ");
         setLoadingPhotos(false);
         return;
       }

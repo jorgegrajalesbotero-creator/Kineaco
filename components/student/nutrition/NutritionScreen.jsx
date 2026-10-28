@@ -86,7 +86,7 @@ export function NutritionScreen({ userId, onFirstRoutineAssigned }) {
     );
     setSaving(false);
     if (error) {
-      alert(tr("No se pudo guardar: ") + error.message);
+      alert(tr("No se pudo guardar: "));
       return;
     }
 

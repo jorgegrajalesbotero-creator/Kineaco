@@ -89,14 +89,14 @@ export function AnnouncementsView() {
       .single();
     if (error) {
       setSending(false);
-      return alert("No se pudo enviar: " + error.message);
+      return alert("No se pudo enviar: ");
     }
     const rows = recipients.map((s) => ({ announcement_id: ann.id, user_id: s.id }));
     for (let i = 0; i < rows.length; i += 500) {
       const { error: e2 } = await supabase.from("announcement_recipients").insert(rows.slice(i, i + 500));
       if (e2) {
         setSending(false);
-        return alert("El anuncio se creó pero no se pudo enviar a todos: " + e2.message);
+        return alert("El anuncio se creó pero no se pudo enviar a todos: ");
       }
     }
     setSending(false);
@@ -111,7 +111,7 @@ export function AnnouncementsView() {
   const remove = async (a) => {
     if (!confirm(`¿Borrar el anuncio "${a.title}"? Los alumnos dejan de verlo.`)) return;
     const { error } = await supabase.from("announcements").delete().eq("id", a.id);
-    if (error) return alert("No se pudo borrar: " + error.message);
+    if (error) return alert("No se pudo borrar: ");
     load();
   };
 

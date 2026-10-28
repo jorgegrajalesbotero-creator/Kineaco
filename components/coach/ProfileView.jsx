@@ -58,7 +58,7 @@ export function ProfileView({ onProfileUpdate }) {
       .upload(path, blob, { upsert: true, contentType: "image/jpeg" });
 
     if (uploadError) {
-      alert("No se pudo subir la foto: " + uploadError.message);
+      alert("No se pudo subir la foto: ");
       setUploading(false);
       return;
     }

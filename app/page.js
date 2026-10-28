@@ -84,7 +84,7 @@ export default function App() {
     if (!kg) return;
     const { error } = await supabase.from("body_weight_logs").insert({ user_id: userId, weight_kg: Number(kg) });
     if (error) {
-      alert(tr("No se pudo guardar el peso: ") + error.message);
+      alert(tr("No se pudo guardar el peso: "));
       return;
     }
     loadBodyWeight(userId);
@@ -92,13 +92,13 @@ export default function App() {
 
   const updateBodyWeight = async (id, kg) => {
     const { error } = await supabase.from("body_weight_logs").update({ weight_kg: Number(kg) }).eq("id", id);
-    if (error) alert(tr("No se pudo guardar el peso: ") + error.message);
+    if (error) alert(tr("No se pudo guardar el peso: "));
     loadBodyWeight(userId);
   };
 
   const deleteBodyWeight = async (id) => {
     const { error } = await supabase.from("body_weight_logs").delete().eq("id", id);
-    if (error) alert(tr("No se pudo borrar: ") + error.message);
+    if (error) alert(tr("No se pudo borrar: "));
     loadBodyWeight(userId);
   };
 

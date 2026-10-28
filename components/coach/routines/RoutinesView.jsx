@@ -109,7 +109,7 @@ export function RoutinesView() {
       .select("id, name, muscle_group")
       .single();
     if (error || !data) {
-      alert("No se pudo crear el ejercicio: " + (error?.message || "error desconocido"));
+      alert("No se pudo crear el ejercicio.");
       return null;
     }
     setCatalog((c) => [...c, data].sort((x, y) => x.name.localeCompare(y.name)));
@@ -160,14 +160,14 @@ export function RoutinesView() {
       .single();
 
     if (routineError || !newRoutine) {
-      alert("Error al guardar la rutina: " + routineError?.message);
+      alert("Error al guardar la rutina.");
       setSaving(false);
       return;
     }
 
     const contentError = await writeRoutineContent(newRoutine.id, draftMode, draftExercises, draftBlocks);
     if (contentError) {
-      alert("La rutina se creó, pero hubo un error al guardar sus ejercicios: " + contentError.message);
+      alert("La rutina se creó, pero hubo un error al guardar sus ejercicios: ");
     }
 
     setDraft({ title: "", level: "Principiante", goal: "", duration: "" });
@@ -263,14 +263,14 @@ export function RoutinesView() {
       .eq("id", viewingId);
 
     if (updateError) {
-      alert("Error al actualizar la rutina: " + updateError.message);
+      alert("Error al actualizar la rutina: ");
       setSavingEdit(false);
       return;
     }
 
     const contentError = await writeRoutineContent(viewingId, editMode, editExercises, editBlocks);
     if (contentError) {
-      alert("Error al guardar los ejercicios de la rutina: " + contentError.message);
+      alert("Error al guardar los ejercicios de la rutina: ");
       setSavingEdit(false);
       return;
     }
@@ -278,7 +278,7 @@ export function RoutinesView() {
     if (deleteMerged && mergedFrom.length > 0) {
       const ids = mergedFrom.map((m) => m.id).filter((id) => id !== viewingId);
       const { error: delErr } = await supabase.from("routines").delete().in("id", ids);
-      if (delErr) alert("La rutina se guardó, pero no se pudieron eliminar las rutinas fusionadas: " + delErr.message);
+      if (delErr) alert("La rutina se guardó, pero no se pudieron eliminar las rutinas fusionadas: ");
     }
 
     setSavingEdit(false);
@@ -300,7 +300,7 @@ export function RoutinesView() {
       alert(
         error.code === "23503"
           ? "No se pudo eliminar: la rutina todavía está conectada al historial de entrenamientos. Falta correr el SQL de arreglo en Supabase."
-          : "No se pudo eliminar la rutina: " + error.message
+          : "No se pudo eliminar la rutina: "
       );
       return;
     }
@@ -318,7 +318,7 @@ export function RoutinesView() {
       alert(
         error.code === "23503"
           ? "No se pudo eliminar: la rutina todavía está conectada al historial de entrenamientos. Falta correr el SQL de arreglo en Supabase."
-          : "No se pudo eliminar la rutina: " + error.message
+          : "No se pudo eliminar la rutina: "
       );
       return;
     }
@@ -338,14 +338,14 @@ export function RoutinesView() {
       .single();
     if (error || !nr) {
       setBusyId(null);
-      return alert("No se pudo duplicar la rutina: " + (error?.message || "error desconocido"));
+      return alert("No se pudo duplicar la rutina.");
     }
     const strip = (arr) => arr.map((e) => ({ ...e, itemKey: null }));
     const list = strip(content.list);
     const blocks = content.blocks.map((b) => ({ ...b, exercises: strip(b.exercises) }));
     const cErr = await writeRoutineContent(nr.id, content.mode, list, blocks);
     setBusyId(null);
-    if (cErr) alert("La copia se creó, pero hubo un error al copiar sus ejercicios: " + cErr.message);
+    if (cErr) alert("La copia se creó, pero hubo un error al copiar sus ejercicios: ");
     loadRoutines();
   };
 
@@ -355,7 +355,7 @@ export function RoutinesView() {
     try {
       await downloadRoutinePdf({ supabase, routineIds: [r.id] });
     } catch (e) {
-      alert("No se pudo generar el PDF: " + e.message);
+      alert("No se pudo generar el PDF: ");
     }
     setBusyId(null);
   };
@@ -373,7 +373,7 @@ export function RoutinesView() {
       alert(
         error.code === "23503"
           ? "No se pudieron eliminar: alguna todavía está conectada al historial. Falta correr el SQL de arreglo en Supabase."
-          : "No se pudieron eliminar: " + error.message
+          : "No se pudieron eliminar: "
       );
       return;
     }

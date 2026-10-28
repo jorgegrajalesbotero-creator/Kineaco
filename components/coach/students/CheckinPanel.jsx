@@ -125,7 +125,7 @@ export function CheckinPanel({ student, onClose }) {
       .update({ coach_reply: drafts[c.id].trim() || null })
       .eq("id", c.id);
     setSavingId(null);
-    if (error) return alert("No se pudo guardar la respuesta: " + error.message);
+    if (error) return alert("No se pudo guardar la respuesta: ");
     load();
   };
 

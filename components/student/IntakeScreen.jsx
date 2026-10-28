@@ -93,7 +93,7 @@ export function IntakeScreen({ userId, title, subtitle, onSaved, onCancel, onSig
     const { error } = await supabase.from("intake_forms").upsert(payload, { onConflict: "user_id" });
     setSavingForm(false);
     if (error) {
-      alert(tr("No se pudo guardar su ficha: ") + error.message);
+      alert(tr("No se pudo guardar su ficha: "));
       return;
     }
     if (onSaved) onSaved();

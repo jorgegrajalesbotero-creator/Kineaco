@@ -82,7 +82,7 @@ export function SetLogger({ exercise, routine, userId, onClose, onComplete, onUn
       const { data, error } = await supabase.from("progress_sets").insert(rowValues(r)).select("id").single();
       if (error) {
         setBusy(false);
-        return alert(tr("No se pudo guardar la serie: ") + error.message);
+        return alert(tr("No se pudo guardar la serie: "));
       }
       navigator.vibrate?.(12);
       next = rows.map((x, i) => (i === idx ? { ...x, done: true, id: data.id } : x));
@@ -90,7 +90,7 @@ export function SetLogger({ exercise, routine, userId, onClose, onComplete, onUn
       const { error } = await supabase.from("progress_sets").delete().eq("id", r.id);
       if (error) {
         setBusy(false);
-        return alert(tr("No se pudo actualizar la serie: ") + error.message);
+        return alert(tr("No se pudo actualizar la serie: "));
       }
       next = rows.map((x, i) => (i === idx ? { ...x, done: false, id: null } : x));
     }
@@ -107,7 +107,7 @@ export function SetLogger({ exercise, routine, userId, onClose, onComplete, onUn
     const { data, error } = await supabase.from("progress_sets").insert(pending.map(rowValues)).select("id, set_number");
     if (error) {
       setBusy(false);
-      return alert(tr("No se pudo guardar la serie: ") + error.message);
+      return alert(tr("No se pudo guardar la serie: "));
     }
     navigator.vibrate?.(15);
     const ids = {};

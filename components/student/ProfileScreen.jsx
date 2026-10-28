@@ -35,7 +35,7 @@ export function ProfileScreen({ fullName, email, avatarUrl, userId, onProfileUpd
       .upload(path, blob, { upsert: true, contentType: "image/jpeg" });
 
     if (uploadError) {
-      alert(tr("No se pudo subir la foto: ") + uploadError.message);
+      alert(tr("No se pudo subir la foto: "));
       setUploading(false);
       return;
     }
@@ -57,7 +57,7 @@ export function ProfileScreen({ fullName, email, avatarUrl, userId, onProfileUpd
     const { error } = await supabase.from("profiles").update({ full_name: nameDraft }).eq("id", userId);
     setSaving(false);
     if (error) {
-      alert(tr("No se pudo guardar: ") + error.message);
+      alert(tr("No se pudo guardar: "));
       return;
     }
     setSaved(true);
