@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { Camera, Check, User } from "lucide-react";
 import { shrinkAvatar } from "@/lib/images";
 import { supabase } from "@/lib/supabaseClient";
+import { signedAvatarUrl } from "@/lib/avatars";
 import { Skeleton } from "@/components/ui/Skeleton";
 
 export function ProfileView({ onProfileUpdate }) {
@@ -28,7 +29,7 @@ export function ProfileView({ onProfileUpdate }) {
       email: user?.email || "",
       specialty: profile?.specialty || "",
       bio: profile?.bio || "",
-      avatarUrl: profile?.avatar_url || "",
+      avatarUrl: await signedAvatarUrl(profile?.avatar_url),
     });
     setLoading(false);
   }
@@ -62,12 +63,14 @@ export function ProfileView({ onProfileUpdate }) {
       return;
     }
 
-    const { data: publicUrlData } = supabase.storage.from("avatars").getPublicUrl(path);
-    const newUrl = `${publicUrlData.publicUrl}?t=${Date.now()}`;
+    // Guardamos la RUTA (no una URL pública) porque el bucket es privado.
+    await supabase.from("profiles").update({ avatar_url: path }).eq("id", userId);
 
-    await supabase.from("profiles").update({ avatar_url: newUrl }).eq("id", userId);
+    // Para mostrarla de inmediato, firmamos la URL y rompemos la caché del navegador.
+    const signed = await signedAvatarUrl(path);
+    const display = signed ? `${signed}&t=${Date.now()}` : signed;
 
-    setForm((f) => ({ ...f, avatarUrl: newUrl }));
+    setForm((f) => ({ ...f, avatarUrl: display }));
     setUploading(false);
   };
 

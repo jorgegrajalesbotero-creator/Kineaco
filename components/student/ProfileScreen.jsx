@@ -5,6 +5,7 @@ import { Camera, ChevronRight, User } from "lucide-react";
 import { tr } from "@/lib/i18n";
 import { shrinkAvatar } from "@/lib/images";
 import { supabase } from "@/lib/supabaseClient";
+import { signedAvatarUrl } from "@/lib/avatars";
 import { PrivacySection } from "@/components/student/PrivacySection";
 
 export function ProfileScreen({ fullName, email, avatarUrl, userId, onProfileUpdate, onOpenIntake, onOpenAnnouncements, isCoach, onLogout, lang, onChangeLang, healthConsent, onHealthChange }) {
@@ -39,14 +40,16 @@ export function ProfileScreen({ fullName, email, avatarUrl, userId, onProfileUpd
       return;
     }
 
-    const { data: publicUrlData } = supabase.storage.from("avatars").getPublicUrl(path);
-    const newUrl = `${publicUrlData.publicUrl}?t=${Date.now()}`;
+    // Guardamos la RUTA (no una URL pública) porque el bucket es privado.
+    await supabase.from("profiles").update({ avatar_url: path }).eq("id", userId);
 
-    await supabase.from("profiles").update({ avatar_url: newUrl }).eq("id", userId);
+    // Para mostrarla de inmediato, firmamos la URL y rompemos la caché del navegador.
+    const signed = await signedAvatarUrl(path);
+    const display = signed ? `${signed}&t=${Date.now()}` : signed;
 
-    setLocalAvatarUrl(newUrl);
+    setLocalAvatarUrl(display);
     setUploading(false);
-    if (onProfileUpdate) onProfileUpdate(nameDraft, newUrl);
+    if (onProfileUpdate) onProfileUpdate(nameDraft, display);
   };
 
   const handleSave = async () => {

@@ -30,6 +30,7 @@ export function RestTimer({ endsAt, total, onChange, onClose }) {
   const [now, setNow] = useState(Date.now());
   const finished = useRef(false);
   const left = Math.ceil((endsAt - now) / 1000);
+  const done = left <= 0;
 
   useEffect(() => {
     finished.current = false;
@@ -37,18 +38,19 @@ export function RestTimer({ endsAt, total, onChange, onClose }) {
     return () => clearInterval(id);
   }, [endsAt]);
 
+  // Dependemos de `done` (booleano estable) y no de `left`: así el setTimeout no se
+  // cancela en cada tick y el temporizador se cierra solo a los 2,5 s.
   useEffect(() => {
-    if (left <= 0 && !finished.current) {
+    if (done && !finished.current) {
       finished.current = true;
       navigator.vibrate?.([200, 100, 200]);
       beep();
       const t = setTimeout(onClose, 2500);
       return () => clearTimeout(t);
     }
-  }, [left]);
+  }, [done]);
 
   const pct = total ? Math.max(0, Math.min(100, (left / total) * 100)) : 0;
-  const done = left <= 0;
 
   return (
     <div className="fixed inset-x-0 top-[calc(0.75rem+env(safe-area-inset-top))] z-[55] flex justify-center px-4 pointer-events-none">

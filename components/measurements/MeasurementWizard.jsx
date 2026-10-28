@@ -59,7 +59,9 @@ export function MeasurementWizard({ userId, onClose, t = plain, coachMode = fals
       setLoading(false);
     }
     load();
-  }, [userId]);
+    // Incluimos `date` para recargar el borrador cuando el coach cambia la fecha;
+    // sin esto se conservaban valores de otra fecha y el upsert borraba las medidas previas.
+  }, [userId, date]);
 
   const set = (k, v) => setDraft((d) => ({ ...d, [k]: v }));
 

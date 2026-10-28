@@ -17,62 +17,43 @@ export function defaultBlockTitle(type, blocks) {
   return blockTypeLabel(type);
 }
 
+// Guarda el contenido de una rutina de forma ATÓMICA mediante la RPC
+// save_routine_content (transacción en Postgres). Antes se borraba y se
+// insertaba fila por fila sin transacción: si una inserción fallaba, la
+// rutina quedaba vacía o a medias (BUG-M1). Ahora, si algo falla, se
+// revierte todo y la rutina conserva su contenido anterior.
 export async function writeRoutineContent(routineId, mode, list, blocks) {
-  const { error: delExErr } = await supabase.from("routine_exercises").delete().eq("routine_id", routineId);
-  if (delExErr) return delExErr;
-  const { error: delBlErr } = await supabase.from("routine_blocks").delete().eq("routine_id", routineId);
-  if (delBlErr) return delBlErr;
+  const mapExercise = (ex) => ({
+    exercise_id: ex.exerciseId,
+    reps: ex.reps ?? "",
+    target_weight_kg: ex.targetWeight ?? "",
+    rest_minutes: ex.restMinutes ?? "",
+    item_key: ex.itemKey ?? "",
+  });
 
-  let order = 0;
-  if (mode === "bloques") {
-    for (let b = 0; b < blocks.length; b++) {
-      const bl = blocks[b];
-      const { data: newBlock, error: blockErr } = await supabase
-        .from("routine_blocks")
-        .insert({
-          routine_id: routineId,
+  const payloadBlocks =
+    mode === "bloques"
+      ? blocks.map((bl) => ({
           block_type: bl.block_type,
-          title: bl.title?.trim() || null,
-          sets: Number(bl.sets) > 0 ? Number(bl.sets) : null,
-          notes: bl.notes?.trim() || null,
-          order_index: b,
-        })
-        .select("id")
-        .single();
-      if (blockErr) return blockErr;
-      for (const ex of bl.exercises) {
-        const row = {
-          routine_id: routineId,
-          block_id: newBlock.id,
-          exercise_id: ex.exerciseId,
-          sets: Number(bl.sets) > 0 ? Number(bl.sets) : null,
-          reps: ex.reps,
-          order_index: order++,
-          target_weight_kg: ex.targetWeight ? Number(ex.targetWeight) : null,
-          rest_minutes: ex.restMinutes ? Number(ex.restMinutes) : null,
-        };
-        if (ex.itemKey) row.item_key = ex.itemKey;
-        const { error } = await supabase.from("routine_exercises").insert(row);
-        if (error) return error;
-      }
-    }
-  } else {
-    for (const ex of list) {
-      const row = {
-        routine_id: routineId,
-        exercise_id: ex.exerciseId,
-        sets: Number(ex.sets) || 0,
-        reps: ex.reps,
-        order_index: order++,
-        target_weight_kg: ex.targetWeight ? Number(ex.targetWeight) : null,
-        rest_minutes: ex.restMinutes ? Number(ex.restMinutes) : null,
-      };
-      if (ex.itemKey) row.item_key = ex.itemKey;
-      const { error } = await supabase.from("routine_exercises").insert(row);
-      if (error) return error;
-    }
-  }
-  return null;
+          title: bl.title ?? "",
+          sets: bl.sets ?? "",
+          notes: bl.notes ?? "",
+          exercises: (bl.exercises || []).map(mapExercise),
+        }))
+      : [];
+
+  const payloadList =
+    mode === "bloques"
+      ? []
+      : list.map((ex) => ({ ...mapExercise(ex), sets: ex.sets ?? "" }));
+
+  const { error } = await supabase.rpc("save_routine_content", {
+    p_routine_id: routineId,
+    p_mode: mode,
+    p_blocks: payloadBlocks,
+    p_list: payloadList,
+  });
+  return error || null;
 }
 
 export function autoRoutineTitle() {

@@ -9,6 +9,7 @@ import { fetchAllRows } from "@/lib/fetchAll";
 import { appLocale, dayLetters, detectLang, rememberLang, setLang, tr } from "@/lib/i18n";
 import { NotificationBell, addNotifications } from "@/lib/notifications";
 import { supabase } from "@/lib/supabaseClient";
+import { signedAvatarUrl } from "@/lib/avatars";
 import { HomeScreen } from "@/components/student/HomeScreen";
 import { IntakeScreen } from "@/components/student/IntakeScreen";
 import { CheckinScreen } from "@/components/student/CheckinScreen";
@@ -524,7 +525,7 @@ export default function App() {
         setLangState(langRow.language);
         rememberLang(langRow.language);
       }
-      setAvatarUrl(profile?.avatar_url || "");
+      setAvatarUrl(await signedAvatarUrl(profile?.avatar_url));
       setUserEmail(user?.email || "");
 
       let healthOk = true;
