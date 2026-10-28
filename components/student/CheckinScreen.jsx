@@ -6,7 +6,7 @@ import { supabase } from "@/lib/supabaseClient";
 import { REVERSED, SCALE_FACES, WELLBEING_FIELDS, checkinWeekStart, formatWeek } from "@/lib/checkin";
 import { appLocale, tr } from "@/lib/i18n";
 import { Skeleton } from "@/components/ui/Skeleton";
-import { cleanDecimal } from "@/lib/numbers";
+import { cleanDecimal, toNumber } from "@/lib/numbers";
 
 const EMPTY = {
   sleep: null, energy: null, stress: null, mood: null, hunger: null,
@@ -93,7 +93,7 @@ export function CheckinScreen({ userId, onClose, healthConsent = true }) {
       pain: form.pain,
       pain_area: form.pain ? form.pain_area.trim().slice(0, 200) : null,
       pain_level: form.pain ? form.pain_level : null,
-      weight_kg: form.weight_kg === "" ? null : Number(form.weight_kg),
+      weight_kg: toNumber(form.weight_kg),
       comment: form.comment.trim().slice(0, 1000) || null,
       updated_at: new Date().toISOString(),
     };

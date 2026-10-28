@@ -91,10 +91,14 @@ export function MeasurementResults({ m, previous, t = plain }) {
                 <Delta value={diff(r.bodyFat.value, p.bodyFat?.value)} unit="%" t={t} />
               </div>
             </div>
-            {r.bodyFat.ranges && <FatBar bf={r.bodyFat.value} ranges={r.bodyFat.ranges} sex={m.sex} />}
-            <p className="text-soft text-xs mt-2">
-              {t("Rango saludable para su edad: {p0}–{p1} %.", { p0: r.bodyFat.ranges.low, p1: r.bodyFat.ranges.healthy })}
-            </p>
+            {r.bodyFat.ranges && (
+              <>
+                <FatBar bf={r.bodyFat.value} ranges={r.bodyFat.ranges} sex={m.sex} />
+                <p className="text-soft text-xs mt-2">
+                  {t("Rango saludable para su edad: {p0}–{p1} %.", { p0: r.bodyFat.ranges.low, p1: r.bodyFat.ranges.healthy })}
+                </p>
+              </>
+            )}
             {r.bodyFat.percentile != null && (
               <div className="mt-3 rounded-xl bg-white/[0.04] p-3">
                 <div className="flex items-baseline justify-between gap-2 mb-1.5">

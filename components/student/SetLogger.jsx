@@ -5,7 +5,7 @@ import { Check, Plus, Timer, X } from "lucide-react";
 import { supabase } from "@/lib/supabaseClient";
 import { currentWeekStartISO } from "@/lib/dates";
 import { tr } from "@/lib/i18n";
-import { cleanDecimal, cleanInt } from "@/lib/numbers";
+import { cleanDecimal, cleanInt, toNumber } from "@/lib/numbers";
 
 // Primer número de las reps sugeridas ("8-10" → 8) para "Marcar todas como sugeridas"
 const firstNumber = (text) => {
@@ -61,8 +61,8 @@ export function SetLogger({ exercise, routine, userId, onClose, onComplete, onUn
     item_key: exercise.itemKey || null,
     day_label: routine.day_label,
     set_number: r.n,
-    weight_kg: r.weight === "" || r.weight == null ? null : Number(r.weight),
-    reps: r.reps === "" || r.reps == null ? null : Math.round(Number(r.reps)),
+    weight_kg: toNumber(r.weight),
+    reps: toNumber(r.reps) == null ? null : Math.round(toNumber(r.reps)),
   });
 
   // Cuando cambian las series: si están todas hechas, el ejercicio queda hecho; si se desmarca una, deja de estarlo
