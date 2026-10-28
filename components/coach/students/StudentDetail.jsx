@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Activity, ArrowLeft, Calendar, Camera, ClipboardCheck, Download, TrendingUp, Lock, MessageCircle, Ruler, Utensils } from "lucide-react";
+import { Activity, ArrowLeft, Calendar, Camera, ClipboardCheck, Download, Dumbbell, TrendingUp, Lock, MessageCircle, Ruler, Utensils } from "lucide-react";
 import { supabase } from "@/lib/supabaseClient";
 import { downloadReportPdf } from "@/lib/planPdf";
 import { currentOrNextPlan, loadSchedule } from "@/lib/trainingPlan";
@@ -9,6 +9,7 @@ import { AccessPanel } from "./AccessPanel";
 import { CheckinPanel } from "./CheckinPanel";
 import { ComparePanel } from "./ComparePanel";
 import { DaysPanel } from "./DaysPanel";
+import { ExerciseHistoryPanel } from "./ExerciseHistoryPanel";
 import { MeasurementsPanel } from "./MeasurementsPanel";
 import { MessagesPanel } from "./MessagesPanel";
 import { NutritionPanel } from "./NutritionPanel";
@@ -27,12 +28,13 @@ const PANELS = {
   access: AccessPanel,
   nutrition: NutritionPanel,
   measurements: MeasurementsPanel,
+  exercises: ExerciseHistoryPanel,
 };
 
 // Grupos de opciones de la ficha (lo más usado va arriba, aparte)
 const GROUPS = [
   { title: "Entrenamiento", items: [["Plan por semanas", "plan", Calendar], ["Rutinas por día", "days", Activity], ["Progresión de cargas (ATR)", "progression", TrendingUp]] },
-  { title: "Seguimiento", items: [["Progreso", "compare", TrendingUp], ["Medidas", "measurements", Ruler], ["Fotos", "photos", Camera], ["Check-in", "checkin", ClipboardCheck]] },
+  { title: "Seguimiento", items: [["Progreso por ejercicio (gráficos e historial)", "exercises", Dumbbell], ["Progreso", "compare", TrendingUp], ["Medidas", "measurements", Ruler], ["Fotos", "photos", Camera], ["Check-in", "checkin", ClipboardCheck]] },
   { title: "Nutrición", items: [["Nutrición", "nutrition", Utensils]] },
   { title: "Cuenta", items: [["Acceso y ficha", "access", Lock]] },
 ];

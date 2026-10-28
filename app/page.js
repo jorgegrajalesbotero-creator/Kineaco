@@ -51,7 +51,6 @@ export default function App() {
   const [bestStreak, setBestStreak] = useState(0);
   const [recentActivity, setRecentActivity] = useState([]);
   const [bodyWeightLogs, setBodyWeightLogs] = useState([]);
-  const [weightProgress, setWeightProgress] = useState([]);
   const [userEmail, setUserEmail] = useState("");
   const [avatarUrl, setAvatarUrl] = useState("");
   const [accessBlocked, setAccessBlocked] = useState(false);
@@ -100,18 +99,6 @@ export default function App() {
     const { error } = await supabase.from("body_weight_logs").delete().eq("id", id);
     if (error) alert(tr("No se pudo borrar: "));
     loadBodyWeight(userId);
-  };
-
-  const loadWeightProgress = async (uid) => {
-    const data = await fetchAllRows(() =>
-      supabase
-        .from("progress")
-        .select("*, exercises(name)")
-        .eq("user_id", uid)
-        .not("weight_kg", "is", null)
-        .order("completed_at", { ascending: true })
-    );
-    setWeightProgress(data);
   };
 
   const resolveTargetWeight = (exerciseId, generalWeight, customWeight, progressionMap) => {
@@ -597,7 +584,6 @@ export default function App() {
         .eq("read_by_alumno", false);
       setUnreadMessageCount((unreadMsgs || []).length);
       loadBodyWeight(user.id);
-      loadWeightProgress(user.id);
 
       setRoutineReady(true);
     }
@@ -661,7 +647,7 @@ export default function App() {
       />
     );
   } else if (showRoutine && routine) {
-    content = <RoutineScreen routine={routine} userId={userId} onClose={() => setShowRoutine(false)} onToggle={handleToggleExercise} onProgressChange={() => { loadStreak(userId); loadRecentActivity(userId); loadWeightProgress(userId); }} />;
+    content = <RoutineScreen routine={routine} userId={userId} onClose={() => setShowRoutine(false)} onToggle={handleToggleExercise} onProgressChange={() => { loadStreak(userId); loadRecentActivity(userId); }} />;
   } else if (tab === "nutrition") {
     content = <NutritionScreen userId={userId} onFirstRoutineAssigned={goToAssignedRoutine} />;
   } else if (tab === "home") {
@@ -691,7 +677,7 @@ export default function App() {
   } else if (tab === "messages") {
     content = <MessagesScreen userId={userId} onMessagesRead={() => { setUnreadMessageCount(0); setNotifKey((k) => k + 1); }} />;
   } else if (tab === "progress") {
-    content = <ProgressScreen healthConsent={healthConsent} onOpenCheckin={() => setShowCheckin(true)} onOpenMeasure={() => setShowMeasure(true)} streak={streak} bestStreak={bestStreak} totalCompleted={totalCompleted} weekStats={weekStats} recentActivity={recentActivity} bodyWeightLogs={bodyWeightLogs} weightProgress={weightProgress} onAddWeight={addBodyWeight} onUpdateWeight={updateBodyWeight} onDeleteWeight={deleteBodyWeight} userId={userId} fullName={fullName} />;
+    content = <ProgressScreen healthConsent={healthConsent} onOpenCheckin={() => setShowCheckin(true)} onOpenMeasure={() => setShowMeasure(true)} streak={streak} bestStreak={bestStreak} totalCompleted={totalCompleted} weekStats={weekStats} recentActivity={recentActivity} bodyWeightLogs={bodyWeightLogs} onAddWeight={addBodyWeight} onUpdateWeight={updateBodyWeight} onDeleteWeight={deleteBodyWeight} userId={userId} fullName={fullName} />;
   } else {
     content = tab === "profile" ? (
       <ProfileScreen

@@ -27,7 +27,7 @@ components/
     HomeScreen, RoutineScreen, MessagesScreen, ProfileScreen, IntakeScreen,
     CheckinScreen, SetLogger, RestTimer, Announcements
     Navigation            Menú lateral (computador) y barra inferior (celular)
-    progress/             Progreso: gráfico de cargas, fotos, insignias
+    progress/             Progreso: por ejercicio (por mes), fotos, insignias
     nutrition/            Nutrición y registro de comidas
   coach/                  Panel del coach
     Sidebar               Menú lateral
@@ -35,9 +35,12 @@ components/
     programs/             Programas automáticos y editor de días
     students/             Alumnos: lista + una pantalla por sección
                           (Mensajes, Check-in, Medidas, Días, Progreso,
-                          Nutrición, ATR, Fotos, Acceso)
+                          Nutrición, ATR, Fotos, Acceso, Progreso por ejercicio
+                          con historial de antes de la app)
     planning/             Planeación por fases
     ExercisesView, ReportView, AnnouncementsView, ProfileView
+  progress/               Gráfico de progreso por ejercicio (escalera de récords
+                          + antes vs. ahora), compartido por alumno y coach
   measurements/           Medidas corporales (registro paso a paso, resultados)
   ui/                     Piezas reutilizables (buscadores, figura del cuerpo, etc.)
 
@@ -46,6 +49,7 @@ lib/                      Lógica sin pantallas
   dates, images, search   Fechas, achicar fotos, buscar sin tildes
   badges, blocks, intake, planning, notifications, i18n (traducción del alumno)
   checkin, measurements   Check-in semanal y fórmulas de las medidas
+  exerciseHistory         Progreso por ejercicio: une historial + registros de la app
 
 ```
 

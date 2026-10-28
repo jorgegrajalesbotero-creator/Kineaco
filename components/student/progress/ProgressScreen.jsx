@@ -12,11 +12,10 @@ import { BodyWeightSection } from "@/components/student/progress/BodyWeightSecti
 import { CheckinHistory } from "@/components/student/progress/CheckinHistory";
 import { MeasurementsSection } from "@/components/student/progress/MeasurementsSection";
 import { ProgressPhotosSection } from "@/components/student/progress/ProgressPhotosSection";
-import { WeightProgressChart } from "@/components/student/progress/WeightProgressChart";
+import { ExerciseProgressSection } from "@/components/student/progress/ExerciseProgressSection";
 
-export function ProgressScreen({ streak, bestStreak, totalCompleted, weekStats, recentActivity, bodyWeightLogs, weightProgress, onAddWeight, onUpdateWeight, onDeleteWeight, userId, fullName, onOpenCheckin, onOpenMeasure, healthConsent = true }) {
+export function ProgressScreen({ streak, bestStreak, totalCompleted, weekStats, recentActivity, bodyWeightLogs, onAddWeight, onUpdateWeight, onDeleteWeight, userId, fullName, onOpenCheckin, onOpenMeasure, healthConsent = true }) {
   const maxCount = Math.max(1, ...weekStats.map((d) => d.count));
-  const [selectedExerciseId, setSelectedExerciseId] = useState(null);
   const [pdfBusy, setPdfBusy] = useState(false);
 
   // Descargar todo el informe en PDF: progreso, medidas, nutrición y entrenamientos
@@ -32,28 +31,6 @@ export function ProgressScreen({ streak, bestStreak, totalCompleted, weekStats, 
   };
 
   const latest = bodyWeightLogs[0];
-  const exerciseOptions = [];
-  const seenExerciseIds = new Set();
-  weightProgress.forEach((r) => {
-    const id = r.exercise_id != null ? String(r.exercise_id) : `name:${r.exercise_name || ""}`;
-    if (!seenExerciseIds.has(id)) {
-      seenExerciseIds.add(id);
-      exerciseOptions.push({ id, name: r.exercises?.name || r.exercise_name || "Ejercicio" });
-    }
-  });
-
-  const activeExerciseId = selectedExerciseId ?? (exerciseOptions[0] ? exerciseOptions[0].id : null);
-
-  const selectedPoints = weightProgress
-    .filter((r) => (r.exercise_id != null ? String(r.exercise_id) : `name:${r.exercise_name || ""}`) === activeExerciseId)
-    .map((r) => ({ kg: Number(r.weight_kg), date: new Date(r.completed_at) }))
-    .sort((a, b) => a.date - b.date);
-
-  const deltaKg =
-    selectedPoints.length >= 2
-      ? Math.round((selectedPoints[selectedPoints.length - 1].kg - selectedPoints[0].kg) * 10) / 10
-      : 0;
-
 
   return (
     <div className="flex-1 overflow-y-auto px-5 pt-6 pb-4">
@@ -97,6 +74,8 @@ export function ProgressScreen({ streak, bestStreak, totalCompleted, weekStats, 
         </div>
       </div>
 
+      <ExerciseProgressSection userId={userId} />
+
       {healthConsent ? (
         <MeasurementsSection userId={userId} onOpen={onOpenMeasure} />
       ) : (
@@ -116,54 +95,6 @@ export function ProgressScreen({ streak, bestStreak, totalCompleted, weekStats, 
 
       {healthConsent && <ProgressPhotosSection userId={userId} latestWeight={latest?.weight_kg} />}
 
-      <p className="text-muted text-xs uppercase tracking-wider mb-3">{tr("Progreso de carga")}</p>
-      <div className="bg-card rounded-2xl p-4 mb-6">
-        {exerciseOptions.length === 0 ? (
-          <p className="text-muted text-sm text-center py-4">
-            {tr("Todavía no ha registrado peso en ningún ejercicio.")}
-          </p>
-        ) : (
-          <>
-            <select
-              value={activeExerciseId}
-              onChange={(e) => setSelectedExerciseId(e.target.value)}
-              className="block w-full bg-field text-ink text-sm rounded-xl px-3 py-2 mb-4 outline-none"
-            >
-              {exerciseOptions.map((ex) => (
-                <option key={ex.id} value={ex.id}>
-                  {ex.name}
-                </option>
-              ))}
-            </select>
-
-            {selectedPoints.length < 2 ? (
-              <p className="text-muted text-sm text-center py-4">
-                {tr("Registre el peso al menos 2 veces en este ejercicio para ver su progreso.")}
-              </p>
-            ) : (
-              <>
-                <div className="flex items-center justify-between mb-3">
-                  <span className="text-ink text-lg font-semibold">
-                    {selectedPoints[selectedPoints.length - 1].kg}{tr("kg")}
-                  </span>
-                  <span
-                    className={`text-xs font-medium px-2 py-1 rounded-full ${deltaKg > 0
-                      ? "bg-accent/10 text-accent"
-                      : deltaKg < 0
-                        ? "bg-danger/10 text-danger"
-                        : "bg-field text-soft"
-                      }`}
-                  >
-                    {deltaKg > 0 ? "+" : ""}
-                    {deltaKg}{tr("kg desde el inicio")}
-                  </span>
-                </div>
-                <WeightProgressChart points={selectedPoints} />
-              </>
-            )}
-          </>
-        )}
-      </div>
       <p className="text-muted text-xs uppercase tracking-wider mb-3">{tr("Actividad reciente")}</p>
       <div className="bg-card rounded-2xl p-2 mb-6">
         {recentActivity.length === 0 ? (
