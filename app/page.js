@@ -4,7 +4,8 @@ import { useEffect, useRef, useState } from "react";
 import { computeBadges, loadBadgeData } from "@/lib/badges";
 import { blockUsesProgression } from "@/lib/blocks";
 import { WEEK_DAYS, currentWeekStartISO, localDateString, todayDayLabel } from "@/lib/dates";
-import { addDays, loadSchedule, mondayOf, routinesForDate } from "@/lib/trainingPlan";
+import { addDays, loadSchedule, mondayOf, planFor, planWeekOf, routinesForDate } from "@/lib/trainingPlan";
+import { loadMapForWeek } from "@/lib/loadCalc";
 import { fetchAllRows } from "@/lib/fetchAll";
 import { appLocale, dayLetters, detectLang, rememberLang, setLang, tr } from "@/lib/i18n";
 import { NotificationBell, addNotifications } from "@/lib/notifications";
@@ -114,26 +115,20 @@ export default function App() {
     return customWeight ?? generalWeight;
   };
 
+  // Cargas de la semana actual del plan (fases + RM → peso calculado, o casillas escritas por el coach)
   const loadProgressionMap = async (uid) => {
-    const { data: prog } = await supabase
-      .from("load_progressions")
-      .select("id, current_week")
-      .eq("user_id", uid)
-      .maybeSingle();
-
-    if (!prog) return {};
-
-    const { data: items } = await supabase
-      .from("load_progression_items")
-      .select("*")
-      .eq("progression_id", prog.id)
-      .eq("week_number", prog.current_week);
-
-    const map = {};
-    (items || []).forEach((it) => {
-      map[it.exercise_id] = { value_type: it.value_type, value: it.value, reps: it.reps || null };
-    });
-    return map;
+    const today = new Date();
+    const { data: plans } = await supabase.from("training_plans").select("id, start_date, weeks").eq("user_id", uid);
+    const plan = planFor(plans || [], today);
+    if (!plan) return {};
+    const week = planWeekOf(plan, today);
+    const [{ data: phases }, { data: weekRows }, { data: loads }, { data: cellRows }] = await Promise.all([
+      supabase.from("training_plan_phases").select("*").eq("plan_id", plan.id),
+      supabase.from("training_plan_weeks").select("*").eq("plan_id", plan.id),
+      supabase.from("training_plan_loads").select("*").eq("plan_id", plan.id),
+      supabase.from("training_plan_load_cells").select("*").eq("plan_id", plan.id),
+    ]);
+    return loadMapForWeek({ phases: phases || [], totalWeeks: plan.weeks, weekRows, loads, cellRows, week });
   };
 
   const buildRoutine = async (uid, assignment) => {

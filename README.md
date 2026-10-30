@@ -34,10 +34,10 @@ components/
     routines/             Rutinas (lista, editor por bloques, ayudas)
     programs/             Programas automáticos y editor de días
     students/             Alumnos: lista + una pantalla por sección
-                          (Mensajes, Check-in, Medidas, Días, Progreso,
-                          Nutrición, ATR, Fotos, Acceso, Progreso por ejercicio
-                          con historial de antes de la app)
-    planning/             Planeación por fases
+                          (Mensajes, Check-in, Medidas, Semana base, Progreso,
+                          Nutrición, Fotos, Acceso, Progreso por ejercicio con
+                          historial de antes de la app, y Planeación: fases ATR,
+                          rutinas por semana, cargas calculadas y plantillas)
     ExercisesView, ReportView, AnnouncementsView, ProfileView
   progress/               Gráfico de progreso por ejercicio (escalera de récords
                           + antes vs. ahora), compartido por alumno y coach
@@ -50,6 +50,7 @@ lib/                      Lógica sin pantallas
   badges, blocks, intake, planning, notifications, i18n (traducción del alumno)
   checkin, measurements   Check-in semanal y fórmulas de las medidas
   exerciseHistory         Progreso por ejercicio: une historial + registros de la app
+  trainingPlan, loadCalc  Plan por semanas y cálculo de cargas (RM × % de cada fase)
 
 ```
 

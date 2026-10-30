@@ -12,7 +12,7 @@ import { localDateString } from "@/lib/dates";
 import { Skeleton } from "@/components/ui/Skeleton";
 
 // Nombres que usan las notificaciones para abrir directamente una sección de la ficha
-const ACTION_TO_PANEL = { messages: "messages", progress: "compare", nutrition: "nutrition", access: "access", photos: "photos", progression: "progression", checkin: "checkin", measurements: "measurements" };
+const ACTION_TO_PANEL = { messages: "messages", progress: "compare", nutrition: "nutrition", access: "access", photos: "photos", progression: "plan", checkin: "checkin", measurements: "measurements" };
 
 // Lista de alumnos del coach; cada tarjeta abre la ficha del alumno
 export function StudentsView({ initialAction, onInitialActionDone }) {

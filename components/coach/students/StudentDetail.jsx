@@ -15,7 +15,6 @@ import { MessagesPanel } from "./MessagesPanel";
 import { NutritionPanel } from "./NutritionPanel";
 import { PhotosPanel } from "./PhotosPanel";
 import { PlanPanel } from "./PlanPanel";
-import { ProgressionPanel } from "./ProgressionPanel";
 
 const PANELS = {
   messages: MessagesPanel,
@@ -23,7 +22,6 @@ const PANELS = {
   compare: ComparePanel,
   days: DaysPanel,
   plan: PlanPanel,
-  progression: ProgressionPanel,
   photos: PhotosPanel,
   access: AccessPanel,
   nutrition: NutritionPanel,
@@ -33,7 +31,7 @@ const PANELS = {
 
 // Grupos de opciones de la ficha (lo más usado va arriba, aparte)
 const GROUPS = [
-  { title: "Entrenamiento", items: [["Plan por semanas", "plan", Calendar], ["Rutinas por día", "days", Activity], ["Progresión de cargas (ATR)", "progression", TrendingUp]] },
+  { title: "Entrenamiento", items: [["Planeación (fases, rutinas y cargas)", "plan", Calendar], ["Semana base (días fijos)", "days", Activity]] },
   { title: "Seguimiento", items: [["Progreso por ejercicio (gráficos e historial)", "exercises", Dumbbell], ["Progreso", "compare", TrendingUp], ["Medidas", "measurements", Ruler], ["Fotos", "photos", Camera], ["Check-in", "checkin", ClipboardCheck]] },
   { title: "Nutrición", items: [["Nutrición", "nutrition", Utensils]] },
   { title: "Cuenta", items: [["Acceso y ficha", "access", Lock]] },
@@ -48,7 +46,7 @@ export function StudentDetail({ student, onClose, onChanged, initialPanel = null
     setPdfBusy(true);
     try {
       const { plans, fixed } = await loadSchedule(supabase, student.id, "id, title");
-      await downloadReportPdf({ supabase, userId: student.id, plan: currentOrNextPlan(plans), fixed, studentName: student.name });
+      await downloadReportPdf({ supabase, userId: student.id, plan: currentOrNextPlan(plans), fixed, studentName: student.name, includeLoads: true });
     } catch (e) {
       alert("No se pudo generar el PDF: ");
     }

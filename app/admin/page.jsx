@@ -5,7 +5,6 @@ import { NotificationBell, addNotifications } from "@/lib/notifications";
 import { supabase } from "@/lib/supabaseClient";
 import { AnnouncementsView } from "@/components/coach/AnnouncementsView";
 import { ExercisesView } from "@/components/coach/ExercisesView";
-import PlanningView from "@/components/coach/planning/PlanningView";
 import { ProfileView } from "@/components/coach/ProfileView";
 import { ProgramsView } from "@/components/coach/programs/ProgramsView";
 import { ReportView } from "@/components/coach/ReportView";
@@ -93,7 +92,7 @@ export default function AdminPanel() {
     <NotificationBell supabase={supabase} userId={coachId} onNavigate={openFromNotification} refreshKey={notifKey} />
   ) : null;
 
-  const tabLabels = { rutinas: "Rutinas", ejercicios: "Ejercicios", alumnos: "Alumnos", reporte: "Reporte semanal", anuncios: "Anuncios", programas: "Programas", planeacion: "Planeación", perfil: "Mi perfil" };
+  const tabLabels = { rutinas: "Rutinas", ejercicios: "Ejercicios", alumnos: "Alumnos", reporte: "Reporte semanal", anuncios: "Anuncios", programas: "Programas", perfil: "Mi perfil" };
   const sidebarProps = {
     active: tab,
     email: userEmail,
@@ -148,14 +147,6 @@ export default function AdminPanel() {
           )}
           {tab === "anuncios" && <AnnouncementsView />}
           {tab === "programas" && <ProgramsView />}
-          {tab === "planeacion" && (
-            <PlanningView
-              onOpenProgression={(id) => {
-                setPendingStudentAction({ id, action: "progression" });
-                setTab("alumnos");
-              }}
-            />
-          )}
           {tab === "perfil" && <ProfileView onProfileUpdate={setFullName} />}
         </div>
       </div>
