@@ -1,7 +1,7 @@
 "use client";
 
 import { BrandMark } from "@/components/ui/BrandMark";
-import { Calendar, CalendarRange, ClipboardList, Dumbbell, LayoutDashboard, Megaphone, User, Users } from "lucide-react";
+import { Calendar, ClipboardList, Dumbbell, LayoutDashboard, Megaphone, User, Users } from "lucide-react";
 
 export function Sidebar({ active, onSelect, email, fullName, onLogout, bell }) {
   const items = [
@@ -11,7 +11,6 @@ export function Sidebar({ active, onSelect, email, fullName, onLogout, bell }) {
     { key: "reporte", label: "Reporte semanal", icon: ClipboardList },
     { key: "anuncios", label: "Anuncios", icon: Megaphone },
     { key: "programas", label: "Programas", icon: Calendar },
-    { key: "planeacion", label: "Planeación", icon: CalendarRange },
     { key: "perfil", label: "Mi perfil", icon: User },
   ];
   return (
