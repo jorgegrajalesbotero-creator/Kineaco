@@ -206,7 +206,7 @@ export function ReportView({ onStudentAction }) {
             <>
               <SearchInput value={reportSearch} onChange={setReportSearch} placeholder="Buscar alumno..." className="mb-3 max-w-md" />
               {reportSearch && rows.filter((r) => matchesSearch(reportSearch, r.name)).length === 0 && (
-                <p className="text-muted text-sm mb-3">No hay alumnos que coincidan con "{reportSearch}".</p>
+                <p className="text-muted text-sm mb-3">No hay alumnos que coincidan con &quot;{reportSearch}&quot;.</p>
               )}
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
                 {rows.filter((r) => matchesSearch(reportSearch, r.name)).map((r) => (

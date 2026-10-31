@@ -117,7 +117,7 @@ export function ProgressPhotosSection({ userId, latestWeight }) {
       let blob;
       try {
         blob = await shrinkImage(files[angle]);
-      } catch (e) {
+      } catch {
         alert(tr("No se pudo leer la foto de {p0}. Pruebe con una foto en formato JPG o PNG.", { p0: angle }));
         continue;
       }

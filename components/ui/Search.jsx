@@ -59,7 +59,7 @@ export function SearchSelect({ options, value, onChange, placeholder = "Buscar..
             </button>
           )}
           {filtered.length === 0 ? (
-            <p className="px-3 py-2 text-xs text-muted">Sin resultados para "{text}"</p>
+            <p className="px-3 py-2 text-xs text-muted">Sin resultados para &quot;{text}&quot;</p>
           ) : (
             filtered.map((o) => (
               <button

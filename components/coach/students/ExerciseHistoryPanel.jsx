@@ -285,7 +285,7 @@ export function ExerciseHistoryPanel({ student, onClose }) {
               </div>
             ))}
           </div>
-          <p className="text-muted text-[11px] mt-2">Los registros "App" los cargó el alumno al entrenar; se corrigen desde su entreno. Los de "Historial" los podés corregir o borrar acá.</p>
+          <p className="text-muted text-[11px] mt-2">Los registros &quot;App&quot; los cargó el alumno al entrenar; se corrigen desde su entreno. Los de &quot;Historial&quot; los podés corregir o borrar acá.</p>
         </>
       )}
     </PanelLayout>

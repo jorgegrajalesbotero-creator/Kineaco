@@ -12,7 +12,6 @@ import { PlanPhasesEditor, ATR_PRESET } from "./PlanPhasesEditor";
 import { PlanLoadsEditor } from "./PlanLoadsEditor";
 import { blockUsesProgression } from "@/lib/blocks";
 import { cellKey, phaseType, planWeeks } from "@/lib/loadCalc";
-import { cleanInt } from "@/lib/numbers";
 
 const MAX_WEEKS = 52;
 const str = (v) => (v == null ? "" : String(v));
@@ -341,7 +340,7 @@ export function PlanPanel({ student, onClose }) {
     setPdfBusy(plan.id);
     try {
       await downloadPlanPdf({ supabase, userId: student.id, plan, studentName: student.name, includeLoads: true });
-    } catch (e) {
+    } catch {
       alert("No se pudo generar el PDF: ");
     }
     setPdfBusy(null);

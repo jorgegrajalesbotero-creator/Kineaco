@@ -18,7 +18,7 @@ export function DailyCheckinSheet({ userId, healthConsent = true, onDone }) {
   const set = (k, v) => setForm((f) => ({ ...f, [k]: v }));
 
   const remember = () => {
-    try { localStorage.setItem(dailyCheckinKey(userId, today), "1"); } catch (e) { }
+    try { localStorage.setItem(dailyCheckinKey(userId, today), "1"); } catch { }
   };
   const skip = () => {
     remember();

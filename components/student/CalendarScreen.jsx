@@ -75,7 +75,7 @@ export function CalendarScreen({ userId, studentName, healthConsent, onClose, on
     setBusy("plan");
     try {
       await downloadReportPdf({ supabase, userId, plan, fixed, studentName, t: tr, locale, includeHealth: healthConsent });
-    } catch (e) {
+    } catch {
       alert(tr("No se pudo generar el PDF: "));
     }
     setBusy(null);
@@ -85,7 +85,7 @@ export function CalendarScreen({ userId, studentName, healthConsent, onClose, on
     try {
       const raw = fmt(selDate, { weekday: "long", day: "numeric", month: "long" });
       await downloadRoutinePdf({ supabase, routineIds: selIds, dayTitle: raw.charAt(0).toUpperCase() + raw.slice(1), t: tr, locale });
-    } catch (e) {
+    } catch {
       alert(tr("No se pudo generar el PDF: "));
     }
     setBusy(null);

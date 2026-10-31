@@ -49,7 +49,7 @@ export function ExercisesView() {
   const startEdit = (ex) => {
     setEditingId(ex.id);
     setForm({ name: ex.name, group: ex.muscle_group || "", videoUrl: ex.video_url || "" });
-    try { window.scrollTo({ top: 0, behavior: "smooth" }); } catch (e) { }
+    try { window.scrollTo({ top: 0, behavior: "smooth" }); } catch { }
   };
 
   const duplicateExercise = async (ex) => {

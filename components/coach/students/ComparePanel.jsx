@@ -23,7 +23,7 @@ export function ComparePanel({ student, onClose }) {
     try {
       const { plans, fixed } = await loadSchedule(supabase, student.id, "id, title");
       await downloadReportPdf({ supabase, userId: student.id, plan: currentOrNextPlan(plans), fixed, studentName: student.name, includeLoads: true });
-    } catch (e) {
+    } catch {
       alert("No se pudo generar el PDF: ");
     }
     setPdfBusy(false);

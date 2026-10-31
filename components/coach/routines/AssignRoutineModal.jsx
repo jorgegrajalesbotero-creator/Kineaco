@@ -62,7 +62,7 @@ export function AssignRoutineModal({ routine, onClose }) {
           <div className="text-center py-6">
             <div className="w-12 h-12 rounded-full bg-accent/15 flex items-center justify-center mx-auto mb-3"><Check size={22} className="text-accent" /></div>
             <p className="text-ink text-sm font-medium mb-1">Listo</p>
-            <p className="text-soft text-xs mb-5">Se le asignó "{routine.title}" a {name} en {days.length === 1 ? "el día" : "los días"} {days.join(", ")}.</p>
+            <p className="text-soft text-xs mb-5">Se le asignó &quot;{routine.title}&quot; a {name} en {days.length === 1 ? "el día" : "los días"} {days.join(", ")}.</p>
             <div className="flex gap-2 justify-center">
               <button onClick={() => { setDone(false); setStudentId(""); setDays([]); }} className="bg-field text-soft text-sm rounded-xl px-4 py-2.5">Asignar a otro</button>
               <button onClick={onClose} className="bg-accent text-app text-sm font-semibold rounded-xl px-4 py-2.5">Cerrar</button>

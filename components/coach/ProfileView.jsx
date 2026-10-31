@@ -46,7 +46,7 @@ export function ProfileView({ onProfileUpdate }) {
     let blob;
     try {
       blob = await shrinkAvatar(file);
-    } catch (err) {
+    } catch {
       alert("No se pudo subir la foto: " + "formato");
       setUploading(false);
       return;

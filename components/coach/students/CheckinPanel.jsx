@@ -177,7 +177,7 @@ export function CheckinPanel({ student, onClose }) {
               </div>
 
               {c.comment && (
-                <p className="text-ink text-sm bg-field/60 rounded-xl px-3 py-2 mb-3 whitespace-pre-wrap">"{c.comment}"</p>
+                <p className="text-ink text-sm bg-field/60 rounded-xl px-3 py-2 mb-3 whitespace-pre-wrap">&quot;{c.comment}&quot;</p>
               )}
 
               <textarea

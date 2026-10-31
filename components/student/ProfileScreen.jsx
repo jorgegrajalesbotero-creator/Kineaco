@@ -23,7 +23,7 @@ export function ProfileScreen({ fullName, email, avatarUrl, userId, onProfileUpd
     let blob;
     try {
       blob = await shrinkAvatar(file);
-    } catch (err) {
+    } catch {
       alert(tr("No se pudo subir la foto: ") + "formato");
       setUploading(false);
       return;

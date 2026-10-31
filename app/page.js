@@ -36,7 +36,7 @@ export default function App() {
     setLangState(detectLang());
   }, []);
   useEffect(() => {
-    try { document.documentElement.lang = lang; } catch (e) { }
+    try { document.documentElement.lang = lang; } catch { }
   }, [lang]);
   const [tab, setTab] = useState("home");
   const [showRoutine, setShowRoutine] = useState(false);
@@ -378,7 +378,7 @@ export default function App() {
     if (day !== todayDayLabel() || !userId) return setShowRoutine(true);
     const today = localDateString();
     let seen = false;
-    try { seen = localStorage.getItem(dailyCheckinKey(userId, today)) === "1"; } catch (e) { }
+    try { seen = localStorage.getItem(dailyCheckinKey(userId, today)) === "1"; } catch { }
     if (!seen) {
       const { data } = await supabase.from("daily_checkins").select("id").eq("user_id", userId).eq("check_date", today).maybeSingle();
       seen = !!data;

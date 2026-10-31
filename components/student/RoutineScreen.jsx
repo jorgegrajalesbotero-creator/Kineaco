@@ -23,7 +23,7 @@ export function RoutineScreen({ routine, userId, onClose, onToggle, onProgressCh
     try {
       const ids = (routine.parts || [routine]).map((p) => p.id);
       await downloadRoutinePdf({ supabase, routineIds: ids, dayTitle: tr(routine.day_label), t: tr, locale: appLocale() });
-    } catch (e) {
+    } catch {
       alert(tr("No se pudo generar el PDF: "));
     }
     setPdfBusy(false);

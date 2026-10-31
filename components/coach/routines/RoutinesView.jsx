@@ -354,7 +354,7 @@ export function RoutinesView() {
     setBusyId(r.id);
     try {
       await downloadRoutinePdf({ supabase, routineIds: [r.id] });
-    } catch (e) {
+    } catch {
       alert("No se pudo generar el PDF: ");
     }
     setBusyId(null);
@@ -446,7 +446,7 @@ export function RoutinesView() {
                 <input placeholder="Peso sugerido (kg) - opcional" value={exForm.targetWeight} onChange={(e) => setExForm({ ...exForm, targetWeight: e.target.value })} className="col-span-2 bg-field text-ink text-sm rounded-lg px-3 py-2 outline-none mt-2" /><input placeholder="Descanso (min) - opcional" value={exForm.restMinutes} onChange={(e) => setExForm({ ...exForm, restMinutes: e.target.value })} className="col-span-2 bg-field text-ink text-sm rounded-lg px-3 py-2 outline-none mt-2" />
               </div>
               <button onClick={addExerciseToDraft} className="mt-2 bg-field text-accent px-4 py-2 rounded-lg text-sm flex items-center gap-1"><Plus size={15} /> Agregar a la rutina</button>
-              {catalog.length === 0 && <p className="text-muted text-xs italic mt-2">Todavía no hay ejercicios en tu catálogo — cargalos primero en la pestaña "Ejercicios".</p>}
+              {catalog.length === 0 && <p className="text-muted text-xs italic mt-2">Todavía no hay ejercicios en tu catálogo — cargalos primero en la pestaña &quot;Ejercicios&quot;.</p>}
             </div>
           </>
         )}
@@ -524,7 +524,7 @@ export function RoutinesView() {
                 <input placeholder="Peso sugerido (kg) - opcional" value={editExForm.targetWeight} onChange={(e) => setEditExForm({ ...editExForm, targetWeight: e.target.value })} className="col-span-2 bg-field text-ink text-sm rounded-lg px-3 py-2 outline-none mt-2" /><input placeholder="Descanso (min) - opcional" value={editExForm.restMinutes} onChange={(e) => setEditExForm({ ...editExForm, restMinutes: e.target.value })} className="col-span-2 bg-field text-ink text-sm rounded-lg px-3 py-2 outline-none mt-2" />
               </div>
               <button onClick={addExerciseToEdit} className="mt-2 bg-field text-accent px-4 py-2 rounded-lg text-sm flex items-center gap-1"><Plus size={15} /> Agregar a la rutina</button>
-              {catalog.length === 0 && <p className="text-muted text-xs italic mt-2">Todavía no hay ejercicios en tu catálogo — cargalos primero en la pestaña "Ejercicios".</p>}
+              {catalog.length === 0 && <p className="text-muted text-xs italic mt-2">Todavía no hay ejercicios en tu catálogo — cargalos primero en la pestaña &quot;Ejercicios&quot;.</p>}
             </div>
           </>
         )}
@@ -537,7 +537,7 @@ export function RoutinesView() {
           ) : (
             <div className="space-y-2">
               <p className="text-ink text-sm font-medium flex items-center gap-2"><GitMerge size={15} className="text-accent" /> Fusionar con otra rutina</p>
-              <p className="text-muted text-xs">Los ejercicios de la rutina que elijas se agregan al final de esta. Revisá el resultado y tocá "Guardar cambios".</p>
+              <p className="text-muted text-xs">Los ejercicios de la rutina que elijas se agregan al final de esta. Revisá el resultado y tocá &quot;Guardar cambios&quot;.</p>
               <SearchSelect
                 options={routines
                   .filter((r) => r.id !== viewingId && !mergedFrom.some((m) => m.id === r.id))
@@ -613,7 +613,7 @@ export function RoutinesView() {
 
       <SearchInput value={routineSearch} onChange={setRoutineSearch} placeholder="Buscar rutina por nombre, nivel u objetivo..." className="mb-4 max-w-md" />
       {routineSearch && visible.length === 0 && (
-        <p className="text-muted text-sm mb-4">No hay rutinas que coincidan con "{routineSearch}".</p>
+        <p className="text-muted text-sm mb-4">No hay rutinas que coincidan con &quot;{routineSearch}&quot;.</p>
       )}
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">

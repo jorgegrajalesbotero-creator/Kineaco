@@ -26,7 +26,7 @@ export function BadgesSection({ userId }) {
       let seen = [];
       try {
         seen = JSON.parse(localStorage.getItem(storageKey) || "[]");
-      } catch (e) {
+      } catch {
         seen = [];
       }
       const seenSet = new Set(seen);
@@ -35,7 +35,7 @@ export function BadgesSection({ userId }) {
         setNewBadges(fresh);
         try {
           localStorage.setItem(storageKey, JSON.stringify(list.filter((b) => b.unlocked).map((b) => b.key)));
-        } catch (e) { }
+        } catch { }
       }
     })();
     return () => { cancelled = true; };

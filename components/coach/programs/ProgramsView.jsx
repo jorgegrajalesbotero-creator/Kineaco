@@ -139,7 +139,7 @@ export function ProgramsView() {
           />
         </div>
 
-        {routines.length === 0 && <p className="text-muted text-xs italic mb-4">Todavía no tenés rutinas creadas — armalas primero en la pestaña "Rutinas".</p>}
+        {routines.length === 0 && <p className="text-muted text-xs italic mb-4">Todavía no tenés rutinas creadas — armalas primero en la pestaña &quot;Rutinas&quot;.</p>}
 
         <button onClick={saveProgram} disabled={saving} className="bg-accent text-app font-semibold px-6 py-2.5 rounded-lg text-sm disabled:opacity-60">
           {saving ? "Guardando..." : "Guardar programa"}
