@@ -13,8 +13,12 @@ Ejecuta los scripts en Supabase Studio → **SQL Editor**, en este orden:
 > Ver `04_estado_real.md` para el detalle de lo que ya está cubierto.
 >
 > **Actualización (2026-10-31):** `01` y `02` **aplicados en Supabase** (confirmado).
-> Falta **verificar** con `npm run pentest:rls`. Nueva auditoría de código en
-> `05_auditoria_codigo.md` + mejoras recomendadas en `05_recomendaciones_seguridad.sql`.
+> **Verificado con `npm run pentest:rls`: 6/6 ataques bloqueados.** SEG-A1 confirmado
+> en vivo (no se puede escalar `role` ni extender `access_until`). El pentest también
+> confirma que `save_routine_content` (BUG-M1) ya existe y rechaza a alumnos, y que
+> las políticas de `profiles`, `body_measurements` y `messages` bloquean IDOR y
+> suplantación de remitente. Nueva auditoría de código en `05_auditoria_codigo.md` +
+> mejoras recomendadas en `05_recomendaciones_seguridad.sql`.
 
 | Archivo | Qué hace | Riesgo que cierra |
 |---|---|---|
@@ -25,7 +29,27 @@ Ejecuta los scripts en Supabase Studio → **SQL Editor**, en este orden:
 | `04_estado_real.md` | Resumen de qué ya estaba cubierto y qué no. | — |
 | `04_tablas_rls_plantilla.sql` | Plantilla del patrón RLS estándar para tablas **nuevas** (no ejecutar tal cual). | Prevención |
 | `05_auditoria_codigo.md` | Informe de la auditoría de seguridad del código (2026-10-31), priorizado. | — |
-| `05_recomendaciones_seguridad.sql` | Mejoras SQL recomendadas (consentimiento salud, avatars por carpeta, IDOR RPC). **Revisar y probar antes de aplicar.** | SEG varios |
+| `05_recomendaciones_seguridad.sql` | Resumen original de mejoras recomendadas (reemplazado por `06`–`08`, ya afinados). | SEG varios |
+| `06_avatars_por_carpeta.sql` | **Listo para aplicar.** Lectura de avatar solo del dueño o del coach. | IDOR avatares (medio) |
+| `07_consentimiento_salud.sql` | Parte 1 (función `has_health_consent`) lista; parte 2 (políticas por tabla) requiere ver las RLS actuales. | Consentimiento salud / Ley 1581 (medio) |
+| `08_funciones_versionadas.sql` | `is_coach`, `has_active_access`, `delete_my_account` **versionadas** (exportadas 2026-10-31) + revisión Ley 1581. | Auditabilidad / supresión (medio) |
+| `09_aplicar_todo.sql` | **SOLUCIÓN DEFINITIVA.** Un solo script idempotente: avatares (06) + IDOR coaches con backfill (03) + consentimiento salud (07) + `delete_my_account` que borra Storage. Incluye verificación. | Todos los hallazgos medios |
+
+> **Validación en vivo de los hallazgos medios (2026-10-31, vía MCP solo-lectura):**
+> - **IDOR entre coaches (`03`):** ❌ **no aplicado** en la base (la RPC solo valida
+>   `is_coach()`). Riesgo **actual bajo**: hay **1 solo coach** y **0 rutinas sin dueño**
+>   (backfill NO necesario). `03` actualizado con el check `created_by`. → **Aplicar `03`.**
+> - **Avatares por carpeta (`06`):** ❌ **ABIERTO** — sigue la política ancha
+>   `"avatar lectura autenticada"` (cualquier autenticado lee avatares ajenos). → **Aplicar `06`.**
+> - **Consentimiento de salud (`07`):** ❌ **ABIERTO** — `has_health_consent` no existe
+>   y las 26 políticas de salud no lo comprueban. `07` ahora trae **Parte 1 + Parte 2
+>   completas** (recreadas contra las políticas reales). → **Revisar y aplicar `07`.**
+> - **Versionar funciones (`08`):** ✅ **resuelto** — `is_coach`, `has_active_access` y
+>   `delete_my_account` exportadas y versionadas en `08`. Revisión Ley 1581 de
+>   `delete_my_account`: OK salvo que **no borra los archivos de Storage** (huérfanos).
+>
+> ⚠️ El MCP de esta sesión es **solo-lectura**: los scripts `03`, `06`, `07` hay que
+> ejecutarlos en **Supabase Studio → SQL Editor**. Haz backup antes.
 
 ## Antes de aplicar — IMPORTANTE
 

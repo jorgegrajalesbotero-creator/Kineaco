@@ -1,0 +1,41 @@
+name: CI
+
+# Corre en cada push y pull request contra main.
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  verificar:
+    name: Lint · Tests · Build
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Configurar Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+
+      - name: Instalar dependencias
+        run: npm ci
+
+      - name: Lint (0 errores permitidos; los warnings no bloquean)
+        run: npm run lint
+
+      - name: Tests
+        run: npm test
+
+      - name: Build
+        # Variables NEXT_PUBLIC_* de marcador: el build las necesita en tiempo de
+        # compilación para el prerender, pero en CI no se conecta a Supabase real.
+        # En producción (Vercel u otro) se configuran los valores reales.
+        env:
+          NEXT_PUBLIC_SUPABASE_URL: https://placeholder.supabase.co
+          NEXT_PUBLIC_SUPABASE_ANON_KEY: sb_publishable_placeholder_ci_build_only
+        run: npm run build

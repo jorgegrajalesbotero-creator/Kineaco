@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { BrandMark } from "@/components/ui/BrandMark";
 import { Calendar, ClipboardList, Dumbbell, LayoutDashboard, Megaphone, User, Users } from "lucide-react";
 
@@ -34,9 +35,9 @@ export function Sidebar({ active, onSelect, email, fullName, onLogout, bell }) {
         ))}
       </nav>
       <div className="px-3 pb-[max(1rem,env(safe-area-inset-bottom))] space-y-1">
-        <a href="/" className="block w-full text-left px-3 py-2.5 rounded-lg text-sm text-accent bg-card hover:bg-field">
+        <Link href="/" className="block w-full text-left px-3 py-2.5 rounded-lg text-sm text-accent bg-card hover:bg-field">
           Mi entrenamiento (vista de alumno)
-        </a>
+        </Link>
         <button onClick={onLogout} className="w-full text-left px-3 py-2.5 rounded-lg text-sm text-danger hover:bg-card/60">
           Cerrar sesión
         </button>

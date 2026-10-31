@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
 import { Activity, ArrowLeft, Calendar, Camera, ClipboardCheck, Download, Dumbbell, TrendingUp, Lock, MessageCircle, Ruler, Utensils } from "lucide-react";
 import { supabase } from "@/lib/supabaseClient";
 import { downloadReportPdf } from "@/lib/planPdf";
@@ -86,10 +87,10 @@ export function StudentDetail({ student, onClose, onChanged, initialPanel = null
       {/* Lo más usado */}
       <div className="grid grid-cols-2 gap-2.5 mb-6">
         {student.isSelf ? (
-          <a href="/" className={tile}>
+          <Link href="/" className={tile}>
             <span className="w-9 h-9 rounded-xl bg-accent/15 flex items-center justify-center"><Dumbbell size={17} className="text-accent" /></span>
             <span className="text-ink text-sm font-medium">Entrenar (mi vista)</span>
-          </a>
+          </Link>
         ) : (
         <button onClick={() => setPanel("messages")} className={tile}>
           <span className="w-9 h-9 rounded-xl bg-accent/15 flex items-center justify-center"><MessageCircle size={17} className="text-accent" /></span>

@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import Link from "next/link";
 import { supabase } from "@/lib/supabaseClient";
 import { intakeHasAlert } from "@/lib/intake";
 import { matchesSearch } from "@/lib/search";
@@ -97,9 +98,9 @@ export function StudentsView({ initialAction, onInitialActionDone }) {
             {me.planLabel ? <span className="text-accent">{me.planLabel}</span> : `${me.daysAssigned} / 7 días con rutina`} · No cuenta en el reporte ni en los anuncios
           </p>
           <div className="flex items-center gap-2 mt-3">
-            <a href="/" className="flex items-center justify-center gap-2 bg-field text-accent text-sm font-medium rounded-lg py-2 px-4">
+            <Link href="/" className="flex items-center justify-center gap-2 bg-field text-accent text-sm font-medium rounded-lg py-2 px-4">
               <Dumbbell size={15} /> Entrenar
-            </a>
+            </Link>
             <button onClick={() => setOpen({ student: me, initialPanel: null })} className="flex-1 bg-accent text-app text-sm font-semibold rounded-lg py-2">
               Planearme
             </button>

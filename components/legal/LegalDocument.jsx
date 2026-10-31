@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import Link from "next/link";
 import { BrandMark } from "@/components/ui/BrandMark";
 import { LEGAL_TEXT } from "@/lib/legalText";
 import { detectLang, rememberLang } from "@/lib/i18n";
@@ -20,10 +21,10 @@ export function LegalDocument({ kind }) {
     <div className="min-h-screen bg-night">
       <div className="max-w-2xl mx-auto px-5 py-8">
         <div className="flex items-center justify-between mb-8">
-          <a href="/" className="flex items-center gap-3">
+          <Link href="/" className="flex items-center gap-3">
             <BrandMark size={36} />
             <span className="text-ink text-lg font-semibold tracking-tight">kineaco</span>
-          </a>
+          </Link>
           <div className="flex gap-1 bg-card border border-white/[0.06] rounded-full p-1">
             {["es", "en"].map((code) => (
               <button
@@ -67,8 +68,8 @@ export function LegalDocument({ kind }) {
         </div>
 
         <div className="mt-10 pt-6 border-t border-white/[0.06] flex flex-wrap gap-4 text-sm">
-          <a href={other.href} className="text-accent">{other.label}</a>
-          <a href="/" className="text-soft">{lang === "en" ? "Back to the app" : "Volver a la app"}</a>
+          <Link href={other.href} className="text-accent">{other.label}</Link>
+          <Link href="/" className="text-soft">{lang === "en" ? "Back to the app" : "Volver a la app"}</Link>
         </div>
       </div>
     </div>
