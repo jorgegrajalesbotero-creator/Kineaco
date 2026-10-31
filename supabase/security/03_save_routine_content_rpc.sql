@@ -46,6 +46,17 @@ begin
     raise exception 'No autorizado' using errcode = '42501';
   end if;
 
+  -- (SEG · IDOR entre coaches) Además de ser coach, debe ser el dueño de la
+  -- rutina. Evita que un coach sobreescriba rutinas creadas por otro coach.
+  -- La columna dueña es routines.created_by (verificada en RoutinesView.jsx).
+  if not exists (
+    select 1 from public.routines r
+     where r.id = p_routine_id
+       and r.created_by = (select auth.uid())
+  ) then
+    raise exception 'No autorizado para esta rutina' using errcode = '42501';
+  end if;
+
   -- Todo lo que sigue va en la misma transacción: si algo falla, se revierte.
   delete from public.routine_exercises where routine_id = p_routine_id;
   delete from public.routine_blocks    where routine_id = p_routine_id;
@@ -118,3 +129,16 @@ revoke all on function public.save_routine_content(uuid, text, jsonb, jsonb) fro
 grant execute on function public.save_routine_content(uuid, text, jsonb, jsonb) to authenticated;
 
 -- NOTA: ajusta el tipo de exercise_id / routine_id si en tu esquema no son uuid.
+--
+-- ⚠️ IMPORTANTE (check de dueño): si hay rutinas ANTIGUAS con created_by = NULL
+-- (creadas antes de que existiera esa columna), el coach ya no podrá editarlas
+-- con esta versión. Antes de aplicar, rellena el dueño de las rutinas huérfanas,
+-- por ejemplo asignándolas al coach principal:
+--
+--   update public.routines
+--      set created_by = '<UUID-DEL-COACH>'
+--    where created_by is null;
+--
+-- Comprueba primero cuántas hay:  select count(*) from public.routines where created_by is null;
+-- Si Kineaco tiene un único coach, el check es defensa en profundidad (riesgo bajo),
+-- pero el backfill es necesario igualmente para no bloquear la edición.

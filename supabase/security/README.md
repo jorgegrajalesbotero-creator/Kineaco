@@ -29,7 +29,17 @@ Ejecuta los scripts en Supabase Studio → **SQL Editor**, en este orden:
 | `04_estado_real.md` | Resumen de qué ya estaba cubierto y qué no. | — |
 | `04_tablas_rls_plantilla.sql` | Plantilla del patrón RLS estándar para tablas **nuevas** (no ejecutar tal cual). | Prevención |
 | `05_auditoria_codigo.md` | Informe de la auditoría de seguridad del código (2026-10-31), priorizado. | — |
-| `05_recomendaciones_seguridad.sql` | Mejoras SQL recomendadas (consentimiento salud, avatars por carpeta, IDOR RPC). **Revisar y probar antes de aplicar.** | SEG varios |
+| `05_recomendaciones_seguridad.sql` | Resumen original de mejoras recomendadas (reemplazado por `06`–`08`, ya afinados). | SEG varios |
+| `06_avatars_por_carpeta.sql` | **Listo para aplicar.** Lectura de avatar solo del dueño o del coach. | IDOR avatares (medio) |
+| `07_consentimiento_salud.sql` | Parte 1 (función `has_health_consent`) lista; parte 2 (políticas por tabla) requiere ver las RLS actuales. | Consentimiento salud / Ley 1581 (medio) |
+| `08_funciones_versionadas.sql` | Plantilla para versionar `is_coach`, `has_active_access`, `delete_my_account` (exportar desde Supabase). | Auditabilidad / supresión (medio) |
+
+> **Hallazgos medios (afinados 2026-10-31):** scripts `06`–`08` preparados contra
+> el esquema real del código. Pendiente de aplicar en Supabase:
+> - **IDOR entre coaches:** ya integrado en `03` (check `routines.created_by`). Re-aplicar `03`. ⚠️ Rellenar antes `created_by` en rutinas antiguas (ver `03`).
+> - **Avatares por carpeta:** aplicar `06`.
+> - **Consentimiento de salud:** aplicar parte 1 de `07`; la parte 2 necesita las políticas RLS actuales (correr el `select from pg_policies` del propio `07`).
+> - **Versionar funciones:** correr el export de `08` y pegar las definiciones.
 
 ## Antes de aplicar — IMPORTANTE
 
