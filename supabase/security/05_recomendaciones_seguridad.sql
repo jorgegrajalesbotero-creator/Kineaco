@@ -1,0 +1,101 @@
+-- =====================================================================
+-- 05 · RECOMENDACIONES DE SEGURIDAD (de la auditoría 2026-10-31)
+-- =====================================================================
+-- NO EJECUTAR A CIEGAS. Cada bloque está comentado. Revísalo contra tu
+-- esquema real, descoméntalo y pruébalo en Supabase (idealmente en un
+-- entorno de pruebas) antes de aplicarlo en producción. Ver el detalle y
+-- la severidad de cada hallazgo en 05_auditoria_codigo.md.
+-- =====================================================================
+
+
+-- ---------------------------------------------------------------------
+-- (A) Consentimiento de datos de salud impuesto por el servidor  [MEDIO]
+-- ---------------------------------------------------------------------
+-- Hoy, retirar el consentimiento solo oculta datos en la UI. Esta función
+-- permite a las políticas RLS respetar la última decisión del alumno.
+-- Ajusta nombres de tabla/columnas a tu esquema real antes de usar.
+--
+-- create or replace function public.has_health_consent(p_uid uuid)
+-- returns boolean
+-- language sql
+-- security definer
+-- set search_path = public
+-- as $$
+--   select coalesce(
+--     (select lc.health_data_consent
+--        from public.legal_consents lc
+--       where lc.user_id = p_uid
+--       order by lc.created_at desc
+--       limit 1),
+--     false
+--   );
+-- $$;
+-- revoke execute on function public.has_health_consent(uuid) from public, anon;
+-- grant  execute on function public.has_health_consent(uuid) to authenticated;
+--
+-- Luego, en CADA tabla de datos de salud (progress_photos, body_measurements,
+-- intake_forms, y el campo de dolor en daily_checkins), añadir la condición a
+-- las políticas SELECT e INSERT, por ejemplo:
+--
+--   using ( public.is_coach() and public.has_health_consent(user_id)
+--           or ((select auth.uid()) = user_id and public.has_health_consent(user_id)) )
+--
+-- Aplica la misma idea en el bucket de fotos (storage.objects del bucket
+-- de progreso). Decide con el responsable legal si, retirado el consentimiento,
+-- los datos se OCULTAN (RLS) o se BORRAN (job/Edge Function).
+
+
+-- ---------------------------------------------------------------------
+-- (B) Avatares: lectura solo del dueño o del coach            [MEDIO]
+-- ---------------------------------------------------------------------
+-- Reemplaza la política de 02_storage_rls.sql que deja a cualquier
+-- autenticado leer cualquier avatar.
+-- ANTES DE APLICAR: confirma que ningún alumno necesite ver el avatar de
+-- otro usuario (p. ej. el del coach en una pantalla compartida). Si lo
+-- necesita, ajusta la condición.
+--
+-- drop policy if exists "avatar lectura autenticada" on storage.objects;
+-- create policy "avatar lectura propia o coach" on storage.objects
+--   for select to authenticated
+--   using (
+--     bucket_id = 'avatars'
+--     and ( (storage.foldername(name))[1] = (select auth.uid())::text
+--           or public.is_coach() )
+--   );
+
+
+-- ---------------------------------------------------------------------
+-- (C) save_routine_content: evitar IDOR entre coaches         [MEDIO]
+-- ---------------------------------------------------------------------
+-- La RPC de 03 solo valida is_coach(), no que la rutina sea de quien llama.
+-- Si tus rutinas tienen una columna de dueño (p. ej. coach_id o created_by),
+-- añade esta comprobación al inicio del cuerpo, tras el check is_coach():
+--
+--   if not exists (
+--     select 1 from public.routines r
+--      where r.id = p_routine_id
+--        and r.coach_id = (select auth.uid())   -- ajusta el nombre de la columna
+--   ) then
+--     raise exception 'No autorizado para esta rutina' using errcode = '42501';
+--   end if;
+--
+-- Si en Kineaco hay un único coach, el riesgo es bajo, pero la comprobación
+-- es defensa en profundidad para cuando haya más de uno.
+
+
+-- ---------------------------------------------------------------------
+-- (D) Versionar las funciones SQL que faltan en el repo       [MEDIO]
+-- ---------------------------------------------------------------------
+-- is_coach(), has_active_access() y delete_my_account() NO están en el repo,
+-- así que no se pueden auditar ni reconstruir. Expórtalas desde Supabase
+-- (SQL Editor) y guárdalas en supabase/security/ para control de versiones.
+-- Para obtener su definición:
+--
+--   select pg_get_functiondef(p.oid)
+--     from pg_proc p join pg_namespace n on n.oid = p.pronamespace
+--    where n.nspname = 'public'
+--      and p.proname in ('is_coach', 'has_active_access', 'delete_my_account');
+--
+-- Verifica que delete_my_account use auth.uid() (no un id del cliente) y que
+-- borre TODO: filas del usuario, fotos del Storage y la cuenta de auth.users
+-- (derecho de supresión, Ley 1581).

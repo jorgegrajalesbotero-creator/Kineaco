@@ -20,6 +20,8 @@ Ejecuta los scripts en Supabase Studio → **SQL Editor**, en este orden:
 | `03_save_routine_content_rpc.sql` | RPC transaccional para guardar rutinas sin corromperlas. | BUG-M1 |
 | `04_estado_real.md` | Resumen de qué ya estaba cubierto y qué no. | — |
 | `04_tablas_rls_plantilla.sql` | Plantilla del patrón RLS estándar para tablas **nuevas** (no ejecutar tal cual). | Prevención |
+| `05_auditoria_codigo.md` | Informe de la auditoría de seguridad del código (2026-10-31), priorizado. | — |
+| `05_recomendaciones_seguridad.sql` | Mejoras SQL recomendadas (consentimiento salud, avatars por carpeta, IDOR RPC). **Revisar y probar antes de aplicar.** | SEG varios |
 
 ## Antes de aplicar — IMPORTANTE
 
