@@ -32,14 +32,24 @@ Ejecuta los scripts en Supabase Studio → **SQL Editor**, en este orden:
 | `05_recomendaciones_seguridad.sql` | Resumen original de mejoras recomendadas (reemplazado por `06`–`08`, ya afinados). | SEG varios |
 | `06_avatars_por_carpeta.sql` | **Listo para aplicar.** Lectura de avatar solo del dueño o del coach. | IDOR avatares (medio) |
 | `07_consentimiento_salud.sql` | Parte 1 (función `has_health_consent`) lista; parte 2 (políticas por tabla) requiere ver las RLS actuales. | Consentimiento salud / Ley 1581 (medio) |
-| `08_funciones_versionadas.sql` | Plantilla para versionar `is_coach`, `has_active_access`, `delete_my_account` (exportar desde Supabase). | Auditabilidad / supresión (medio) |
+| `08_funciones_versionadas.sql` | `is_coach`, `has_active_access`, `delete_my_account` **versionadas** (exportadas 2026-10-31) + revisión Ley 1581. | Auditabilidad / supresión (medio) |
+| `09_aplicar_todo.sql` | **SOLUCIÓN DEFINITIVA.** Un solo script idempotente: avatares (06) + IDOR coaches con backfill (03) + consentimiento salud (07) + `delete_my_account` que borra Storage. Incluye verificación. | Todos los hallazgos medios |
 
-> **Hallazgos medios (afinados 2026-10-31):** scripts `06`–`08` preparados contra
-> el esquema real del código. Pendiente de aplicar en Supabase:
-> - **IDOR entre coaches:** ya integrado en `03` (check `routines.created_by`). Re-aplicar `03`. ⚠️ Rellenar antes `created_by` en rutinas antiguas (ver `03`).
-> - **Avatares por carpeta:** aplicar `06`.
-> - **Consentimiento de salud:** aplicar parte 1 de `07`; la parte 2 necesita las políticas RLS actuales (correr el `select from pg_policies` del propio `07`).
-> - **Versionar funciones:** correr el export de `08` y pegar las definiciones.
+> **Validación en vivo de los hallazgos medios (2026-10-31, vía MCP solo-lectura):**
+> - **IDOR entre coaches (`03`):** ❌ **no aplicado** en la base (la RPC solo valida
+>   `is_coach()`). Riesgo **actual bajo**: hay **1 solo coach** y **0 rutinas sin dueño**
+>   (backfill NO necesario). `03` actualizado con el check `created_by`. → **Aplicar `03`.**
+> - **Avatares por carpeta (`06`):** ❌ **ABIERTO** — sigue la política ancha
+>   `"avatar lectura autenticada"` (cualquier autenticado lee avatares ajenos). → **Aplicar `06`.**
+> - **Consentimiento de salud (`07`):** ❌ **ABIERTO** — `has_health_consent` no existe
+>   y las 26 políticas de salud no lo comprueban. `07` ahora trae **Parte 1 + Parte 2
+>   completas** (recreadas contra las políticas reales). → **Revisar y aplicar `07`.**
+> - **Versionar funciones (`08`):** ✅ **resuelto** — `is_coach`, `has_active_access` y
+>   `delete_my_account` exportadas y versionadas en `08`. Revisión Ley 1581 de
+>   `delete_my_account`: OK salvo que **no borra los archivos de Storage** (huérfanos).
+>
+> ⚠️ El MCP de esta sesión es **solo-lectura**: los scripts `03`, `06`, `07` hay que
+> ejecutarlos en **Supabase Studio → SQL Editor**. Haz backup antes.
 
 ## Antes de aplicar — IMPORTANTE
 

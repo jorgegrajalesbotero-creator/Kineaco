@@ -46,37 +46,234 @@ grant execute on function public.has_health_consent(uuid) to authenticated;
 -- ---------------------------------------------------------------------
 -- PARTE 2 — Aplicar el consentimiento en las políticas RLS
 -- ---------------------------------------------------------------------
--- ⚠️ REQUIERE ver primero las políticas ACTUALES de cada tabla de salud, para
--- no romperlas. Ejecuta antes (solo lectura) y revisa el resultado:
+-- GENERADO 2026-10-31 recreando las políticas REALES (exportadas de pg_policies)
+-- y añadiendo " and public.has_health_consent(<user_id>) ". Se conservan nombre,
+-- rol y lógica originales; se moderniza auth.uid() -> (select auth.uid()) (perf RLS).
 --
---   select tablename, policyname, cmd, qual, with_check
---     from pg_policies
---    where schemaname = 'public'
---      and tablename in ('body_measurements','intake_forms',
---                        'progress_photo_sets','progress_photos',
---                        'weekly_checkins','daily_checkins')
---    order by tablename, cmd;
+-- CRITERIO:
+--   · Se gatea SELECT / INSERT / UPDATE (y el ALL del coach) con el consentimiento.
+--   · Los DELETE se dejan SIN gatear: el alumno debe poder borrar sus propios
+--     datos aunque haya retirado el consentimiento (derecho de supresión, Ley 1581).
+--   · Para el coach, el consentimiento comprobado es el del DUEÑO del dato (user_id).
 --
--- Con el patrón actual (auth.uid() = user_id  OR  is_coach()), la forma de
--- imponer el consentimiento es AÑADIR " and public.has_health_consent(user_id) "
--- a la condición. Para cada política SELECT e INSERT (y UPDATE donde aplique),
--- recréala conservando su nombre y su lógica, p. ej.:
+-- DECISIÓN LEGAL (confirmar): esto implementa la opción (a) OCULTAR (reversible).
+-- Para la opción (b) BORRAR haría falta además un job/Edge Function de borrado.
 --
---   drop policy if exists "<nombre actual>" on public.body_measurements;
---   create policy "<nombre actual>" on public.body_measurements
---     for select to authenticated
---     using (
---       ( (select auth.uid()) = user_id or public.is_coach() )
---       and public.has_health_consent(user_id)
---     );
---
--- Repite para: intake_forms, progress_photo_sets, progress_photos y el acceso
--- al dolor en los check-ins. Para las FOTOS, aplica la misma condición a la
--- política SELECT del bucket 'progress-photos' en storage.objects, derivando el
--- user_id de la carpeta:  public.has_health_consent( ((storage.foldername(name))[1])::uuid ).
---
--- DECISIÓN LEGAL (confirmar con el responsable): al retirar el consentimiento,
---   (a) OCULTAR los datos (RLS, lo de arriba) — reversible si lo vuelve a dar, o
---   (b) BORRARLOS (job/Edge Function) — irreversible, cumplimiento más estricto.
--- El mínimo recomendado es (a); (b) requiere además un proceso de borrado.
+-- ⚠️ Aplicar en Supabase Studio -> SQL Editor (el MCP de esta sesión es solo-lectura).
+--    Haz backup antes. Si algún alumno SIN consentimiento vigente tiene datos, tras
+--    aplicar dejarán de verse hasta que lo vuelva a otorgar.
+-- =====================================================================
+
+-- ===================== body_measurements =====================
+drop policy if exists "alumno ve sus medidas" on public.body_measurements;
+create policy "alumno ve sus medidas" on public.body_measurements
+  for select to authenticated
+  using (
+    ((select auth.uid()) = user_id) and has_active_access()
+    and public.has_health_consent(user_id)
+  );
+
+drop policy if exists "alumno registra sus medidas" on public.body_measurements;
+create policy "alumno registra sus medidas" on public.body_measurements
+  for insert to authenticated
+  with check (
+    ((select auth.uid()) = user_id) and has_active_access()
+    and (measured_on >= (current_date - 1) and measured_on <= (current_date + 1))
+    and public.has_health_consent(user_id)
+  );
+
+drop policy if exists "alumno edita sus medidas" on public.body_measurements;
+create policy "alumno edita sus medidas" on public.body_measurements
+  for update to authenticated
+  using (
+    ((select auth.uid()) = user_id) and (created_by = (select auth.uid()))
+    and has_active_access() and (measured_on >= (current_date - 8))
+    and public.has_health_consent(user_id)
+  )
+  with check (
+    ((select auth.uid()) = user_id) and (measured_on >= (current_date - 8))
+    and public.has_health_consent(user_id)
+  );
+
+drop policy if exists "coach maneja medidas" on public.body_measurements;
+create policy "coach maneja medidas" on public.body_measurements
+  for all to authenticated
+  using ( is_coach() and public.has_health_consent(user_id) )
+  with check ( is_coach() and public.has_health_consent(user_id) );
+-- DELETE "alumno borra sus medidas": SIN cambios (derecho de supresión).
+
+-- ===================== daily_checkins (campo de dolor) =====================
+drop policy if exists "alumno ve su check-in diario" on public.daily_checkins;
+create policy "alumno ve su check-in diario" on public.daily_checkins
+  for select to authenticated
+  using (
+    ((select auth.uid()) = user_id) and has_active_access()
+    and public.has_health_consent(user_id)
+  );
+
+drop policy if exists "coach ve check-ins diarios" on public.daily_checkins;
+create policy "coach ve check-ins diarios" on public.daily_checkins
+  for select to authenticated
+  using ( is_coach() and public.has_health_consent(user_id) );
+
+drop policy if exists "alumno registra su check-in diario" on public.daily_checkins;
+create policy "alumno registra su check-in diario" on public.daily_checkins
+  for insert to authenticated
+  with check (
+    ((select auth.uid()) = user_id) and has_active_access()
+    and (check_date >= (current_date - 1) and check_date <= (current_date + 1))
+    and public.has_health_consent(user_id)
+  );
+
+drop policy if exists "alumno corrige su check-in diario" on public.daily_checkins;
+create policy "alumno corrige su check-in diario" on public.daily_checkins
+  for update to authenticated
+  using (
+    ((select auth.uid()) = user_id) and has_active_access()
+    and (check_date >= (current_date - 1) and check_date <= (current_date + 1))
+    and public.has_health_consent(user_id)
+  )
+  with check (
+    ((select auth.uid()) = user_id)
+    and (check_date >= (current_date - 1) and check_date <= (current_date + 1))
+    and public.has_health_consent(user_id)
+  );
+
+-- ===================== intake_forms (ficha de ingreso) =====================
+drop policy if exists "alumno ve su ficha" on public.intake_forms;
+create policy "alumno ve su ficha" on public.intake_forms
+  for select to authenticated
+  using ( ((select auth.uid()) = user_id) and public.has_health_consent(user_id) );
+
+drop policy if exists "coach ve fichas" on public.intake_forms;
+create policy "coach ve fichas" on public.intake_forms
+  for select to authenticated
+  using ( is_coach() and public.has_health_consent(user_id) );
+
+drop policy if exists "alumno crea su ficha" on public.intake_forms;
+create policy "alumno crea su ficha" on public.intake_forms
+  for insert to authenticated
+  with check ( ((select auth.uid()) = user_id) and public.has_health_consent(user_id) );
+
+drop policy if exists "alumno actualiza su ficha" on public.intake_forms;
+create policy "alumno actualiza su ficha" on public.intake_forms
+  for update to authenticated
+  using ( ((select auth.uid()) = user_id) and public.has_health_consent(user_id) )
+  with check ( ((select auth.uid()) = user_id) and public.has_health_consent(user_id) );
+
+-- ===================== progress_photo_sets =====================
+drop policy if exists "alumno ve sus registros de fotos" on public.progress_photo_sets;
+create policy "alumno ve sus registros de fotos" on public.progress_photo_sets
+  for select to authenticated
+  using (
+    ((select auth.uid()) = user_id) and has_active_access()
+    and public.has_health_consent(user_id)
+  );
+
+drop policy if exists "coach ve registros de fotos" on public.progress_photo_sets;
+create policy "coach ve registros de fotos" on public.progress_photo_sets
+  for select to authenticated
+  using ( is_coach() and public.has_health_consent(user_id) );
+
+drop policy if exists "alumno crea sus registros de fotos" on public.progress_photo_sets;
+create policy "alumno crea sus registros de fotos" on public.progress_photo_sets
+  for insert to authenticated
+  with check (
+    ((select auth.uid()) = user_id) and has_active_access()
+    and public.has_health_consent(user_id)
+  );
+
+drop policy if exists "alumno edita sus registros de fotos" on public.progress_photo_sets;
+create policy "alumno edita sus registros de fotos" on public.progress_photo_sets
+  for update to authenticated
+  using (
+    ((select auth.uid()) = user_id) and has_active_access()
+    and public.has_health_consent(user_id)
+  )
+  with check ( ((select auth.uid()) = user_id) and public.has_health_consent(user_id) );
+-- DELETE "alumno borra sus registros de fotos": SIN cambios (supresión).
+
+-- ===================== progress_photos =====================
+drop policy if exists "alumno ve sus fotos de progreso" on public.progress_photos;
+create policy "alumno ve sus fotos de progreso" on public.progress_photos
+  for select to authenticated
+  using (
+    ((select auth.uid()) = user_id) and has_active_access()
+    and public.has_health_consent(user_id)
+  );
+
+drop policy if exists "coach ve fotos de progreso" on public.progress_photos;
+create policy "coach ve fotos de progreso" on public.progress_photos
+  for select to authenticated
+  using ( is_coach() and public.has_health_consent(user_id) );
+
+drop policy if exists "alumno sube sus fotos de progreso" on public.progress_photos;
+create policy "alumno sube sus fotos de progreso" on public.progress_photos
+  for insert to authenticated
+  with check (
+    ((select auth.uid()) = user_id) and has_active_access()
+    and exists (
+      select 1 from public.progress_photo_sets s
+       where s.id = progress_photos.set_id and s.user_id = (select auth.uid())
+    )
+    and public.has_health_consent(user_id)
+  );
+-- DELETE "alumno borra sus fotos de progreso": SIN cambios (supresión).
+
+-- ===================== weekly_checkins =====================
+drop policy if exists "alumno ve sus checkins" on public.weekly_checkins;
+create policy "alumno ve sus checkins" on public.weekly_checkins
+  for select to authenticated
+  using ( ((select auth.uid()) = user_id) and public.has_health_consent(user_id) );
+
+drop policy if exists "coach ve checkins" on public.weekly_checkins;
+create policy "coach ve checkins" on public.weekly_checkins
+  for select to authenticated
+  using ( is_coach() and public.has_health_consent(user_id) );
+
+drop policy if exists "alumno crea su checkin" on public.weekly_checkins;
+create policy "alumno crea su checkin" on public.weekly_checkins
+  for insert to authenticated
+  with check (
+    ((select auth.uid()) = user_id) and (has_active_access() or is_coach())
+    and (week_start >= (current_date - 8) and week_start <= (current_date + 1))
+    and public.has_health_consent(user_id)
+  );
+
+drop policy if exists "alumno edita su checkin" on public.weekly_checkins;
+create policy "alumno edita su checkin" on public.weekly_checkins
+  for update to authenticated
+  using (
+    ((select auth.uid()) = user_id) and (week_start >= (current_date - 8))
+    and public.has_health_consent(user_id)
+  )
+  with check ( ((select auth.uid()) = user_id) and public.has_health_consent(user_id) );
+
+drop policy if exists "coach responde checkins" on public.weekly_checkins;
+create policy "coach responde checkins" on public.weekly_checkins
+  for update to authenticated
+  using ( is_coach() and public.has_health_consent(user_id) )
+  with check ( is_coach() and public.has_health_consent(user_id) );
+
+-- ===================== Storage: bucket privado 'progress-photos' =====================
+-- El user_id se deriva de la carpeta: (storage.foldername(name))[1].
+drop policy if exists "alumno ve fotos de progreso (storage)" on storage.objects;
+create policy "alumno ve fotos de progreso (storage)" on storage.objects
+  for select to authenticated
+  using (
+    bucket_id = 'progress-photos'
+    and (storage.foldername(name))[1] = (select auth.uid())::text
+    and has_active_access()
+    and public.has_health_consent((select auth.uid()))
+  );
+
+drop policy if exists "coach ve fotos de progreso (storage)" on storage.objects;
+create policy "coach ve fotos de progreso (storage)" on storage.objects
+  for select to authenticated
+  using (
+    bucket_id = 'progress-photos'
+    and is_coach()
+    and public.has_health_consent( ((storage.foldername(name))[1])::uuid )
+  );
+-- INSERT/DELETE de fotos en storage: SIN cambios (subida y supresión por el dueño).
 -- =====================================================================
