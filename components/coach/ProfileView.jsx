@@ -101,7 +101,7 @@ export function ProfileView({ onProfileUpdate }) {
         <div className="relative">
           <div className="w-20 h-20 rounded-full bg-field flex items-center justify-center overflow-hidden">
             {form.avatarUrl ? (
-              <img src={form.avatarUrl} alt="Foto de perfil" className="w-full h-full object-cover" />
+              <img src={form.avatarUrl} alt="Foto de perfil" decoding="async" className="w-full h-full object-cover" />
             ) : (
               <User size={30} className="text-muted" />
             )}

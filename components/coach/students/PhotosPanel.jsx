@@ -58,7 +58,7 @@ export function PhotosPanel({ student, onClose }) {
   const photoBox = (url, label) =>
     url ? (
       <a href={url} target="_blank" rel="noreferrer">
-        <img src={url} alt={label} className="w-full aspect-[3/4] object-cover rounded-lg" />
+        <img src={url} alt={label} loading="lazy" decoding="async" className="w-full aspect-[3/4] object-cover rounded-lg" />
       </a>
     ) : (
       <div className="w-full aspect-[3/4] rounded-lg bg-field flex items-center justify-center text-muted text-xs">Sin foto</div>

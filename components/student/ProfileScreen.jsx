@@ -73,7 +73,7 @@ export function ProfileScreen({ fullName, email, avatarUrl, userId, onProfileUpd
         <div className="relative mb-3">
           <div className="w-24 h-24 rounded-full bg-field flex items-center justify-center overflow-hidden">
             {localAvatarUrl ? (
-              <img src={localAvatarUrl} alt={tr("Foto de perfil")} className="w-full h-full object-cover" />
+              <img src={localAvatarUrl} alt={tr("Foto de perfil")} decoding="async" className="w-full h-full object-cover" />
             ) : (
               <User size={36} className="text-muted" />
             )}

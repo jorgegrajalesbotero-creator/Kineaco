@@ -17,7 +17,7 @@ export function SideNav({ active, onSelect, unreadCount, fullName, avatarUrl, on
       <div className="px-5 py-6 border-b border-field flex items-center gap-3">
         <div className="w-10 h-10 rounded-full bg-field flex items-center justify-center overflow-hidden shrink-0">
           {avatarUrl ? (
-            <img src={avatarUrl} alt="" className="w-full h-full object-cover" />
+            <img src={avatarUrl} alt="" decoding="async" className="w-full h-full object-cover" />
           ) : (
             <User size={18} className="text-muted" />
           )}

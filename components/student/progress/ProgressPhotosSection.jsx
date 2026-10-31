@@ -207,7 +207,7 @@ export function ProgressPhotosSection({ userId, latestWeight }) {
                   </div>
                 ) : previews[a.key] ? (
                   <div className="relative">
-                    <img src={previews[a.key]} alt={a.label} className="w-full aspect-[3/4] object-cover rounded-xl" />
+                    <img src={previews[a.key]} alt={a.label} decoding="async" className="w-full aspect-[3/4] object-cover rounded-xl" />
                     <button
                       onClick={() => removeFile(a.key)}
                       className="absolute top-1 right-1 w-6 h-6 rounded-full bg-app/80 flex items-center justify-center"
@@ -304,7 +304,7 @@ export function ProgressPhotosSection({ userId, latestWeight }) {
                       <div key={a.key}>
                         {url ? (
                           <a href={url} target="_blank" rel="noreferrer">
-                            <img src={url} alt={a.label} className="w-full aspect-[3/4] object-cover rounded-xl" />
+                            <img src={url} alt={a.label} loading="lazy" decoding="async" className="w-full aspect-[3/4] object-cover rounded-xl" />
                           </a>
                         ) : (
                           <div className="w-full aspect-[3/4] rounded-xl bg-field flex items-center justify-center text-muted text-[10px]">{tr("Sin foto")}</div>

@@ -63,7 +63,7 @@ export function HomeScreen({ userId, onNavigate, onOpenCheckin, onOpenAnnounceme
           <div className="flex items-center gap-3 min-w-0">
             <div className="p-[2px] rounded-full bg-gradient-to-br from-accent to-accent/20 shrink-0">
               <div className="w-11 h-11 rounded-full bg-field flex items-center justify-center overflow-hidden ring-2 ring-app">
-                {avatarUrl ? <img src={avatarUrl} alt="" className="w-full h-full object-cover" /> : <User size={18} className="text-muted" />}
+                {avatarUrl ? <img src={avatarUrl} alt="" decoding="async" className="w-full h-full object-cover" /> : <User size={18} className="text-muted" />}
               </div>
             </div>
             <div className="min-w-0">
