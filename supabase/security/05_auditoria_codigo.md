@@ -46,5 +46,12 @@ seguridad/validación: `safeHttpUrl` (rechaza `javascript:`/`data:`/otros),
 
 Las pruebas de penetración reales (intentar escalar rol, leer datos ajenos,
 saltar RLS desde la consola del navegador) **requieren la app corriendo con
-usuarios de prueba**. No se pudieron ejecutar en esta sesión. Checklist de
-verificación manual en el README (`SEG-A1`, `SEG-A2`) y en `05_...sql`.
+usuarios de prueba**. No se pudieron ejecutar en esta sesión.
+
+Hay un script listo: **`scripts/pentest-rls.mjs`** (`npm run pentest:rls`).
+Simula a un alumno malicioso e intenta 6 ataques (escalar rol, extender acceso,
+leer perfiles ajenos, usar la RPC de coach, escribir datos a nombre de otro,
+suplantar remitente). Se ejecuta con un usuario alumno de prueba y la clave
+anon; cada ataque PASA si Supabase lo bloquea. Recomendado contra un entorno de
+pruebas. Ver las instrucciones en la cabecera del script. También está el
+checklist manual del README (`SEG-A1`, `SEG-A2`).
