@@ -27,7 +27,7 @@ const fmt = (s) => `${Math.floor(s / 60)}:${String(Math.max(0, s) % 60).padStart
 
 // Temporizador de descanso flotante. `endsAt` = momento en que termina (ms)
 export function RestTimer({ endsAt, total, onChange, onClose }) {
-  const [now, setNow] = useState(Date.now());
+  const [now, setNow] = useState(() => Date.now());
   const finished = useRef(false);
   const left = Math.ceil((endsAt - now) / 1000);
   const done = left <= 0;
