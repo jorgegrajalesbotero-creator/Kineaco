@@ -13,8 +13,12 @@ Ejecuta los scripts en Supabase Studio → **SQL Editor**, en este orden:
 > Ver `04_estado_real.md` para el detalle de lo que ya está cubierto.
 >
 > **Actualización (2026-10-31):** `01` y `02` **aplicados en Supabase** (confirmado).
-> Falta **verificar** con `npm run pentest:rls`. Nueva auditoría de código en
-> `05_auditoria_codigo.md` + mejoras recomendadas en `05_recomendaciones_seguridad.sql`.
+> **Verificado con `npm run pentest:rls`: 6/6 ataques bloqueados.** SEG-A1 confirmado
+> en vivo (no se puede escalar `role` ni extender `access_until`). El pentest también
+> confirma que `save_routine_content` (BUG-M1) ya existe y rechaza a alumnos, y que
+> las políticas de `profiles`, `body_measurements` y `messages` bloquean IDOR y
+> suplantación de remitente. Nueva auditoría de código en `05_auditoria_codigo.md` +
+> mejoras recomendadas en `05_recomendaciones_seguridad.sql`.
 
 | Archivo | Qué hace | Riesgo que cierra |
 |---|---|---|
