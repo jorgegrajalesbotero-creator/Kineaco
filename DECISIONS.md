@@ -40,6 +40,31 @@ Supabase** (cambian y expiran en cada carga) y **previews locales** (`blob:`).
 `loading="lazy"` + `decoding="async"` en las fotos grandes (galerías de
 progreso) y `decoding="async"` en los avatares.
 
+## Warnings de `react-hooks` aceptados (carga de datos y hydration)
+
+**Warnings relacionados:** `react-hooks/set-state-in-effect`,
+`react-hooks/exhaustive-deps`.
+
+Se analizaron uno a uno. **Ninguno es un bug real de dependencias.** Se dejan
+como están porque "arreglarlos" en masa no mejora el rendimiento (son cargas
+únicas al montar) e introduce riesgo de bucles de recarga. Dos patrones:
+
+- **Carga de datos** (`useEffect(() => { loadX(); }, [])` o `[student.id]` /
+  `[userId]`): el `setState` ocurre DESPUÉS del `await`, no es síncrono; no hay
+  render en cascada evitable. Las dependencias están completas (o `[]` es
+  intencional para cargar solo al montar). Es el patrón idiomático de fetch con
+  Supabase sin librería de data-fetching.
+- **Idioma / hydration** (`setLang(detectLang())` en login, `page.js`,
+  `restablecer`, `LegalDocument`): necesita `window`/`localStorage`, que no
+  existen en el servidor. NO se puede derivar en el render sin romper SSR
+  (provocaría hydration mismatch). Debe quedarse en un effect de montaje.
+
+Sí se corrigieron las impurezas de render reales (no son cargas):
+`react-hooks/globals` (formateador con estado de módulo mutado en render →
+fábrica local), `react-hooks/static-components` (componente definido en el
+render → elemento JSX) y un `react-hooks/immutability` (acumulador mutable →
+`reduce`).
+
 ## CSP
 
 Ver `SEG-M6` (documentado en `next.config.mjs`): decisión de CSP con riesgo

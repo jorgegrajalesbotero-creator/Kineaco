@@ -9,9 +9,9 @@ const GRID = "#25332C";
 const MUTED = "#5E6B63";
 const SOFT = "#8A9690";
 
-// Número con 1 decimal como máximo (coma en español, punto en inglés)
-let decimalComma = true;
-const fmt = (n) => {
+// Número con 1 decimal como máximo (coma en español, punto en inglés).
+// Fábrica: cada vista crea su propio formateador según su locale, sin estado global.
+const makeFmt = (decimalComma) => (n) => {
   if (n == null) return "—";
   const s = String(Math.round(n * 10) / 10);
   return decimalComma ? s.replace(".", ",") : s;
@@ -85,7 +85,8 @@ export function ExerciseProgressView({ points: allPoints, t = plainT, locale = "
   }, [points]);
 
   if (allPoints.length === 0) return null;
-  decimalComma = !String(locale).startsWith("en");
+  const decimalComma = !String(locale).startsWith("en");
+  const fmt = makeFmt(decimalComma);
 
   const pts = records.points;
   const n = pts.length;
@@ -240,9 +241,9 @@ export function ExerciseProgressView({ points: allPoints, t = plainT, locale = "
         <div>
           <p className="text-muted text-[11px] font-medium uppercase tracking-[0.14em] mb-1">{t("Antes vs. ahora")}</p>
           <p className="text-soft text-xs mb-3">{formatEntryDate(pts[0].date, pts[0].precision, locale)} → {formatEntryDate(pts[n - 1].date, pts[n - 1].precision, locale)}</p>
-          <CompareRow label={t("Peso")} unit={t("kg")} data={cmp.weight} />
-          <CompareRow label={t("Reps por serie")} data={cmp.reps} />
-          <CompareRow label={t("Series")} data={cmp.sets} />
+          <CompareRow label={t("Peso")} unit={t("kg")} data={cmp.weight} fmt={fmt} />
+          <CompareRow label={t("Reps por serie")} data={cmp.reps} fmt={fmt} />
+          <CompareRow label={t("Series")} data={cmp.sets} fmt={fmt} />
           {cmp.volume && (
             <div className="flex items-center justify-between bg-app/60 border border-white/[0.06] rounded-xl px-3.5 py-2.5 mt-1">
               <span className="text-soft text-xs">{t("Kilos movidos por sesión")}</span>
@@ -256,7 +257,7 @@ export function ExerciseProgressView({ points: allPoints, t = plainT, locale = "
 }
 
 // Una fila de "antes vs. ahora" con barra de inicio a fin
-function CompareRow({ label, unit = "", data }) {
+function CompareRow({ label, unit = "", data, fmt }) {
   if (!data) return null;
   const { from, to } = data;
   const max = Math.max(from, to, 1) * 1.1;

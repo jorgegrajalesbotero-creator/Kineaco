@@ -37,15 +37,19 @@ export function PlanPhasesEditor({ phases, onChange }) {
   };
   const field = "w-full bg-field text-ink text-sm rounded-lg px-2.5 py-2 outline-none focus:ring-1 focus:ring-accent";
   const label = "text-muted text-[11px]";
-  let weekCursor = 1;
+  // Semana de inicio (acumulada) de cada fase, precalculada sin mutar nada durante el render.
+  const phaseStarts = [];
+  phases.reduce((acc, p) => {
+    phaseStarts.push(acc);
+    return acc + (Number(p.weeks) || 0);
+  }, 1);
 
   return (
     <div className="space-y-2">
       {phases.map((p, i) => {
         const t = phaseType(p.phase_type);
         const n = Number(p.weeks) || 0;
-        const from = weekCursor;
-        weekCursor += n;
+        const from = phaseStarts[i];
         return (
           <div key={i} className="bg-field/40 rounded-lg p-3" style={{ borderLeft: `3px solid ${t.color}`, borderRadius: 0 }}>
             <div className="flex items-center gap-2 mb-2">

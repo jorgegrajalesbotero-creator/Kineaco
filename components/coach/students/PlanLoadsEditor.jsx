@@ -58,7 +58,8 @@ export function PlanLoadsEditor({ weeks, exercises, loads, cells, weekOv, onLoad
   const noPct = weeks.every((w) => w.pct == null);
 
   // Fila de semanas (encabezado común)
-  const Header = () => (
+  // Elemento (no componente) para no recrear el tipo en cada render y evitar remontajes.
+  const headerRow = (
     <div className="flex gap-1">
       {weeks.map((w) => {
         const t = w.phase ? phaseType(w.phase.phase_type) : null;
@@ -82,7 +83,7 @@ export function PlanLoadsEditor({ weeks, exercises, loads, cells, weekOv, onLoad
         <div className="overflow-x-auto pb-1">
           <div className="flex gap-2 items-end min-w-max">
             <div className="w-16 shrink-0" />
-            <Header />
+            {headerRow}
           </div>
           <div className="flex gap-2 items-center mt-1 min-w-max">
             <span className="w-16 shrink-0 text-muted text-xs">% del RM</span>
@@ -194,7 +195,7 @@ export function PlanLoadsEditor({ weeks, exercises, loads, cells, weekOv, onLoad
 
                   <div className="overflow-x-auto pb-1">
                     <div className="min-w-max">
-                      <Header />
+                      {headerRow}
                       <div className="flex gap-1 mt-1">
                         {weeks.map((w) => {
                           const r = loadFor({ weeks, loads, cells, exerciseId: ex.exercise_id, week: w.week });
