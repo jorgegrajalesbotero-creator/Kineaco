@@ -19,6 +19,7 @@ Ejecuta los scripts en Supabase Studio → **SQL Editor**, en este orden:
 | `02_storage_rls.sql` | Privatiza el bucket `avatars` + lectura solo autenticada. | SEG-A2 |
 | `03_save_routine_content_rpc.sql` | RPC transaccional para guardar rutinas sin corromperlas. | BUG-M1 |
 | `04_estado_real.md` | Resumen de qué ya estaba cubierto y qué no. | — |
+| `04_tablas_rls_plantilla.sql` | Plantilla del patrón RLS estándar para tablas **nuevas** (no ejecutar tal cual). | Prevención |
 
 ## Antes de aplicar — IMPORTANTE
 
