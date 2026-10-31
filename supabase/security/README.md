@@ -11,6 +11,10 @@ Ejecuta los scripts en Supabase Studio → **SQL Editor**, en este orden:
 > **Actualización (2026-10-28):** se ejecutó el diagnóstico. La base **ya tiene
 > RLS completa y bien hecha**. Solo quedan **2 hallazgos confirmados** (`01` y `02`).
 > Ver `04_estado_real.md` para el detalle de lo que ya está cubierto.
+>
+> **Actualización (2026-10-31):** `01` y `02` **aplicados en Supabase** (confirmado).
+> Falta **verificar** con `npm run pentest:rls`. Nueva auditoría de código en
+> `05_auditoria_codigo.md` + mejoras recomendadas en `05_recomendaciones_seguridad.sql`.
 
 | Archivo | Qué hace | Riesgo que cierra |
 |---|---|---|
