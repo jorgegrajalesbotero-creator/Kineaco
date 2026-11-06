@@ -78,7 +78,7 @@ export function PlanLoadsEditor({ weeks, exercises, loads, cells, weekOv, onLoad
       <div className="bg-card rounded-xl p-4 mb-4">
         <p className="text-ink text-sm font-medium mb-1">%, reps y series de cada semana</p>
         <p className="text-muted text-xs mb-3">
-          Salen de las fases. Podés cambiar una semana puntual escribiendo encima; para volver al cálculo, borrá el número. Si una semana no tiene series, se usan las de la rutina.
+          Salen de las fases. Podés cambiar una semana puntual escribiendo encima; para volver al cálculo, borrá el número. Las series salen solas de cada fase, igual que el % y las reps.
         </p>
         <div className="overflow-x-auto pb-1">
           <div className="flex gap-2 items-end min-w-max">
