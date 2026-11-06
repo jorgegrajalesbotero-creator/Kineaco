@@ -11,7 +11,7 @@ const CELL_W = 72;
 
 // Cargas del plan: base de cada ejercicio (RM o peso × reps) y peso calculado de cada semana.
 // weeks = planWeeks(...) · loads = [{ exercise_id, from_week, base_type, weight_kg, reps, rounding }]
-// cells = { "exId:week": { value, reps } } · weekOv = { [week]: { pct, reps } }
+// cells = { "exId:week": { value, reps, sets } } · weekOv = { [week]: { pct, reps, sets } }
 export function PlanLoadsEditor({ weeks, exercises, loads, cells, weekOv, onLoads, onCells, onWeekOv }) {
   const [search, setSearch] = useState("");
   const total = weeks.length;
@@ -37,7 +37,7 @@ export function PlanLoadsEditor({ weeks, exercises, loads, cells, weekOv, onLoad
     const k = cellKey(exId, week);
     const next = { ...(cells[k] || {}), ...patch };
     const copy = { ...cells };
-    if ((next.value === "" || next.value == null) && !(next.reps || "").trim()) delete copy[k];
+    if ((next.value === "" || next.value == null) && !(next.reps || "").trim() && !String(next.sets || "").trim()) delete copy[k];
     else copy[k] = next;
     onCells(copy);
   };
@@ -49,7 +49,7 @@ export function PlanLoadsEditor({ weeks, exercises, loads, cells, weekOv, onLoad
   const setWeek = (week, patch) => {
     const next = { ...(weekOv[week] || {}), ...patch };
     const copy = { ...weekOv };
-    if ((next.pct === "" || next.pct == null) && !(next.reps || "").trim()) delete copy[week];
+    if ((next.pct === "" || next.pct == null) && !(next.reps || "").trim() && !String(next.sets || "").trim()) delete copy[week];
     else copy[week] = next;
     onWeekOv(copy);
   };
@@ -75,9 +75,9 @@ export function PlanLoadsEditor({ weeks, exercises, loads, cells, weekOv, onLoad
   return (
     <div>
       <div className="bg-card rounded-xl p-4 mb-4">
-        <p className="text-ink text-sm font-medium mb-1">% y reps de cada semana</p>
+        <p className="text-ink text-sm font-medium mb-1">%, reps y series de cada semana</p>
         <p className="text-muted text-xs mb-3">
-          Salen de las fases. Podés cambiar una semana puntual escribiendo encima; para volver al cálculo, borrá el número.
+          Salen de las fases. Podés cambiar una semana puntual escribiendo encima; para volver al cálculo, borrá el número. Si una semana no tiene series, se usan las de la rutina.
         </p>
         <div className="overflow-x-auto pb-1">
           <div className="flex gap-2 items-end min-w-max">
@@ -103,6 +103,18 @@ export function PlanLoadsEditor({ weeks, exercises, loads, cells, weekOv, onLoad
                   value={weekOv[w.week]?.reps ?? ""} placeholder={w.repsAuto || "—"}
                   onChange={(e) => setWeek(w.week, { reps: e.target.value })}
                   className={`shrink-0 text-center text-xs rounded-md py-1.5 bg-field outline-none focus:ring-1 focus:ring-accent placeholder:text-soft ${w.repsEdited ? "text-accent ring-1 ring-accent/60" : "text-ink"}`} />
+              ))}
+            </div>
+          </div>
+          <div className="flex gap-2 items-center mt-1 min-w-max">
+            <span className="w-16 shrink-0 text-muted text-xs">Series</span>
+            <div className="flex gap-1">
+              {weeks.map((w) => (
+                <input key={w.week} inputMode="numeric" style={{ width: CELL_W }}
+                  value={weekOv[w.week]?.sets ?? ""} placeholder={w.setsAuto == null ? "Rutina" : String(w.setsAuto)}
+                  onChange={(e) => setWeek(w.week, { sets: cleanInt(e.target.value).slice(0, 2) })}
+                  aria-label={`Series semana ${w.week}`}
+                  className={`shrink-0 text-center text-xs rounded-md py-1.5 bg-field outline-none focus:ring-1 focus:ring-accent placeholder:text-soft ${w.setsEdited ? "text-accent ring-1 ring-accent/60" : "text-ink"}`} />
               ))}
             </div>
           </div>
@@ -205,6 +217,10 @@ export function PlanLoadsEditor({ weeks, exercises, loads, cells, weekOv, onLoad
                                 onChange={(e) => setCell(ex.exercise_id, w.week, { value: cleanDecimal(e.target.value) })}
                                 aria-label={`Peso semana ${w.week}`}
                                 className={`w-full text-center text-sm rounded-md py-1.5 bg-field outline-none focus:ring-1 focus:ring-accent placeholder:text-ink ${r.manual ? "text-accent ring-1 ring-accent/60" : "text-ink"}`} />
+                              <input inputMode="numeric" value={cell.sets ?? ""} placeholder={r.setsAuto == null ? "series" : `${r.setsAuto} s`}
+                                onChange={(e) => setCell(ex.exercise_id, w.week, { sets: cleanInt(e.target.value).slice(0, 2) })}
+                                aria-label={`Series semana ${w.week}`} title="Series de esta semana"
+                                className={`w-full mt-1 text-center text-[11px] rounded-md py-1 bg-field/60 outline-none focus:ring-1 focus:ring-accent placeholder:text-muted ${r.setsManual ? "text-accent ring-1 ring-accent/60" : "text-ink"}`} />
                               <p className="text-muted text-[10px] text-center mt-0.5 truncate">
                                 {r.kg != null && r.pct != null ? `${fmtNum(r.pct)}%` : ""}{r.reps ? ` · ${r.reps}` : ""}
                               </p>
@@ -214,7 +230,7 @@ export function PlanLoadsEditor({ weeks, exercises, loads, cells, weekOv, onLoad
                       </div>
                     </div>
                   </div>
-                  {hasManual && <p className="text-muted text-[11px] mt-1">Los pesos en lima los escribiste a mano: el cálculo no los cambia. Para volver al cálculo, borrá el número.</p>}
+                  {hasManual && <p className="text-muted text-[11px] mt-1">Los pesos y series en lima los escribiste a mano: el cálculo no los cambia. Para volver al cálculo, borrá el número.</p>}
                 </div>
               );
             })}

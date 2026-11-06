@@ -17,6 +17,7 @@ import { cleanInt } from "@/lib/numbers";
 const MAX_WEEKS = 52;
 const str = (v) => (v == null ? "" : String(v));
 const nOrNull = (v) => (v === "" || v == null ? null : Number(String(v).replace(",", ".")));
+const setsOrNull = (v) => { const n = parseInt(String(v ?? ""), 10); return n > 0 ? Math.min(n, 20) : null; };
 const phaseWeeksTotal = (phases) => phases.reduce((s, p) => s + (Number(p.weeks) || 0), 0);
 
 // Corre todo lo que está en la semana >= desde (índice 1) en "delta" semanas
@@ -137,7 +138,7 @@ export function PlanPanel({ student, onClose }) {
   const startFromTemplate = (tpl) => {
     const phases = [...(tpl.plan_template_phases || [])]
       .sort((a, b) => (a.order_index ?? 0) - (b.order_index ?? 0))
-      .map((p) => ({ phase_type: p.phase_type, name: p.name || "", weeks: str(p.weeks), pct_start: str(p.pct_start), pct_end: str(p.pct_end), reps_start: p.reps_start || "", reps_end: p.reps_end || "" }));
+      .map((p) => ({ phase_type: p.phase_type, name: p.name || "", weeks: str(p.weeks), pct_start: str(p.pct_start), pct_end: str(p.pct_end), reps_start: p.reps_start || "", reps_end: p.reps_end || "", sets_start: str(p.sets_start), sets_end: str(p.sets_end) }));
     const days = tpl.plan_template_days || [];
     const n = Math.min(MAX_WEEKS, Math.max(1, phaseWeeksTotal(phases) || Math.max(4, ...days.map((d) => d.week_index))));
     const data = emptyWeeks(n);
@@ -156,7 +157,7 @@ export function PlanPanel({ student, onClose }) {
     const { data: ph } = await supabase.from("training_plan_phases").select("*").eq("plan_id", plan.id).order("order_index");
     const { data: tpl, error } = await supabase.from("plan_templates").insert({ name: name.trim().slice(0, 80) }).select("id").single();
     if (error || !tpl) return alert("No se pudo crear la plantilla.");
-    const phaseRows = (ph || []).map((p) => ({ template_id: tpl.id, order_index: p.order_index, phase_type: p.phase_type, name: p.name, weeks: p.weeks, pct_start: p.pct_start, pct_end: p.pct_end, reps_start: p.reps_start, reps_end: p.reps_end }));
+    const phaseRows = (ph || []).map((p) => ({ template_id: tpl.id, order_index: p.order_index, phase_type: p.phase_type, name: p.name, weeks: p.weeks, pct_start: p.pct_start, pct_end: p.pct_end, reps_start: p.reps_start, reps_end: p.reps_end, sets_start: p.sets_start ?? null, sets_end: p.sets_end ?? null }));
     const dayRows = (plan.training_plan_days || []).map((d) => ({ template_id: tpl.id, week_index: d.week_index, day_label: d.day_label, routine_id: d.routine_id, order_index: d.order_index ?? 0 }));
     const res = await Promise.all([
       phaseRows.length ? supabase.from("plan_template_phases").insert(phaseRows) : { error: null },
@@ -182,12 +183,12 @@ export function PlanPanel({ student, onClose }) {
       supabase.from("training_plan_load_cells").select("*").eq("plan_id", plan.id),
     ]);
     const weekOv = {};
-    (wk || []).forEach((r) => { weekOv[r.week_index] = { pct: str(r.pct), reps: r.reps || "" }; });
+    (wk || []).forEach((r) => { weekOv[r.week_index] = { pct: str(r.pct), reps: r.reps || "", sets: str(r.sets) }; });
     const cells = {};
-    (cl || []).forEach((c) => { cells[cellKey(c.exercise_id, c.week_index)] = { value: str(c.value), reps: c.reps || "" }; });
+    (cl || []).forEach((c) => { cells[cellKey(c.exercise_id, c.week_index)] = { value: str(c.value), reps: c.reps || "", sets: str(c.sets) }; });
     setEditing({
       id: plan.id, name: plan.name || "", start: plan.start_date, weeks: plan.weeks, data: weeksFromPlan(plan),
-      phases: (ph || []).map((p) => ({ phase_type: p.phase_type, name: p.name || "", weeks: str(p.weeks), pct_start: str(p.pct_start), pct_end: str(p.pct_end), reps_start: p.reps_start || "", reps_end: p.reps_end || "" })),
+      phases: (ph || []).map((p) => ({ phase_type: p.phase_type, name: p.name || "", weeks: str(p.weeks), pct_start: str(p.pct_start), pct_end: str(p.pct_end), reps_start: p.reps_start || "", reps_end: p.reps_end || "", sets_start: str(p.sets_start), sets_end: str(p.sets_end) })),
       weekOv,
       loads: (ld || []).map((l) => ({ exercise_id: l.exercise_id, from_week: l.from_week, base_type: l.base_type, weight_kg: str(l.weight_kg), reps: str(l.reps), rounding: Number(l.rounding) || 2.5 })),
       cells,
@@ -307,19 +308,19 @@ export function PlanPanel({ student, onClose }) {
     if (del.some((r) => r.error)) { setSaving(false); return alert("El plan se guardó, pero no se pudieron actualizar las fases y cargas."); }
     const phaseRows = editing.phases
       .filter((p) => Number(p.weeks) > 0)
-      .map((p, i) => ({ plan_id: planId, order_index: i, phase_type: p.phase_type, name: p.name.trim() || null, weeks: Number(p.weeks), pct_start: nOrNull(p.pct_start), pct_end: nOrNull(p.pct_end), reps_start: p.reps_start.trim() || null, reps_end: p.reps_end.trim() || null }));
+      .map((p, i) => ({ plan_id: planId, order_index: i, phase_type: p.phase_type, name: p.name.trim() || null, weeks: Number(p.weeks), pct_start: nOrNull(p.pct_start), pct_end: nOrNull(p.pct_end), reps_start: p.reps_start.trim() || null, reps_end: p.reps_end.trim() || null, sets_start: setsOrNull(p.sets_start), sets_end: setsOrNull(p.sets_end) }));
     const weekRows = Object.entries(editing.weekOv)
       .filter(([w]) => Number(w) <= n)
-      .map(([w, v]) => ({ plan_id: planId, week_index: Number(w), pct: nOrNull(v.pct), reps: (v.reps || "").trim() || null }))
-      .filter((r) => r.pct != null || r.reps);
+      .map(([w, v]) => ({ plan_id: planId, week_index: Number(w), pct: nOrNull(v.pct), reps: (v.reps || "").trim() || null, sets: setsOrNull(v.sets) }))
+      .filter((r) => r.pct != null || r.reps || r.sets != null);
     const seenBase = new Set();
     const loadRows = editing.loads
       .filter((l) => nOrNull(l.weight_kg) > 0 && Number(l.from_week) <= n && (l.base_type === "rm" || Number(l.reps) > 0))
       .filter((l) => { const k = `${l.exercise_id}:${l.from_week}`; if (seenBase.has(k)) return false; seenBase.add(k); return true; })
       .map((l) => ({ plan_id: planId, exercise_id: l.exercise_id, from_week: Number(l.from_week) || 1, base_type: l.base_type, weight_kg: nOrNull(l.weight_kg), reps: l.base_type === "work" ? Number(l.reps) : null, rounding: Number(l.rounding) || 2.5 }));
     const cellRows = Object.entries(editing.cells)
-      .map(([k, v]) => { const [ex, w] = k.split(":"); return { plan_id: planId, exercise_id: ex, week_index: Number(w), value_type: "kg", value: nOrNull(v.value), reps: (v.reps || "").trim() || null }; })
-      .filter((c) => c.week_index <= n && (c.value != null || c.reps));
+      .map(([k, v]) => { const [ex, w] = k.split(":"); return { plan_id: planId, exercise_id: ex, week_index: Number(w), value_type: "kg", value: nOrNull(v.value), reps: (v.reps || "").trim() || null, sets: setsOrNull(v.sets) }; })
+      .filter((c) => c.week_index <= n && (c.value != null || c.reps || c.sets != null));
     const inserts = [
       ["training_plan_phases", phaseRows], ["training_plan_weeks", weekRows], ["training_plan_loads", loadRows], ["training_plan_load_cells", cellRows],
     ].filter(([, r]) => r.length > 0);

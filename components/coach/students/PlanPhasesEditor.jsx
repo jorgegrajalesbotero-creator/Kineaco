@@ -13,19 +13,21 @@ function stringDefaults(type) {
     pct_end: d.pct_end == null ? "" : String(d.pct_end),
     reps_start: d.reps_start || "",
     reps_end: d.reps_end || "",
+    sets_start: d.sets_start == null ? "" : String(d.sets_start),
+    sets_end: d.sets_end == null ? "" : String(d.sets_end),
   };
 }
 
 export const ATR_PRESET = () => [newPhase("acumulacion", 4), newPhase("transformacion", 3), newPhase("realizacion", 2)];
 
-// Fases del plan: tipo, nombre, semanas, % de inicio y fin, reps de inicio y fin
+// Fases del plan: tipo, nombre, semanas, % de inicio y fin, reps y series de inicio y fin
 export function PlanPhasesEditor({ phases, onChange }) {
   const set = (i, patch) => onChange(phases.map((p, j) => (j === i ? { ...p, ...patch } : p)));
   const changeType = (i, type) => {
     const p = phases[i];
     const old = stringDefaults(p.phase_type);
     // Si los % siguen siendo los de partida del tipo anterior, se cambian por los del tipo nuevo
-    const untouched = ["pct_start", "pct_end", "reps_start", "reps_end"].every((k) => (p[k] || "") === old[k]);
+    const untouched = ["pct_start", "pct_end", "reps_start", "reps_end", "sets_start", "sets_end"].every((k) => (p[k] || "") === old[k]);
     set(i, { phase_type: type, ...(untouched ? stringDefaults(type) : {}) });
   };
   const move = (i, dir) => {
@@ -89,6 +91,14 @@ export function PlanPhasesEditor({ phases, onChange }) {
               <label className="block">
                 <span className={label}>Reps fin</span>
                 <input value={p.reps_end} maxLength={20} onChange={(e) => set(i, { reps_end: e.target.value })} placeholder="8" className={field} />
+              </label>
+              <label className="block">
+                <span className={label}>Series inicio</span>
+                <input inputMode="numeric" value={p.sets_start || ""} onChange={(e) => set(i, { sets_start: cleanInt(e.target.value).slice(0, 2) })} placeholder="De la rutina" className={field} />
+              </label>
+              <label className="block">
+                <span className={label}>Series fin</span>
+                <input inputMode="numeric" value={p.sets_end || ""} onChange={(e) => set(i, { sets_end: cleanInt(e.target.value).slice(0, 2) })} placeholder="De la rutina" className={field} />
               </label>
             </div>
           </div>

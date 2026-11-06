@@ -173,17 +173,23 @@ export default function App() {
         const blockSets = block?.sets ?? e.sets;
         const usesProgression = blockUsesProgression(block?.block_type);
         const reps = (usesProgression && progressionMap[e.exercise_id]?.reps) || e.reps;
+        // Series: las de la semana del plan (si las tiene) mandan sobre las de la rutina o el bloque
+        const planSets = usesProgression ? progressionMap[e.exercise_id]?.sets || null : null;
+        const routineSets = block ? blockSets : e.sets;
+        const setsN = planSets || routineSets;
+        const setsDiffer = !!(block && planSets && Number(planSets) !== Number(blockSets));
         return {
           exerciseId: e.exercise_id,
           itemKey: e.item_key,
           blockId: block ? block.id : null,
           name: e.exercises?.name || "Ejercicio",
           get sets() {
-            const n = block ? blockSets : e.sets;
-            return [n ? tr("{p0} series", { p0: n }) : "", reps ? tr("{p0} reps", { p0: reps }) : ""].filter(Boolean).join(" × ");
+            return [setsN ? tr("{p0} series", { p0: setsN }) : "", reps ? tr("{p0} reps", { p0: reps }) : ""].filter(Boolean).join(" × ");
           },
           get rowLabel() {
-            return block ? (reps ? tr("{p0} reps", { p0: reps }) : "") : null;
+            if (!block) return null;
+            if (setsDiffer) return [tr("{p0} series", { p0: planSets }), reps ? tr("{p0} reps", { p0: reps }) : ""].filter(Boolean).join(" × ");
+            return reps ? tr("{p0} reps", { p0: reps }) : "";
           },
           videoUrl: e.exercises?.video_url || "",
           completed: hasBlocks ? doneItemKeys.has(e.item_key) : doneExerciseIds.has(e.exercise_id),
@@ -191,7 +197,7 @@ export default function App() {
             ? resolveTargetWeight(e.exercise_id, e.target_weight_kg, customWeightMap[e.exercise_id], progressionMap)
             : e.target_weight_kg,
           restMinutes: e.rest_minutes,
-          setsCount: parseInt(block ? blockSets : e.sets, 10) || 0,
+          setsCount: parseInt(setsN, 10) || 0,
           targetReps: reps ? String(reps) : "",
         };
       }),

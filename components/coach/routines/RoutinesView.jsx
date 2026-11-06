@@ -167,7 +167,7 @@ export function RoutinesView() {
 
     const contentError = await writeRoutineContent(newRoutine.id, draftMode, draftExercises, draftBlocks);
     if (contentError) {
-      alert("La rutina se creó, pero hubo un error al guardar sus ejercicios: ");
+      alert("La rutina se creó, pero hubo un error al guardar sus ejercicios: " + (contentError.message || ""));
     }
 
     setDraft({ title: "", level: "Principiante", goal: "", duration: "" });
@@ -270,7 +270,7 @@ export function RoutinesView() {
 
     const contentError = await writeRoutineContent(viewingId, editMode, editExercises, editBlocks);
     if (contentError) {
-      alert("Error al guardar los ejercicios de la rutina: ");
+      alert("Error al guardar los ejercicios de la rutina: " + (contentError.message || ""));
       setSavingEdit(false);
       return;
     }
@@ -345,7 +345,7 @@ export function RoutinesView() {
     const blocks = content.blocks.map((b) => ({ ...b, exercises: strip(b.exercises) }));
     const cErr = await writeRoutineContent(nr.id, content.mode, list, blocks);
     setBusyId(null);
-    if (cErr) alert("La copia se creó, pero hubo un error al copiar sus ejercicios: ");
+    if (cErr) alert("La copia se creó, pero hubo un error al copiar sus ejercicios: " + (cErr.message || ""));
     loadRoutines();
   };
 
