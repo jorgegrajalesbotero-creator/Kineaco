@@ -2,9 +2,9 @@
 
 import Link from "next/link";
 import { BrandMark } from "@/components/ui/BrandMark";
-import { Calendar, ClipboardList, Dumbbell, LayoutDashboard, Megaphone, User, Users } from "lucide-react";
+import { Calendar, ClipboardList, Dumbbell, LayoutDashboard, Megaphone, User, UserCog, Users } from "lucide-react";
 
-export function Sidebar({ active, onSelect, email, fullName, onLogout, bell }) {
+export function Sidebar({ active, onSelect, email, fullName, onLogout, bell, isAdmin }) {
   const items = [
     { key: "rutinas", label: "Rutinas", icon: LayoutDashboard },
     { key: "ejercicios", label: "Ejercicios", icon: Dumbbell },
@@ -12,6 +12,8 @@ export function Sidebar({ active, onSelect, email, fullName, onLogout, bell }) {
     { key: "reporte", label: "Reporte semanal", icon: ClipboardList },
     { key: "anuncios", label: "Anuncios", icon: Megaphone },
     { key: "programas", label: "Programas", icon: Calendar },
+    // Solo el administrador gestiona usuarios y roles.
+    ...(isAdmin ? [{ key: "usuarios", label: "Usuarios", icon: UserCog }] : []),
     { key: "perfil", label: "Mi perfil", icon: User },
   ];
   return (
@@ -20,7 +22,7 @@ export function Sidebar({ active, onSelect, email, fullName, onLogout, bell }) {
         <div className="flex items-center gap-3 min-w-0">
           <BrandMark size={32} className="shrink-0" />
           <div className="min-w-0">
-            <p className="text-ink font-semibold text-[15px] tracking-tight leading-tight whitespace-nowrap">Panel Coach</p>
+            <p className="text-ink font-semibold text-[15px] tracking-tight leading-tight whitespace-nowrap">{isAdmin ? "Panel Admin" : "Panel Coach"}</p>
             <p className="text-muted text-xs truncate">{fullName || email}</p>
           </div>
         </div>

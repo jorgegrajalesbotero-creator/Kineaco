@@ -11,6 +11,7 @@ import { ReportView } from "@/components/coach/ReportView";
 import { RoutinesView } from "@/components/coach/routines/RoutinesView";
 import { Sidebar } from "@/components/coach/Sidebar";
 import { StudentsView } from "@/components/coach/students/StudentsView";
+import { UsersView } from "@/components/admin/UsersView";
 import { BrandMark } from "@/components/ui/BrandMark";
 
 export default function AdminPanel() {
@@ -18,6 +19,7 @@ export default function AdminPanel() {
   const [pendingStudentAction, setPendingStudentAction] = useState(null);
   const [menuOpen, setMenuOpen] = useState(false);
   const [coachId, setCoachId] = useState(null);
+  const [isAdmin, setIsAdmin] = useState(false);
   const [notifKey, setNotifKey] = useState(0);
   const [checking, setChecking] = useState(true);
   const [userEmail, setUserEmail] = useState("");
@@ -39,10 +41,11 @@ export default function AdminPanel() {
         .eq("id", user.id)
         .single();
 
-      if (profile?.role !== "coach") {
+      if (profile?.role !== "coach" && profile?.role !== "admin") {
         window.location.href = "/";
         return;
       }
+      setIsAdmin(profile?.role === "admin");
       setCoachId(user.id);
       setChecking(false);
       createCoachNotices(user.id).catch(() => { });
@@ -92,11 +95,12 @@ export default function AdminPanel() {
     <NotificationBell supabase={supabase} userId={coachId} onNavigate={openFromNotification} refreshKey={notifKey} />
   ) : null;
 
-  const tabLabels = { rutinas: "Rutinas", ejercicios: "Ejercicios", alumnos: "Alumnos", reporte: "Reporte semanal", anuncios: "Anuncios", programas: "Programas", perfil: "Mi perfil" };
+  const tabLabels = { rutinas: "Rutinas", ejercicios: "Ejercicios", alumnos: "Alumnos", reporte: "Reporte semanal", anuncios: "Anuncios", programas: "Programas", usuarios: "Usuarios", perfil: "Mi perfil" };
   const sidebarProps = {
     active: tab,
     email: userEmail,
     fullName,
+    isAdmin,
     onLogout: async () => {
       await supabase.auth.signOut();
       window.location.href = "/login";
@@ -112,7 +116,7 @@ export default function AdminPanel() {
           </button>
           <BrandMark size={30} />
           <div className="min-w-0 flex-1">
-            <p className="text-muted text-[11px] leading-none">Panel Coach</p>
+            <p className="text-muted text-[11px] leading-none">{isAdmin ? "Panel Admin" : "Panel Coach"}</p>
             <p className="text-ink text-base font-semibold truncate">{tabLabels[tab]}</p>
           </div>
           {bell}
@@ -147,6 +151,7 @@ export default function AdminPanel() {
           )}
           {tab === "anuncios" && <AnnouncementsView />}
           {tab === "programas" && <ProgramsView />}
+          {tab === "usuarios" && isAdmin && <UsersView />}
           {tab === "perfil" && <ProfileView onProfileUpdate={setFullName} />}
         </div>
       </div>

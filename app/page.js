@@ -509,6 +509,9 @@ export default function App() {
         .eq("id", user.id)
         .single();
 
+      // El personal (coach o admin) usa la app como alumno, pero sin muros de acceso ni consentimiento.
+      const isStaff = profile?.role === "coach" || profile?.role === "admin";
+
       setFullName(profile?.full_name || "");
       const { data: langRow } = await supabase.from("profiles").select("language").eq("id", user.id).maybeSingle();
       if (langRow?.language === "es" || langRow?.language === "en") {
@@ -519,7 +522,7 @@ export default function App() {
       setUserEmail(user?.email || "");
 
       let healthOk = true;
-      if (profile?.role !== "coach") {
+      if (!isStaff) {
         const { data: intakeRow } = await supabase
           .from("intake_forms")
           .select("user_id")
@@ -543,9 +546,9 @@ export default function App() {
       setAccessNeverGranted(!profile?.access_until);
 
       const until = profile?.access_until ? new Date(profile.access_until) : null;
-      const blocked = profile?.role !== "coach" && (!until || until < new Date());
+      const blocked = !isStaff && (!until || until < new Date());
       setAccessBlocked(blocked);
-      setIsCoach(profile?.role === "coach");
+      setIsCoach(isStaff);
 
       if (blocked) {
         setLoadingRoutine(false);
@@ -559,7 +562,7 @@ export default function App() {
       loadedDayRef.current = today;
       setLoadingRoutine(false);
 
-      if (profile?.role !== "coach") {
+      if (!isStaff) {
         // Los avisos usan SIEMPRE la rutina de hoy, no la del día que se esté mirando.
         createStudentNotices(user.id, profile, todayRoutine, healthOk).catch(() => { });
       }
