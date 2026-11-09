@@ -6,6 +6,7 @@ import { EPLEY_MAX_REPS, cellKey, fmtNum, loadFor, phaseType, rmOf } from "@/lib
 import { cleanDecimal, cleanInt } from "@/lib/numbers";
 import { SearchInput } from "@/components/ui/Search";
 import { matchesSearch } from "@/lib/search";
+import { Select } from "@/components/ui/Select";
 
 const CELL_W = 72;
 
@@ -140,11 +141,10 @@ export function PlanLoadsEditor({ weeks, exercises, loads, cells, weekOv, onLoad
                   <div className="flex items-center justify-between gap-2 mb-3">
                     <p className="text-ink text-sm font-medium truncate">{ex.name}{ex.missing ? <span className="text-muted text-xs font-normal"> · ya no está en las rutinas del plan</span> : null}</p>
                     <div className="flex items-center gap-2 shrink-0">
-                      <select value={String(rounding)} onChange={(e) => setRounding(ex.exercise_id, Number(e.target.value))} disabled={exLoads.length === 0}
-                        className="bg-field text-soft text-xs rounded-lg px-2 py-1.5 outline-none disabled:opacity-40" aria-label="Redondeo">
+                      <Select size="sm" aria-label="Redondeo" value={String(rounding)} onChange={(e) => setRounding(ex.exercise_id, Number(e.target.value))} disabled={exLoads.length === 0}>
                         <option value="2.5">Redondeo 2,5 kg</option>
                         <option value="1">Redondeo 1 kg</option>
-                      </select>
+                      </Select>
                       {hasManual && (
                         <button onClick={() => resetRow(ex.exercise_id)} className="text-soft text-xs flex items-center gap-1 hover:text-ink" title="Volver todo al cálculo">
                           <RotateCcw size={12} /> Recalcular
@@ -170,14 +170,14 @@ export function PlanLoadsEditor({ weeks, exercises, loads, cells, weekOv, onLoad
                               <span className="text-soft text-xs">Base</span>
                             )}
                             {idx > 0 && (
-                              <select value={l.from_week} onChange={(e) => updateLoad(l, { from_week: Number(e.target.value) })} className={`${field} py-1.5 text-xs`}>
+                              <Select size="sm" aria-label="Desde la semana" value={l.from_week} onChange={(e) => updateLoad(l, { from_week: Number(e.target.value) })}>
                                 {weeks.filter((w) => w.week > 1).map((w) => <option key={w.week} value={w.week}>{w.week}</option>)}
-                              </select>
+                              </Select>
                             )}
-                            <select value={l.base_type} onChange={(e) => updateLoad(l, { base_type: e.target.value })} className={`${field} py-1.5 text-xs`}>
+                            <Select size="sm" aria-label="Tipo de base" value={l.base_type} onChange={(e) => updateLoad(l, { base_type: e.target.value })}>
                               <option value="rm">RM (1 repetición)</option>
                               <option value="work">Peso × reps</option>
-                            </select>
+                            </Select>
                             <input inputMode="decimal" value={l.weight_kg} onChange={(e) => updateLoad(l, { weight_kg: cleanDecimal(e.target.value) })} placeholder="kg" className={`${field} w-20 py-1.5`} />
                             <span className="text-muted text-xs">kg</span>
                             {l.base_type === "work" && (

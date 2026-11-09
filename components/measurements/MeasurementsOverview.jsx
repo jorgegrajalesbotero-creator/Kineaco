@@ -5,6 +5,7 @@ import { supabase } from "@/lib/supabaseClient";
 import { plain, computeResults } from "@/lib/measurements";
 import { BodyFigure } from "@/components/ui/BodyFigure";
 import { MeasurementResults } from "./MeasurementResults";
+import { Select } from "@/components/ui/Select";
 
 const fmt = (v) => (v == null ? "—" : Number(v).toFixed(1).replace(/\.0$/, ""));
 
@@ -23,7 +24,6 @@ const shortDate = (d, locale) => new Date(d + "T12:00:00").toLocaleDateString(lo
 export const formatMeasureDate = (d, locale = "es-CO") =>
   new Date(d + "T12:00:00").toLocaleDateString(locale, { day: "numeric", month: "short", year: "numeric" });
 
-const selectCls = "w-full bg-app/60 border border-white/[0.07] text-ink text-sm rounded-xl px-3 py-2 outline-none";
 
 // Figura + resultados + historial de las medidas de un alumno (lo usan el alumno y el coach)
 export function MeasurementsOverview({ rows, userId, t = plain, locale = "es-CO", fallbackSex = "mujer", wide = false }) {
@@ -48,16 +48,16 @@ export function MeasurementsOverview({ rows, userId, t = plain, locale = "es-CO"
         <div className="grid grid-cols-2 gap-2 mb-2">
           <label className="block">
             <span className="text-muted text-[10px] uppercase tracking-wider">{t("Medición")}</span>
-            <select value={sel} onChange={(e) => { const v = Number(e.target.value); setSel(v); if (cmp >= 0 && cmp <= v) setCmp(v + 1 < rows.length ? v + 1 : -1); }} className={selectCls}>
+            <Select tone="soft" value={sel} onChange={(e) => { const v = Number(e.target.value); setSel(v); if (cmp >= 0 && cmp <= v) setCmp(v + 1 < rows.length ? v + 1 : -1); }} className="w-full">
               {rows.map((r, i) => <option key={r.id} value={i}>{shortDate(r.measured_on, locale)}</option>)}
-            </select>
+            </Select>
           </label>
           <label className="block">
             <span className="text-muted text-[10px] uppercase tracking-wider">{t("Comparar con")}</span>
-            <select value={cmp} onChange={(e) => setCmp(Number(e.target.value))} className={selectCls}>
+            <Select tone="soft" value={cmp} onChange={(e) => setCmp(Number(e.target.value))} className="w-full">
               <option value={-1}>{t("Sin comparar")}</option>
               {rows.map((r, i) => (i > sel ? <option key={r.id} value={i}>{shortDate(r.measured_on, locale)}</option> : null))}
-            </select>
+            </Select>
           </label>
         </div>
       )}

@@ -3,6 +3,7 @@
 import { useEffect, useId, useRef, useState } from "react";
 import { ArrowUpDown, Check, SlidersHorizontal, X } from "lucide-react";
 import { SearchInput } from "@/components/ui/Search";
+import { Select } from "@/components/ui/Select";
 
 const MAX_VISIBLE = 8; // opciones visibles por categoría antes de "Ver todas"
 const FOCUS = "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/50";
@@ -69,19 +70,18 @@ export function FilterBar({ state, placeholder = "Buscar...", facets = [], sorts
         <SearchInput value={query} onChange={setQuery} placeholder={placeholder} className="flex-1 min-w-0" />
 
         {canSort && (
-          <label className={`${hasFilters ? "hidden md:flex" : "flex"} items-center gap-1.5 shrink-0 bg-card border border-field rounded-lg pl-3 pr-1`}>
-            <ArrowUpDown size={14} className="text-muted" aria-hidden="true" />
-            <span className="sr-only">Ordenar por</span>
-            <select
-              value={sort}
-              onChange={(e) => setSort(e.target.value)}
-              className="bg-transparent text-ink text-sm pr-1 py-2 outline-none cursor-pointer"
-            >
-              {sorts.map((s) => (
-                <option key={s.id} value={s.id} className="bg-panel">{s.label}</option>
-              ))}
-            </select>
-          </label>
+          <Select
+            tone="card"
+            icon={ArrowUpDown}
+            aria-label="Ordenar por"
+            value={sort}
+            onChange={(e) => setSort(e.target.value)}
+            className={`${hasFilters ? "hidden md:block" : ""} shrink-0`}
+          >
+            {sorts.map((s) => (
+              <option key={s.id} value={s.id}>{s.label}</option>
+            ))}
+          </Select>
         )}
 
         {hasFilters && (

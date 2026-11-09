@@ -10,6 +10,7 @@ import { ExerciseProgressView } from "@/components/progress/ExerciseProgressView
 import { SearchSelect } from "@/components/ui/Search";
 import { Skeleton } from "@/components/ui/Skeleton";
 import { PanelLayout } from "./PanelLayout";
+import { Select } from "@/components/ui/Select";
 
 const MONTHS = ["Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio", "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre"];
 const THIS_YEAR = new Date().getFullYear();
@@ -194,14 +195,14 @@ export function ExerciseHistoryPanel({ student, onClose }) {
           <div className="flex flex-wrap gap-2 mb-4">
             {form.precision === "day" && <input type="date" value={form.day} max={localDateString()} onChange={(e) => set({ day: e.target.value })} className={selectCls} />}
             {form.precision === "month" && (
-              <select value={form.month} onChange={(e) => set({ month: Number(e.target.value) })} className={selectCls}>
+              <Select aria-label="Mes" value={form.month} onChange={(e) => set({ month: Number(e.target.value) })}>
                 {MONTHS.map((m, i) => <option key={m} value={i}>{m}</option>)}
-              </select>
+              </Select>
             )}
             {form.precision !== "day" && (
-              <select value={form.year} onChange={(e) => set({ year: Number(e.target.value) })} className={selectCls}>
+              <Select aria-label="Año" value={form.year} onChange={(e) => set({ year: Number(e.target.value) })}>
                 {YEARS.map((y) => <option key={y} value={y}>{y}</option>)}
-              </select>
+              </Select>
             )}
           </div>
 

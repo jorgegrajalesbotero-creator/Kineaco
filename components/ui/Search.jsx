@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Search, X } from "lucide-react";
+import { Check, ChevronDown, Search, X } from "lucide-react";
 import { matchesSearch } from "@/lib/search";
 
 export function SearchInput({ value, onChange, placeholder = "Buscar...", className = "" }) {
@@ -49,30 +49,41 @@ export function SearchSelect({ options, value, onChange, placeholder = "Buscar..
         }}
         placeholder={placeholder}
         disabled={disabled}
-        className={`w-full bg-field text-ink text-sm rounded-lg pl-8 pr-3 py-2 outline-none disabled:opacity-60 ${inputClassName}`}
+        className={`w-full bg-field hover:bg-field-hover text-ink text-sm rounded-lg pl-8 pr-8 py-2 outline-none transition-colors text-ellipsis focus:ring-2 focus:ring-accent/30 disabled:opacity-60 ${inputClassName}`}
+      />
+      <ChevronDown
+        size={15}
+        aria-hidden="true"
+        className={`absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none transition-transform duration-200 ${open ? "rotate-180 text-accent" : "text-soft"}`}
       />
       {open && (
-        <div className="absolute z-30 left-0 right-0 mt-1 max-h-64 overflow-y-auto bg-panel border border-field rounded-lg shadow-xl">
+        <div className="absolute z-30 left-0 right-0 mt-1.5 max-h-64 overflow-y-auto overscroll-contain p-1 bg-panel border border-white/[0.07] rounded-xl shadow-[0_18px_40px_-12px_rgba(0,0,0,0.8)] origin-top animate-panel-in [scrollbar-width:thin] [scrollbar-color:var(--color-field)_transparent]">
           {topOption && (
-            <button type="button" onMouseDown={(e) => e.preventDefault()} onClick={() => pick(topOption.value)} className="w-full text-left px-3 py-2 text-sm text-accent hover:bg-card border-b border-field">
+            <button type="button" onMouseDown={(e) => e.preventDefault()} onClick={() => pick(topOption.value)} className="w-full text-left px-2.5 py-2 mb-1 text-sm text-accent rounded-lg hover:bg-card border-b border-white/[0.05]">
               {topOption.label}{text ? `: "${text}"` : ""}
             </button>
           )}
           {filtered.length === 0 ? (
-            <p className="px-3 py-2 text-xs text-muted">Sin resultados para &quot;{text}&quot;</p>
+            <p className="px-2.5 py-2 text-xs text-soft">Sin resultados para &quot;{text}&quot;</p>
           ) : (
-            filtered.map((o) => (
-              <button
-                key={o.value}
-                type="button"
-                onMouseDown={(e) => e.preventDefault()}
-                onClick={() => pick(o.value)}
-                className={`w-full text-left px-3 py-2 text-sm hover:bg-card ${o.value === value ? "text-accent" : "text-ink"}`}
-              >
-                {o.label}
-                {o.sub && <span className="text-muted text-xs"> · {o.sub}</span>}
-              </button>
-            ))
+            filtered.map((o) => {
+              const isSelected = o.value === value;
+              return (
+                <button
+                  key={o.value}
+                  type="button"
+                  onMouseDown={(e) => e.preventDefault()}
+                  onClick={() => pick(o.value)}
+                  className={`w-full text-left px-2.5 py-2 text-sm rounded-lg flex items-center gap-2 hover:bg-card ${isSelected ? "text-accent" : "text-ink"}`}
+                >
+                  <span className="flex-1 min-w-0 truncate">
+                    {o.label}
+                    {o.sub && <span className="text-soft text-xs"> · {o.sub}</span>}
+                  </span>
+                  {isSelected && <Check size={14} strokeWidth={2.5} aria-hidden="true" className="shrink-0" />}
+                </button>
+              );
+            })
           )}
         </div>
       )}

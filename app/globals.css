@@ -40,10 +40,23 @@
   --font-mono: var(--font-geist-mono), ui-monospace, monospace;
 }
 
+/* La app es oscura: así los controles nativos (listas de los selectores,
+   calendario de fechas, barras de desplazamiento) también salen oscuros. */
+:root {
+  color-scheme: dark;
+}
+
 body {
   background: var(--color-app);
   color: var(--color-ink);
   font-family: var(--font-sans);
+}
+
+/* Opciones de los selectores con los colores de la plataforma */
+select option,
+select optgroup {
+  background-color: var(--color-panel);
+  color: var(--color-ink);
 }
 
 /* En celulares, iOS hace zoom si un campo tiene letra menor a 16px */

@@ -6,6 +6,7 @@ import { supabase } from "@/lib/supabaseClient";
 import { buildPoints, exerciseOptionsFrom, loadExerciseEntries } from "@/lib/exerciseHistory";
 import { ExerciseProgressView } from "@/components/progress/ExerciseProgressView";
 import { Skeleton } from "@/components/ui/Skeleton";
+import { Select } from "@/components/ui/Select";
 
 // Progreso por ejercicio del alumno: su mejor registro de cada MES
 // (incluye el historial que su coach cargó de antes de la app)
@@ -34,15 +35,17 @@ export function ExerciseProgressSection({ userId }) {
           <p className="text-muted text-sm text-center py-4">{tr("Todavía no ha registrado peso en ningún ejercicio.")}</p>
         ) : (
           <>
-            <select
+            <Select
+              size="lg"
+              rounded="xl"
               value={activeKey}
               onChange={(e) => setExerciseKey(e.target.value)}
-              className="block w-full bg-field text-ink text-sm rounded-xl px-3 py-2.5 mb-1 outline-none"
+              className="w-full mb-1"
             >
               {options.map((o) => (
                 <option key={o.key} value={o.key}>{o.name}</option>
               ))}
-            </select>
+            </Select>
             <p className="text-muted text-[11px] mb-4">{tr("Vista por mes: se muestra su mejor registro de cada mes.")}</p>
             {points.length < 2 ? (
               <>
