@@ -32,6 +32,9 @@
   --animate-celebrate: celebrate 0.5s cubic-bezier(0.2, 1.4, 0.4, 1) both;
   --animate-grow-up: grow-up 0.6s cubic-bezier(0.2, 0.8, 0.2, 1) both;
   --animate-check-pop: check-pop 0.35s cubic-bezier(0.3, 1.6, 0.5, 1) both;
+  --animate-panel-in: panel-in 0.22s cubic-bezier(0.16, 1, 0.3, 1) both;
+  --animate-sheet-in: sheet-in 0.34s cubic-bezier(0.16, 1, 0.3, 1) both;
+  --animate-fade-in: fade-in 0.2s ease-out both;
 
   --font-sans: var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif;
   --font-mono: var(--font-geist-mono), ui-monospace, monospace;
@@ -94,4 +97,17 @@ body {
 @keyframes grow-up {
   from { transform: scaleY(0); }
   to { transform: scaleY(1); }
+}
+/* Ficha de filtros: panel flotante (escritorio) y hoja inferior (celular) */
+@keyframes panel-in {
+  from { opacity: 0; transform: translateY(-6px) scale(0.98); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+@keyframes sheet-in {
+  from { transform: translateY(100%); }
+  to { transform: translateY(0); }
+}
+@keyframes fade-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
 }
