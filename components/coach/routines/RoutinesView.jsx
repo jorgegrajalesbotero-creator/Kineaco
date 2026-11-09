@@ -3,6 +3,9 @@
 import { useEffect, useState } from "react";
 import { Check, ChevronRight, Clock, Copy, Download, GitMerge, GripVertical, Pencil, Plus, Trash2, UserPlus, X } from "lucide-react";
 import { matchesSearch } from "@/lib/search";
+import { filterItems, sortItems } from "@/lib/filters";
+import { useFilterState } from "@/lib/useFilterState";
+import { fetchAllRows } from "@/lib/fetchAll";
 import { supabase } from "@/lib/supabaseClient";
 import { downloadRoutinePdf } from "@/lib/planPdf";
 import { BlockEditor } from "@/components/coach/routines/BlockEditor";
@@ -10,7 +13,35 @@ import { autoRoutineTitle, catalogOptions, loadRoutineContent, mergeRoutineConte
 import { ExerciseItemEditor } from "@/components/coach/routines/ExerciseItemEditor";
 import { AssignRoutineModal } from "@/components/coach/routines/AssignRoutineModal";
 import { RoutineModeToggle } from "@/components/coach/routines/RoutineModeToggle";
-import { SearchInput, SearchSelect } from "@/components/ui/Search";
+import { SearchSelect } from "@/components/ui/Search";
+import { FilterBar } from "@/components/ui/FilterBar";
+
+const ROUTINE_SORTS = [
+  { id: "recientes", label: "Más recientes", compare: (a, b) => String(b.created_at || "").localeCompare(String(a.created_at || "")) },
+  { id: "az", label: "Nombre (A-Z)", compare: (a, b) => (a.title || "").localeCompare(b.title || "") },
+  { id: "ejercicios", label: "Más ejercicios", compare: (a, b) => (b.routine_exercises?.length || 0) - (a.routine_exercises?.length || 0) },
+];
+
+// Categorías de filtro de rutinas. assignedIds: rutinas usadas por algún alumno
+// (asignación fija o día de un plan).
+function routineFacets(assignedIds) {
+  return [
+    { id: "nivel", label: "Nivel", getValues: (r) => r.level },
+    { id: "objetivo", label: "Objetivo", getValues: (r) => r.goal, emptyLabel: "Sin objetivo" },
+    {
+      id: "asignacion",
+      label: "Asignación",
+      getValues: (r) => (assignedIds.has(r.id) ? "asignada" : "libre"),
+      options: [{ value: "asignada", label: "Asignada a alumnos" }, { value: "libre", label: "Sin asignar" }],
+    },
+    {
+      id: "formato",
+      label: "Formato",
+      getValues: (r) => (r.routine_blocks?.length ? "bloques" : "lista"),
+      options: [{ value: "bloques", label: "Por bloques" }, { value: "lista", label: "Lista simple" }],
+    },
+  ];
+}
 
 // Lista simple de ejercicios: cada uno se puede editar (lápiz), mover o quitar
 function ListItems({ items, setItems, catalog }) {
@@ -57,7 +88,8 @@ export function RoutinesView() {
   const [routines, setRoutines] = useState([]);
   const [loading, setLoading] = useState(true);
   const [catalog, setCatalog] = useState([]);
-  const [routineSearch, setRoutineSearch] = useState("");
+  const filters = useFilterState("kineaco:filtros:rutinas", "recientes");
+  const [assignedIds, setAssignedIds] = useState(() => new Set());
   const [creating, setCreating] = useState(false);
   const [draft, setDraft] = useState({ title: "", level: "Principiante", goal: "", duration: "" });
   const [draftExercises, setDraftExercises] = useState([]);
@@ -89,10 +121,19 @@ export function RoutinesView() {
     setLoading(true);
     const { data: routinesData } = await supabase
       .from("routines")
-      .select("*, routine_exercises(id), routine_blocks(id)")
+      .select("*, routine_exercises(id, exercises(name)), routine_blocks(id)")
       .order("created_at", { ascending: false });
     setRoutines(routinesData || []);
     setLoading(false);
+  }
+
+  // Rutinas que usa algún alumno: asignación fija o día de un plan
+  async function loadAssigned() {
+    const [fixed, planDays] = await Promise.all([
+      fetchAllRows(() => supabase.from("routine_assignments").select("routine_id").order("id")),
+      fetchAllRows(() => supabase.from("training_plan_days").select("routine_id").order("id")),
+    ]);
+    setAssignedIds(new Set([...fixed, ...planDays].map((r) => r.routine_id).filter(Boolean)));
   }
 
   async function loadCatalog() {
@@ -100,7 +141,7 @@ export function RoutinesView() {
     setCatalog(data || []);
   }
 
-  useEffect(() => { loadRoutines(); loadCatalog(); }, []);
+  useEffect(() => { loadRoutines(); loadCatalog(); loadAssigned(); }, []);
 
   const createExercise = async (name, group) => {
     const { data, error } = await supabase
@@ -577,7 +618,14 @@ export function RoutinesView() {
     );
   }
 
-  const visible = routines.filter((r) => matchesSearch(routineSearch, r.title, r.level, r.goal));
+  const { result: filteredRoutines, facetOptions } = filterItems({
+    items: routines,
+    facets: routineFacets(assignedIds),
+    selected: filters.selected,
+    // También busca por los ejercicios que contiene (ej. "sentadilla")
+    matches: (r) => matchesSearch(filters.query, r.title, r.level, r.goal, ...(r.routine_exercises || []).map((x) => x.exercises?.name)),
+  });
+  const visible = sortItems(filteredRoutines, ROUTINE_SORTS, filters.sort);
   const quickBtn = "flex items-center gap-1 text-xs rounded-lg px-2.5 py-1.5 bg-field text-soft hover:text-ink disabled:opacity-40";
 
   return (
@@ -611,9 +659,16 @@ export function RoutinesView() {
         </div>
       )}
 
-      <SearchInput value={routineSearch} onChange={setRoutineSearch} placeholder="Buscar rutina por nombre, nivel u objetivo..." className="mb-4 max-w-md" />
-      {routineSearch && visible.length === 0 && (
-        <p className="text-muted text-sm mb-4">No hay rutinas que coincidan con &quot;{routineSearch}&quot;.</p>
+      <FilterBar
+        state={filters}
+        placeholder="Buscar por nombre, nivel, objetivo o ejercicio..."
+        facets={facetOptions}
+        sorts={ROUTINE_SORTS}
+        shown={visible.length}
+        total={routines.length}
+      />
+      {!loading && routines.length > 0 && visible.length === 0 && (
+        <p className="text-muted text-sm mb-4">No hay rutinas que coincidan con la búsqueda o los filtros.</p>
       )}
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -657,7 +712,7 @@ export function RoutinesView() {
         })}
       </div>
 
-      {assignRoutine && <AssignRoutineModal routine={assignRoutine} onClose={() => setAssignRoutine(null)} />}
+      {assignRoutine && <AssignRoutineModal routine={assignRoutine} onClose={() => { setAssignRoutine(null); loadAssigned(); }} />}
     </div>
   );
 }

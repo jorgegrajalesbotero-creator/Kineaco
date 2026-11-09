@@ -5,8 +5,10 @@ import Link from "next/link";
 import { supabase } from "@/lib/supabaseClient";
 import { intakeHasAlert } from "@/lib/intake";
 import { matchesSearch } from "@/lib/search";
+import { ACCESS_OPTIONS, SENIORITY_OPTIONS, accessBucket, durationSince, filterItems, seniorityBucket, sortItems } from "@/lib/filters";
+import { useFilterState } from "@/lib/useFilterState";
 import { ChevronRight, Dumbbell, MessageCircle } from "lucide-react";
-import { SearchInput } from "@/components/ui/Search";
+import { FilterBar } from "@/components/ui/FilterBar";
 import { StudentDetail } from "./StudentDetail";
 import { planWeekOf } from "@/lib/trainingPlan";
 import { localDateString } from "@/lib/dates";
@@ -15,18 +17,55 @@ import { Skeleton } from "@/components/ui/Skeleton";
 // Nombres que usan las notificaciones para abrir directamente una sección de la ficha
 const ACTION_TO_PANEL = { messages: "messages", progress: "compare", nutrition: "nutrition", access: "access", photos: "photos", progression: "plan", checkin: "checkin", measurements: "measurements" };
 
+const STUDENT_FACETS = [
+  { id: "acceso", label: "Tiempo de acceso", getValues: (s) => s.accessBucket, options: ACCESS_OPTIONS },
+  { id: "antiguedad", label: "Antigüedad", getValues: (s) => s.seniority, options: SENIORITY_OPTIONS },
+  {
+    id: "alertas",
+    label: "Alertas",
+    getValues: (s) => s.alerts,
+    options: [
+      { value: "dolor", label: "Dolor" },
+      { value: "ficha", label: "Ficha con alerta" },
+      { value: "sinficha", label: "Sin ficha" },
+      { value: "mensajes", label: "Mensajes sin leer" },
+      { value: "ok", label: "Sin alertas" },
+    ],
+  },
+  {
+    id: "entreno",
+    label: "Entrenamiento",
+    getValues: (s) => s.training,
+    options: [
+      { value: "plan", label: "Con plan activo" },
+      { value: "fijas", label: "Solo rutinas fijas" },
+      { value: "nada", label: "Sin rutina" },
+    ],
+  },
+];
+
+const byName = (a, b) => a.name.localeCompare(b.name);
+const STUDENT_SORTS = [
+  { id: "nombre", label: "Nombre (A-Z)", compare: byName },
+  // Los que vencen antes primero; sin acceso al final
+  { id: "vence", label: "Vence primero", compare: (a, b) => (a.accessUntil ? new Date(a.accessUntil) : Infinity) - (b.accessUntil ? new Date(b.accessUntil) : Infinity) || byName(a, b) },
+  { id: "antiguos", label: "Más antiguos", compare: (a, b) => String(a.createdAt || "9999").localeCompare(String(b.createdAt || "9999")) || byName(a, b) },
+  { id: "nuevos", label: "Más recientes", compare: (a, b) => String(b.createdAt || "").localeCompare(String(a.createdAt || "")) || byName(a, b) },
+  { id: "mensajes", label: "Mensajes sin leer", compare: (a, b) => b.unreadCount - a.unreadCount || byName(a, b) },
+];
+
 // Lista de alumnos del coach; cada tarjeta abre la ficha del alumno
 export function StudentsView({ initialAction, onInitialActionDone }) {
-  const [query, setQuery] = useState("");
   const [students, setStudents] = useState([]);
   const [loading, setLoading] = useState(true);
   const [open, setOpen] = useState(null); // { student, initialPanel }
+  const filters = useFilterState("kineaco:filtros:alumnos", "nombre");
 
   async function loadData() {
     const { data: { user } } = await supabase.auth.getUser();
     const myId = user?.id || "00000000-0000-0000-0000-000000000000";
     const [{ data: profiles }, { data: assignments }, { data: unreadMessages }, { data: intakeRows }, { data: painRows }, { data: planRows }, { data: dailyRows }] = await Promise.all([
-      supabase.from("profiles").select("id, full_name, access_until, role").or(`role.eq.alumno,id.eq.${myId}`),
+      supabase.from("profiles").select("id, full_name, access_until, role, created_at").or(`role.eq.alumno,id.eq.${myId}`),
       supabase.from("routine_assignments").select("user_id, day_label"),
       supabase.from("messages").select("user_id").eq("read_by_coach", false),
       supabase.from("intake_forms").select("user_id, current_injury, medical_restriction"),
@@ -46,21 +85,38 @@ export function StudentsView({ initialAction, onInitialActionDone }) {
         const until = p.access_until ? new Date(p.access_until) : null;
         const accessActive = !!(until && until > new Date());
         const activePlan = (planRows || []).find((pl) => pl.user_id === p.id && planWeekOf(pl, new Date()));
-        const isSelf = p.id === myId && p.role === "coach";
+        // El personal (coach o admin) se ve como "Mi entrenamiento", no como alumno
+        const isSelf = p.id === myId && (p.role === "coach" || p.role === "admin");
+        const hasIntake = isSelf || !!intakeMap[p.id];
+        const intakeAlert = intakeHasAlert(intakeMap[p.id]);
+        const checkinAlert =
+          (painRows || []).some((r) => r.user_id === p.id) ||
+          (dailyRows || []).some((d) => d.user_id === p.id && ((d.pain && d.pain_level >= 7) || d.energy === 1 || d.sleep === 1 || d.soreness === 5));
+        const unreadCount = unreadCounts[p.id] || 0;
+        const daysAssigned = new Set(mine.map((a) => a.day_label)).size;
+        const alerts = [
+          checkinAlert && "dolor",
+          intakeAlert && "ficha",
+          !hasIntake && "sinficha",
+          unreadCount > 0 && "mensajes",
+        ].filter(Boolean);
         return {
+          createdAt: p.created_at,
+          accessBucket: accessBucket(p.access_until),
+          seniority: seniorityBucket(p.created_at),
+          alerts: alerts.length ? alerts : ["ok"],
+          training: activePlan ? "plan" : daysAssigned > 0 ? "fijas" : "nada",
           id: p.id,
           isSelf,
           name: p.full_name || "Sin nombre",
-          daysAssigned: new Set(mine.map((a) => a.day_label)).size,
+          daysAssigned,
           accessUntil: p.access_until,
           accessActive: isSelf || accessActive,
-          accessLabel: isSelf ? "Coach" : !until ? "Sin acceso" : accessActive ? `Hasta ${until.toLocaleDateString()}` : "Vencido",
-          unreadCount: unreadCounts[p.id] || 0,
-          hasIntake: isSelf || !!intakeMap[p.id],
-          intakeAlert: intakeHasAlert(intakeMap[p.id]),
-          checkinAlert:
-            (painRows || []).some((r) => r.user_id === p.id) ||
-            (dailyRows || []).some((d) => d.user_id === p.id && ((d.pain && d.pain_level >= 7) || d.energy === 1 || d.sleep === 1 || d.soreness === 5)),
+          accessLabel: isSelf ? (p.role === "admin" ? "Admin" : "Coach") : !until ? "Sin acceso" : accessActive ? `Hasta ${until.toLocaleDateString()}` : "Vencido",
+          unreadCount,
+          hasIntake,
+          intakeAlert,
+          checkinAlert,
           planLabel: activePlan ? `Plan: semana ${planWeekOf(activePlan, new Date())} de ${activePlan.weeks}` : null,
         };
       })
@@ -83,7 +139,14 @@ export function StudentsView({ initialAction, onInitialActionDone }) {
   }
 
   const me = students.find((s) => s.isSelf);
-  const filtered = students.filter((s) => !s.isSelf && matchesSearch(query, s.name));
+  const others = students.filter((s) => !s.isSelf);
+  const { result, facetOptions } = filterItems({
+    items: others,
+    facets: STUDENT_FACETS,
+    selected: filters.selected,
+    matches: (s) => matchesSearch(filters.query, s.name),
+  });
+  const filtered = sortItems(result, STUDENT_SORTS, filters.sort);
 
   return (
     <div className="p-4 md:p-8">
@@ -108,7 +171,14 @@ export function StudentsView({ initialAction, onInitialActionDone }) {
         </div>
       )}
 
-      <SearchInput value={query} onChange={setQuery} placeholder="Buscar alumno..." className="mb-4 max-w-md" />
+      <FilterBar
+        state={filters}
+        placeholder="Buscar alumno por nombre..."
+        facets={facetOptions}
+        sorts={STUDENT_SORTS}
+        shown={filtered.length}
+        total={others.length}
+      />
 
       {loading ? (
         <Skeleton />
@@ -137,6 +207,7 @@ export function StudentsView({ initialAction, onInitialActionDone }) {
                       {" · "}
                       <span className={s.accessActive ? "text-accent" : "text-danger"}>{s.accessLabel}</span>
                     </p>
+                    {s.createdAt && <p className="text-muted text-[11px] mt-0.5">Antigüedad: {durationSince(s.createdAt)}</p>}
                   </div>
                   <ChevronRight size={18} className="text-muted shrink-0 mt-0.5" />
                 </div>
@@ -159,7 +230,11 @@ export function StudentsView({ initialAction, onInitialActionDone }) {
                 </div>
               </div>
             ))}
-            {filtered.length === 0 && <p className="text-muted text-sm">No hay alumnos registrados todavía.</p>}
+            {filtered.length === 0 && (
+              <p className="text-muted text-sm">
+                {others.length > 0 ? "No hay alumnos que coincidan con la búsqueda o los filtros." : "No hay alumnos registrados todavía."}
+              </p>
+            )}
           </div>
         </>
       )}
