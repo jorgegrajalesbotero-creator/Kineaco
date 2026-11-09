@@ -12,7 +12,7 @@ export function SearchInput({ value, onChange, placeholder = "Buscar...", classN
         value={value}
         onChange={(e) => onChange(e.target.value)}
         placeholder={placeholder}
-        className="w-full bg-card text-ink text-sm rounded-lg pl-9 pr-8 py-2 outline-none border border-field focus:border-accent/40"
+        className="w-full bg-card text-ink text-sm rounded-lg pl-9 pr-8 py-2 outline-none border border-field focus:border-accent/40 text-ellipsis"
       />
       {value && (
         <button type="button" onClick={() => onChange("")} aria-label="Borrar búsqueda" className="absolute right-2 top-1/2 -translate-y-1/2 text-muted hover:text-ink">
