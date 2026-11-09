@@ -35,6 +35,9 @@
 -- Hoy role es text sin restricción. Añadimos un CHECK para que solo existan
 -- los tres roles previstos. (No se usa un ENUM para no migrar el tipo de la
 -- columna ni romper funciones existentes que la leen como text.)
+-- Esquemas antiguos traían 'profiles_role_valido' (solo alumno/coach): se elimina
+-- porque la reemplaza 'profiles_role_check' (que ya incluye 'admin').
+alter table public.profiles drop constraint if exists profiles_role_valido;
 alter table public.profiles drop constraint if exists profiles_role_check;
 alter table public.profiles
   add constraint profiles_role_check
