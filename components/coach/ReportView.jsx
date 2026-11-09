@@ -5,9 +5,12 @@ import { WEEK_DAYS } from "@/lib/dates";
 import { fetchAllRows } from "@/lib/fetchAll";
 import { intakeHasAlert } from "@/lib/intake";
 import { matchesSearch } from "@/lib/search";
+import { accessBucket, filterItems, seniorityBucket, sortItems } from "@/lib/filters";
+import { REPORT_FACETS, REPORT_SORTS } from "@/lib/reportFilters";
+import { useFilterState } from "@/lib/useFilterState";
 import { supabase } from "@/lib/supabaseClient";
 import { addDays, routinesForDate } from "@/lib/trainingPlan";
-import { SearchInput } from "@/components/ui/Search";
+import { FilterBar } from "@/components/ui/FilterBar";
 import { Skeleton } from "@/components/ui/Skeleton";
 import { CountUp } from "@/components/ui/CountUp";
 import { Select } from "@/components/ui/Select";
@@ -19,7 +22,7 @@ export function reportDayKey(dateLike) {
 
 export function ReportView({ onStudentAction }) {
   const [weekOffset, setWeekOffset] = useState(0);
-  const [reportSearch, setReportSearch] = useState("");
+  const filters = useFilterState("kineaco:filtros:reporte", "prioridad");
   const [rows, setRows] = useState([]);
   const [expiredCount, setExpiredCount] = useState(0);
   const [loading, setLoading] = useState(true);
@@ -49,7 +52,7 @@ export function ReportView({ onStudentAction }) {
 
       const [{ data: profiles }, { data: assignments }, progressRows, mealRows, { data: photoSets }, { data: unread }, { data: intakes }, { data: checkins }, { data: planRows }] =
         await Promise.all([
-          supabase.from("profiles").select("id, full_name, access_until").eq("role", "alumno"),
+          supabase.from("profiles").select("id, full_name, access_until, created_at").eq("role", "alumno"),
           supabase.from("routine_assignments").select("user_id, day_label, routine_id"),
           fetchAllRows(() =>
             supabase
@@ -126,11 +129,12 @@ export function ReportView({ onStudentAction }) {
           intakeAlert: intakeHasAlert(intake),
           checkin,
           status,
+          accessUntil: p.access_until,
+          accessBucket: accessBucket(p.access_until, now),
+          seniority: seniorityBucket(p.created_at, now),
         };
       });
 
-      const order = { inactive: 0, attention: 1, ok: 2 };
-      result.sort((a, b) => order[a.status] - order[b.status] || a.name.localeCompare(b.name));
       setRows(result);
       setLoading(false);
     }
@@ -139,12 +143,22 @@ export function ReportView({ onStudentAction }) {
   }, [weekOffset]);
 
   const statusInfo = {
-    inactive: { label: "Sin actividad", dot: "bg-danger-strong", text: "text-danger-strong" },
-    attention: { label: "Atención", dot: "bg-danger", text: "text-danger" },
-    ok: { label: "Al día", dot: "bg-accent", text: "text-accent" },
+    inactive: { label: "Sin actividad", dot: "bg-danger-strong", text: "text-danger-strong", ring: "ring-danger-strong/60" },
+    attention: { label: "Atención", dot: "bg-danger", text: "text-danger", ring: "ring-danger/60" },
+    ok: { label: "Al día", dot: "bg-accent", text: "text-accent", ring: "ring-accent/60" },
   };
   const counts = { inactive: 0, attention: 0, ok: 0 };
   rows.forEach((r) => { counts[r.status] += 1; });
+
+  const { result: filteredRows, facetOptions } = filterItems({
+    items: rows,
+    facets: REPORT_FACETS,
+    selected: filters.selected,
+    matches: (r) => matchesSearch(filters.query, r.name),
+  });
+  const visible = sortItems(filteredRows, REPORT_SORTS, filters.sort);
+  const selectedStatus = filters.selected.estado || [];
+  const cardCls = "rounded-2xl p-4 text-left bg-gradient-to-b from-card to-deep border border-white/[0.06] transition-colors hover:border-white/15 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/50";
 
   const fmtShort = (d) => d.toLocaleDateString("es-CO", { day: "2-digit", month: "short" });
   const weekOptions = Array.from({ length: 8 }, (_, i) => ({
@@ -179,19 +193,35 @@ export function ReportView({ onStudentAction }) {
       ) : (
         <>
           <div className="grid grid-cols-2 md:grid-cols-4 gap-2.5 mb-5">
-            <div className="rounded-2xl p-4 bg-gradient-to-b from-card to-deep border border-white/[0.06]">
+            {/* Las tarjetas también filtran: tocar un estado muestra solo esos alumnos */}
+            <button
+              type="button"
+              onClick={() => filters.clearFacet("estado")}
+              title="Ver todos los estados"
+              className={cardCls}
+            >
               <p className="text-ink text-3xl font-semibold tracking-tight leading-none"><CountUp value={rows.length} /></p>
               <p className="text-muted text-[11px] uppercase tracking-[0.12em] mt-2">Alumnos activos</p>
-            </div>
-            {["ok", "attention", "inactive"].map((k) => (
-              <div key={k} className="rounded-2xl p-4 bg-gradient-to-b from-card to-deep border border-white/[0.06]">
-                <p className={`text-3xl font-semibold tracking-tight leading-none ${statusInfo[k].text}`}><CountUp value={counts[k]} /></p>
-                <p className="text-muted text-[11px] uppercase tracking-[0.12em] mt-2 flex items-center gap-1.5">
-                  <span className={`w-1.5 h-1.5 rounded-full ${statusInfo[k].dot}`} />
-                  {statusInfo[k].label}
-                </p>
-              </div>
-            ))}
+            </button>
+            {["ok", "attention", "inactive"].map((k) => {
+              const active = selectedStatus.includes(k);
+              return (
+                <button
+                  key={k}
+                  type="button"
+                  aria-pressed={active}
+                  onClick={() => filters.toggle("estado", k)}
+                  title={active ? `Quitar filtro ${statusInfo[k].label}` : `Ver solo ${statusInfo[k].label}`}
+                  className={`${cardCls} ${active ? `ring-1 ${statusInfo[k].ring}` : ""}`}
+                >
+                  <p className={`text-3xl font-semibold tracking-tight leading-none ${statusInfo[k].text}`}><CountUp value={counts[k]} /></p>
+                  <p className="text-muted text-[11px] uppercase tracking-[0.12em] mt-2 flex items-center gap-1.5">
+                    <span className={`w-1.5 h-1.5 rounded-full ${statusInfo[k].dot}`} />
+                    {statusInfo[k].label}
+                  </p>
+                </button>
+              );
+            })}
           </div>
 
           {expiredCount > 0 && (
@@ -206,12 +236,19 @@ export function ReportView({ onStudentAction }) {
             </div>
           ) : (
             <>
-              <SearchInput value={reportSearch} onChange={setReportSearch} placeholder="Buscar alumno..." className="mb-3 max-w-md" />
-              {reportSearch && rows.filter((r) => matchesSearch(reportSearch, r.name)).length === 0 && (
-                <p className="text-muted text-sm mb-3">No hay alumnos que coincidan con &quot;{reportSearch}&quot;.</p>
+              <FilterBar
+                state={filters}
+                placeholder="Buscar alumno..."
+                facets={facetOptions}
+                sorts={REPORT_SORTS}
+                shown={visible.length}
+                total={rows.length}
+              />
+              {visible.length === 0 && (
+                <p className="text-muted text-sm mb-3">No hay alumnos que coincidan con la búsqueda o los filtros.</p>
               )}
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
-                {rows.filter((r) => matchesSearch(reportSearch, r.name)).map((r) => (
+                {visible.map((r) => (
                   <div key={r.id} className="bg-card rounded-xl p-4">
                     <div className="flex items-start justify-between gap-3 mb-3">
                       <p className="text-ink text-sm font-medium flex items-center gap-1.5 flex-wrap">
