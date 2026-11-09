@@ -3,6 +3,7 @@
 import { Check } from "lucide-react";
 import { GUARDIAN_DOC_TYPES, GUARDIAN_RELATIONSHIPS, ageFrom } from "@/lib/legal";
 import { tr } from "@/lib/i18n";
+import { Select } from "@/components/ui/Select";
 
 const inputCls =
   "w-full bg-app/60 border border-white/[0.07] text-ink text-[15px] rounded-xl px-4 py-3 outline-none placeholder:text-muted focus:border-accent/50 transition";
@@ -52,15 +53,15 @@ export function ConsentFields({ value, onChange }) {
             {tr("Para usar la app necesita la autorización de su padre, madre o acudiente. Pídale que llene estos datos y marque la autorización.")}
           </p>
           <input value={value.guardianName} onChange={(e) => set("guardianName", e.target.value)} maxLength={120} placeholder={tr("Nombre y apellidos del acudiente")} className={inputCls} />
-          <select value={value.guardianDocType} onChange={(e) => set("guardianDocType", e.target.value)} className={inputCls}>
+          <Select tone="soft" size="xl" aria-label={tr("Tipo de documento del acudiente")} value={value.guardianDocType} onChange={(e) => set("guardianDocType", e.target.value)} className="w-full">
             {GUARDIAN_DOC_TYPES.map((d) => <option key={d.key} value={d.key}>{tr(d.label)}</option>)}
-          </select>
+          </Select>
           <div>
             <input value={value.guardianDocNumber} onChange={(e) => set("guardianDocNumber", e.target.value.replace(/[^A-Za-z0-9]/g, ""))} maxLength={15} inputMode="numeric" placeholder={tr("Número de documento")} className={inputCls} />
           </div>
-          <select value={value.guardianRelationship} onChange={(e) => set("guardianRelationship", e.target.value)} className={inputCls}>
+          <Select tone="soft" size="xl" aria-label={tr("Parentesco del acudiente")} value={value.guardianRelationship} onChange={(e) => set("guardianRelationship", e.target.value)} className="w-full">
             {GUARDIAN_RELATIONSHIPS.map((r) => <option key={r.key} value={r.key}>{tr(r.label)}</option>)}
-          </select>
+          </Select>
           <input type="email" value={value.guardianEmail} onChange={(e) => set("guardianEmail", e.target.value)} maxLength={120} placeholder={tr("Correo del acudiente")} className={inputCls} />
           <CheckRow checked={value.guardianAccept} onToggle={() => set("guardianAccept", !value.guardianAccept)}>
             {tr("Como padre, madre o acudiente, autorizo que este menor use Kineaco y acepto en su nombre los Términos y la Política de datos.")}

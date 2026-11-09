@@ -15,6 +15,7 @@ import { AssignRoutineModal } from "@/components/coach/routines/AssignRoutineMod
 import { RoutineModeToggle } from "@/components/coach/routines/RoutineModeToggle";
 import { SearchSelect } from "@/components/ui/Search";
 import { FilterBar } from "@/components/ui/FilterBar";
+import { Select } from "@/components/ui/Select";
 
 const ROUTINE_SORTS = [
   { id: "recientes", label: "Más recientes", compare: (a, b) => String(b.created_at || "").localeCompare(String(a.created_at || "")) },
@@ -438,11 +439,11 @@ export function RoutinesView() {
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
             <div>
               <p className="text-muted text-xs mb-1">Nivel</p>
-              <select value={draft.level} onChange={(e) => setDraft({ ...draft, level: e.target.value })} className="w-full bg-field text-ink text-sm rounded-lg px-3 py-2 outline-none">
+              <Select aria-label="Nivel" value={draft.level} onChange={(e) => setDraft({ ...draft, level: e.target.value })} className="w-full">
                 <option>Principiante</option>
                 <option>Intermedio</option>
                 <option>Avanzado</option>
-              </select>
+              </Select>
             </div>
             <div>
               <p className="text-muted text-xs mb-1">Objetivo</p>
@@ -515,11 +516,11 @@ export function RoutinesView() {
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
             <div>
               <p className="text-muted text-xs mb-1">Nivel</p>
-              <select value={editDraft.level} onChange={(e) => setEditDraft({ ...editDraft, level: e.target.value })} className="w-full bg-field text-ink text-sm rounded-lg px-3 py-2 outline-none">
+              <Select aria-label="Nivel" value={editDraft.level} onChange={(e) => setEditDraft({ ...editDraft, level: e.target.value })} className="w-full">
                 <option>Principiante</option>
                 <option>Intermedio</option>
                 <option>Avanzado</option>
-              </select>
+              </Select>
             </div>
             <div>
               <p className="text-muted text-xs mb-1">Objetivo</p>

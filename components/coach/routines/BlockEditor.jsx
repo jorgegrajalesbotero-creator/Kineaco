@@ -5,6 +5,7 @@ import { Pencil, Plus, Trash2 } from "lucide-react";
 import { BLOCK_TYPES, blockTypeLabel } from "@/lib/blocks";
 import { catalogOptions, defaultBlockTitle, tmpKey } from "@/components/coach/routines/routineHelpers";
 import { SearchSelect } from "@/components/ui/Search";
+import { Select } from "@/components/ui/Select";
 import { ExerciseItemEditor } from "@/components/coach/routines/ExerciseItemEditor";
 
 export function BlockEditor({ blocks, setBlocks, catalog, onCreateExercise }) {
@@ -175,11 +176,11 @@ export function BlockEditor({ blocks, setBlocks, catalog, onCreateExercise }) {
       })}
 
       <div className="flex flex-col sm:flex-row gap-2 bg-card rounded-xl p-3 border border-dashed border-field">
-        <select value={newType} onChange={(e) => setNewType(e.target.value)} className={`flex-1 ${inputCls}`}>
+        <Select aria-label="Tipo de bloque" value={newType} onChange={(e) => setNewType(e.target.value)} className="flex-1 min-w-0">
           {BLOCK_TYPES.map((t) => (
             <option key={t.key} value={t.key}>{t.label}</option>
           ))}
-        </select>
+        </Select>
         <button type="button" onClick={addBlock} className="bg-accent text-app font-medium px-4 py-2 rounded-lg text-sm flex items-center justify-center gap-1">
           <Plus size={15} /> Agregar bloque
         </button>

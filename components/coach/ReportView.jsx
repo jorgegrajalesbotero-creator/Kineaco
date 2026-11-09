@@ -10,6 +10,7 @@ import { addDays, routinesForDate } from "@/lib/trainingPlan";
 import { SearchInput } from "@/components/ui/Search";
 import { Skeleton } from "@/components/ui/Skeleton";
 import { CountUp } from "@/components/ui/CountUp";
+import { Select } from "@/components/ui/Select";
 
 export function reportDayKey(dateLike) {
   const d = new Date(dateLike);
@@ -161,15 +162,16 @@ export function ReportView({ onStudentAction }) {
             {weekOffset === 0 && " (hasta hoy)"}
           </p>
         </div>
-        <select
+        <Select
+          tone="card"
+          aria-label="Semana del reporte"
           value={weekOffset}
           onChange={(e) => setWeekOffset(Number(e.target.value))}
-          className="bg-card text-ink text-sm rounded-lg px-3 py-2 outline-none"
         >
           {weekOptions.map((w) => (
             <option key={w.value} value={w.value}>{w.label}</option>
           ))}
-        </select>
+        </Select>
       </div>
 
       {loading ? (

@@ -12,6 +12,7 @@ import { PlanPhasesEditor, ATR_PRESET } from "./PlanPhasesEditor";
 import { PlanLoadsEditor } from "./PlanLoadsEditor";
 import { blockUsesProgression } from "@/lib/blocks";
 import { cellKey, phaseType, planWeeks } from "@/lib/loadCalc";
+import { Select } from "@/components/ui/Select";
 
 const MAX_WEEKS = 52;
 const str = (v) => (v == null ? "" : String(v));
@@ -373,11 +374,11 @@ export function PlanPanel({ student, onClose }) {
             {editing.phases.length > 0 ? (
               <p className={`${input} mt-1 text-soft`}>{editing.weeks} semanas (suma de las fases)</p>
             ) : (
-              <select value={editing.weeks} onChange={(e) => setWeeks(Number(e.target.value))} className={`${input} mt-1`}>
+              <Select value={editing.weeks} onChange={(e) => setWeeks(Number(e.target.value))} className="w-full mt-1">
                 {Array.from({ length: MAX_WEEKS }, (_, i) => i + 1).map((n) => (
                   <option key={n} value={n}>{n} {n === 1 ? "semana" : "semanas"}{n === 4 ? " (1 mes)" : n === 6 ? " (mes y medio)" : ""}</option>
                 ))}
-              </select>
+              </Select>
             )}
           </label>
         </div>
@@ -468,11 +469,10 @@ export function PlanPanel({ student, onClose }) {
           <Plus size={16} /> Nuevo plan
         </button>
         {templates.length > 0 && (
-          <select value="" onChange={(e) => { const tpl = templates.find((x) => String(x.id) === e.target.value); if (tpl) startFromTemplate(tpl); }}
-            className="bg-field text-ink text-sm rounded-lg px-3 py-2.5 outline-none">
+          <Select size="lg" aria-label="Nuevo plan desde plantilla" value="" onChange={(e) => { const tpl = templates.find((x) => String(x.id) === e.target.value); if (tpl) startFromTemplate(tpl); }}>
             <option value="">Nuevo plan desde plantilla...</option>
             {templates.map((tpl) => <option key={tpl.id} value={tpl.id}>{tpl.name}</option>)}
-          </select>
+          </Select>
         )}
       </div>
 

@@ -3,6 +3,7 @@
 import { ArrowDown, ArrowUp, Plus, X } from "lucide-react";
 import { PHASE_DEFAULTS, PHASE_TYPES, phaseType } from "@/lib/loadCalc";
 import { cleanDecimal, cleanInt } from "@/lib/numbers";
+import { Select } from "@/components/ui/Select";
 
 export const newPhase = (type = "acumulacion", weeks = 4) => ({ phase_type: type, name: "", weeks: String(weeks), ...stringDefaults(type) });
 
@@ -75,9 +76,9 @@ export function PlanPhasesEditor({ phases, onChange }) {
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
               <label className="block">
                 <span className={label}>Fase</span>
-                <select value={p.phase_type} onChange={(e) => changeType(i, e.target.value)} className={field}>
+                <Select value={p.phase_type} onChange={(e) => changeType(i, e.target.value)} className="w-full">
                   {PHASE_TYPES.map((pt) => <option key={pt.key} value={pt.key}>{pt.label}</option>)}
-                </select>
+                </Select>
               </label>
               <label className="block">
                 <span className={label}>Nombre (opcional)</span>

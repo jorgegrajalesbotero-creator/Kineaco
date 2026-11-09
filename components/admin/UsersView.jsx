@@ -7,6 +7,7 @@ import { matchesSearch } from "@/lib/search";
 import { accessBucket, filterItems, sortItems } from "@/lib/filters";
 import { useFilterState } from "@/lib/useFilterState";
 import { FilterBar } from "@/components/ui/FilterBar";
+import { Select } from "@/components/ui/Select";
 
 const ROLE_LABELS = { alumno: "Alumno", coach: "Coach", admin: "Admin" };
 const ROLE_ORDER = { admin: 0, coach: 1, alumno: 2 };
@@ -152,23 +153,25 @@ export function UsersView() {
 
             <div className="flex flex-wrap items-center gap-2">
               <label className="text-muted text-xs">Rol</label>
-              <select
+              <Select
+                size="sm"
+                aria-label="Rol"
                 value={r.role}
                 disabled={savingId === r.id}
                 onChange={(e) => changeRole(r.id, e.target.value)}
-                className="bg-field text-ink text-sm rounded-lg px-2 py-1.5 outline-none focus:ring-1 focus:ring-accent disabled:opacity-60"
               >
                 <option value="alumno">Alumno</option>
                 <option value="coach">Coach</option>
                 <option value="admin">Admin</option>
-              </select>
+              </Select>
 
               {r.role === "alumno" && (
-                <select
+                <Select
+                  size="sm"
+                  aria-label="Coach asignado"
                   value={r.coach_id || ""}
                   disabled={savingId === r.id}
                   onChange={(e) => changeCoach(r.id, e.target.value)}
-                  className="bg-field text-ink text-sm rounded-lg px-2 py-1.5 outline-none focus:ring-1 focus:ring-accent disabled:opacity-60"
                 >
                   <option value="">Sin coach</option>
                   {coaches.map((c) => (
@@ -176,7 +179,7 @@ export function UsersView() {
                       {c.full_name || "Coach"}
                     </option>
                   ))}
-                </select>
+                </Select>
               )}
             </div>
           </div>

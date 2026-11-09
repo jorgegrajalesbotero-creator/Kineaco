@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabaseClient";
 import { PanelLayout } from "./PanelLayout";
 import { Skeleton } from "@/components/ui/Skeleton";
+import { Select } from "@/components/ui/Select";
 
 // Fotos de progreso del alumno: comparador "antes vs. ahora" y línea de tiempo
 export function PhotosPanel({ student, onClose }) {
@@ -85,17 +86,17 @@ export function PhotosPanel({ student, onClose }) {
                 ].map((c) => (
                   <label key={c.label} className="text-muted text-xs">
                     {c.label}
-                    <select
+                    <Select
                       value={c.value}
                       onChange={(e) => c.setter(e.target.value)}
-                      className="mt-1 w-full bg-field text-ink text-sm rounded-lg px-3 py-2 outline-none"
+                      className="mt-1 w-full"
                     >
                       {photoSets.map((s) => (
                         <option key={s.id} value={s.id}>
                           {fmtPhotoDate(s.taken_on)}{s.weight_kg != null ? ` · ${s.weight_kg} kg` : ""}
                         </option>
                       ))}
-                    </select>
+                    </Select>
                   </label>
                 ))}
               </div>
