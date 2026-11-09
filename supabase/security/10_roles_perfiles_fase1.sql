@@ -198,6 +198,37 @@ create trigger trg_profiles_guard
   for each row
   execute function public.profiles_guard_privileged_columns();
 
+-- 5b) Trigger ANTIGUO protect_profile_role (ya existía en la base).
+-- Antes revertía SIEMPRE el rol ("solo se cambia desde el SQL Editor"), lo que
+-- impedía que el admin cambiara roles desde la app. Se conserva todo lo demás
+-- (id, created_at, acceso solo por el personal) y se permite el cambio de rol
+-- únicamente al admin.
+create or replace function public.protect_profile_role()
+returns trigger
+language plpgsql
+security definer
+set search_path to 'public'
+as $function$
+begin
+  if auth.uid() is null then
+    return new; -- cambios hechos por el sistema o desde el SQL Editor
+  end if;
+  if tg_op = 'INSERT' then
+    new.role := 'alumno';
+    new.access_until := null;
+  else
+    new.id := old.id;
+    new.created_at := old.created_at;
+    if not public.is_admin() then
+      new.role := old.role;               -- el rol solo lo cambia un admin
+    end if;
+    if not public.is_coach() then
+      new.access_until := old.access_until; -- solo el personal da o quita acceso
+    end if;
+  end if;
+  return new;
+end $function$;
+
 
 -- =====================================================================
 -- 6) delete_my_account() — el admin tampoco se borra desde la app

@@ -3,8 +3,27 @@
 import { useEffect, useState } from "react";
 import { Shield } from "lucide-react";
 import { supabase } from "@/lib/supabaseClient";
+import { matchesSearch } from "@/lib/search";
+import { accessBucket, filterItems, sortItems } from "@/lib/filters";
+import { useFilterState } from "@/lib/useFilterState";
+import { FilterBar } from "@/components/ui/FilterBar";
 
 const ROLE_LABELS = { alumno: "Alumno", coach: "Coach", admin: "Admin" };
+const ROLE_ORDER = { admin: 0, coach: 1, alumno: 2 };
+const NO_COACH = "sin-coach";
+
+const byName = (a, b) => (a.full_name || "").localeCompare(b.full_name || "");
+const USER_SORTS = [
+  { id: "rol", label: "Rol", compare: (a, b) => (ROLE_ORDER[a.role] ?? 9) - (ROLE_ORDER[b.role] ?? 9) || byName(a, b) },
+  { id: "nombre", label: "Nombre (A-Z)", compare: byName },
+];
+
+// Estado de acceso simplificado: el personal no necesita acceso
+function userAccess(r) {
+  if (r.role !== "alumno") return "personal";
+  const b = accessBucket(r.access_until);
+  return b === "vencido" || b === "sin" ? b : "activo";
+}
 
 // Vista SOLO-ADMIN: gestiona el rol de cada usuario y asigna cada alumno a su coach.
 // Requiere la migración de roles aplicada (profiles.coach_id, is_admin(), etc.).
@@ -13,6 +32,7 @@ export function UsersView() {
   const [loading, setLoading] = useState(true);
   const [savingId, setSavingId] = useState(null);
   const [error, setError] = useState("");
+  const filters = useFilterState("kineaco:filtros:usuarios", "rol");
 
   const load = async () => {
     setLoading(true);
@@ -54,6 +74,40 @@ export function UsersView() {
     setSavingId(null);
   };
 
+  const facets = [
+    {
+      id: "rol",
+      label: "Rol",
+      getValues: (r) => r.role,
+      options: [{ value: "admin", label: "Admin" }, { value: "coach", label: "Coach" }, { value: "alumno", label: "Alumno" }],
+    },
+    {
+      id: "coach",
+      label: "Coach",
+      // Solo aplica a alumnos; el personal no tiene coach
+      getValues: (r) => (r.role === "alumno" ? r.coach_id || NO_COACH : []),
+      labelOf: (raw) => (raw === NO_COACH ? "Sin coach" : coachName(raw)),
+    },
+    {
+      id: "acceso",
+      label: "Acceso",
+      getValues: userAccess,
+      options: [
+        { value: "activo", label: "Con acceso" },
+        { value: "vencido", label: "Vencido" },
+        { value: "sin", label: "Sin acceso" },
+        { value: "personal", label: "Personal (coach/admin)" },
+      ],
+    },
+  ];
+  const { result, facetOptions } = filterItems({
+    items: rows,
+    facets,
+    selected: filters.selected,
+    matches: (r) => matchesSearch(filters.query, r.full_name, ROLE_LABELS[r.role]),
+  });
+  const visible = sortItems(result, USER_SORTS, filters.sort);
+
   if (loading) return <div className="p-6 text-muted text-sm">Cargando usuarios...</div>;
 
   return (
@@ -70,8 +124,23 @@ export function UsersView() {
         <p className="text-danger text-xs mb-4 bg-danger/10 border border-danger/20 rounded-xl px-3 py-2">{error}</p>
       )}
 
+      <FilterBar
+        state={filters}
+        placeholder="Buscar usuario por nombre..."
+        facets={facetOptions}
+        sorts={USER_SORTS}
+        shown={visible.length}
+        total={rows.length}
+      />
+
+      {visible.length === 0 && (
+        <p className="text-muted text-sm mb-4">
+          {rows.length > 0 ? "No hay usuarios que coincidan con la búsqueda o los filtros." : "Todavía no hay usuarios."}
+        </p>
+      )}
+
       <div className="space-y-2">
-        {rows.map((r) => (
+        {visible.map((r) => (
           <div key={r.id} className="bg-card rounded-2xl p-4 flex flex-col sm:flex-row sm:items-center gap-3">
             <div className="min-w-0 flex-1">
               <p className="text-ink text-sm font-medium truncate">{r.full_name || "(sin nombre)"}</p>
