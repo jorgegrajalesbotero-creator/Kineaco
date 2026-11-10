@@ -2,12 +2,13 @@
 
 import Link from "next/link";
 import { BrandMark } from "@/components/ui/BrandMark";
-import { Calendar, ClipboardList, Dumbbell, LayoutDashboard, Megaphone, User, UserCog, Users } from "lucide-react";
+import { Calendar, ClipboardList, Dumbbell, LayoutDashboard, Megaphone, MessageCircle, User, UserCog, Users } from "lucide-react";
 
-export function Sidebar({ active, onSelect, email, fullName, onLogout, bell, isAdmin }) {
+export function Sidebar({ active, onSelect, email, fullName, onLogout, bell, isAdmin, unreadMessages = 0 }) {
   const items = [
     { key: "rutinas", label: "Rutinas", icon: LayoutDashboard },
     { key: "ejercicios", label: "Ejercicios", icon: Dumbbell },
+    { key: "mensajes", label: "Mensajes", icon: MessageCircle, badge: unreadMessages },
     { key: "alumnos", label: "Alumnos", icon: Users },
     { key: "reporte", label: "Reporte semanal", icon: ClipboardList },
     { key: "anuncios", label: "Anuncios", icon: Megaphone },
@@ -29,10 +30,13 @@ export function Sidebar({ active, onSelect, email, fullName, onLogout, bell, isA
         {bell}
       </div>
       <nav className="flex-1 px-3 py-4 space-y-1">
-        {items.map(({ key, label, icon: Icon }) => (
+        {items.map(({ key, label, icon: Icon, badge }) => (
           <button key={key} onClick={() => onSelect(key)} className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm transition-colors ${active === key ? "bg-accent/[0.10] text-accent" : "text-soft hover:bg-card/60 hover:text-ink"}`}>
             <Icon size={17} />
-            {label}
+            <span className="flex-1 text-left">{label}</span>
+            {badge > 0 && (
+              <span className="bg-accent text-app text-[10px] font-bold rounded-full min-w-5 h-5 px-1.5 flex items-center justify-center">{badge > 99 ? "99+" : badge}</span>
+            )}
           </button>
         ))}
       </nav>

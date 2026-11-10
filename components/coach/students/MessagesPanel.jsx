@@ -1,14 +1,17 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { supabase } from "@/lib/supabaseClient";
 import { fetchAllRows } from "@/lib/fetchAll";
 import { PanelLayout } from "./PanelLayout";
 import { Skeleton } from "@/components/ui/Skeleton";
 
 // Chat con el alumno, separado por temas
-export function MessagesPanel({ student, onClose, onChanged }) {
-  const [messageTopic, setMessageTopic] = useState("general");
+// initialTopic: tema con el que abre (la bandeja abre en el tema del último mensaje sin leer).
+// padding / width: los usa la bandeja de Mensajes para mostrar el chat al lado de la lista.
+export function MessagesPanel({ student, onClose, onChanged, initialTopic = "general", padding, width = "max-w-lg" }) {
+  const [messageTopic, setMessageTopic] = useState(initialTopic);
+  const listRef = useRef(null);
   const [messages, setMessages] = useState([]);
   const [loadingMessages, setLoadingMessages] = useState(true);
   const [newMessage, setNewMessage] = useState("");
@@ -21,8 +24,8 @@ export function MessagesPanel({ student, onClose, onChanged }) {
     { key: "progreso", label: "Progreso" },
   ];
 
-  const loadMessages = async (topic) => {
-    setLoadingMessages(true);
+  const loadMessages = async (topic, silent = false) => {
+    if (!silent) setLoadingMessages(true);
     const data = await fetchAllRows(() =>
       supabase
         .from("messages")
@@ -48,8 +51,32 @@ export function MessagesPanel({ student, onClose, onChanged }) {
       onChanged?.();
     }
     markRead();
-    loadMessages("general");
+    loadMessages(initialTopic);
   }, [student.id]);
+
+  // Mientras el chat está abierto, revisa cada 15 s si el alumno escribió algo nuevo
+  useEffect(() => {
+    const tick = async () => {
+      if (document.visibilityState !== "visible") return;
+      await loadMessages(messageTopic, true);
+      const { data: marked } = await supabase
+        .from("messages").update({ read_by_coach: true })
+        .eq("user_id", student.id).eq("read_by_coach", false).select("id");
+      if (marked?.length) {
+        await supabase.from("notifications").update({ read_at: new Date().toISOString() })
+          .eq("type", "message").eq("student_id", student.id).is("read_at", null);
+        onChanged?.();
+      }
+    };
+    const timer = setInterval(tick, 15000);
+    return () => clearInterval(timer);
+  }, [student.id, messageTopic]);
+
+  // Baja al último mensaje cuando llegan mensajes nuevos
+  useEffect(() => {
+    const el = listRef.current;
+    if (el) el.scrollTop = el.scrollHeight;
+  }, [messages]);
 
   const switchMessageTopic = (topic) => {
     setMessageTopic(topic);
@@ -71,11 +98,12 @@ export function MessagesPanel({ student, onClose, onChanged }) {
     setSendingMessage(false);
     if (error) return alert("No se pudo enviar el mensaje: ");
     setNewMessage("");
-    loadMessages(messageTopic);
+    loadMessages(messageTopic, true);
+    onChanged?.();
   };
 
   return (
-    <PanelLayout title="Mensajes" subtitle={student.name} onClose={onClose}>
+    <PanelLayout title={padding === "" ? student.name : "Mensajes"} subtitle={padding === "" ? "Mensajes" : student.name} onClose={onClose} width={width} {...(padding !== undefined ? { padding } : {})}>
       <div className="flex gap-2 mb-4">
         {topics.map((t) => (
           <button
@@ -88,7 +116,7 @@ export function MessagesPanel({ student, onClose, onChanged }) {
         ))}
       </div>
 
-      <div className="bg-card rounded-xl p-4 mb-3 h-[55dvh] md:h-80 overflow-y-auto flex flex-col gap-2">
+      <div ref={listRef} className={`bg-card rounded-xl p-4 mb-3 overflow-y-auto flex flex-col gap-2 ${padding === "" ? "h-[60dvh] md:h-[28rem]" : "h-[55dvh] md:h-80"}`}>
         {loadingMessages ? (
           <Skeleton />
         ) : messages.length === 0 ? (
@@ -113,7 +141,7 @@ export function MessagesPanel({ student, onClose, onChanged }) {
           value={newMessage}
           onChange={(e) => setNewMessage(e.target.value)}
           onKeyDown={(e) => { if (e.key === "Enter") sendMessage(); }}
-          placeholder="Escribí un mensaje..."
+          placeholder="Escriba un mensaje..."
           className="flex-1 bg-field text-ink text-sm rounded-lg px-3 py-2 outline-none"
         />
         <button
