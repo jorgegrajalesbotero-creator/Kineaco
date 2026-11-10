@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { catalogOptions } from "@/components/coach/routines/routineHelpers";
 import { SearchSelect } from "@/components/ui/Search";
+import { WeightInput } from "@/components/ui/WeightInput";
 
 // Edita un ejercicio que ya está en la rutina: cambiarlo por otro del catálogo, series (solo en lista), reps, peso y descanso
 export function ExerciseItemEditor({ item, catalog, showSets = false, onSave, onCancel }) {
@@ -44,8 +45,8 @@ export function ExerciseItemEditor({ item, catalog, showSets = false, onSave, on
           <input value={f.reps} onChange={(e) => set({ reps: e.target.value })} className={inputCls} />
         </label>
         <label className="block">
-          <span className="text-muted text-[11px]">Peso (kg)</span>
-          <input inputMode="decimal" value={f.targetWeight} onChange={(e) => set({ targetWeight: e.target.value.replace(/[^\d.,]/g, "") })} className={inputCls} />
+          <span className="text-muted text-[11px]">Peso</span>
+          <WeightInput valueKg={f.targetWeight} onChangeKg={(kg) => set({ targetWeight: kg })} className={inputCls} />
         </label>
         <label className="block">
           <span className="text-muted text-[11px]">Descanso (min)</span>

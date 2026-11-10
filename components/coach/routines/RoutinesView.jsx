@@ -16,6 +16,8 @@ import { RoutineModeToggle } from "@/components/coach/routines/RoutineModeToggle
 import { SearchSelect } from "@/components/ui/Search";
 import { FilterBar } from "@/components/ui/FilterBar";
 import { Select } from "@/components/ui/Select";
+import { WeightInput } from "@/components/ui/WeightInput";
+import { formatWeight, useWeightUnit } from "@/lib/weightUnits";
 
 const ROUTINE_SORTS = [
   { id: "recientes", label: "Más recientes", compare: (a, b) => String(b.created_at || "").localeCompare(String(a.created_at || "")) },
@@ -47,6 +49,7 @@ function routineFacets(assignedIds) {
 // Lista simple de ejercicios: cada uno se puede editar (lápiz), mover o quitar
 function ListItems({ items, setItems, catalog }) {
   const [editing, setEditing] = useState(null);
+  const [unit] = useWeightUnit();
   const move = (i, dir) => {
     const t = i + dir;
     if (t < 0 || t >= items.length) return;
@@ -72,7 +75,7 @@ function ListItems({ items, setItems, catalog }) {
             <GripVertical size={14} className="text-muted shrink-0" />
             <button type="button" onClick={() => setEditing(i)} className="text-ink text-sm flex-1 min-w-0 truncate text-left hover:text-accent">{ex.name}</button>
             <span className="text-muted text-xs shrink-0">
-              {[ex.sets && ex.sets !== "0" ? `${ex.sets}×${ex.reps || "—"}` : ex.reps, ex.targetWeight ? `${ex.targetWeight}kg` : ""].filter(Boolean).join(" · ")}
+              {[ex.sets && ex.sets !== "0" ? `${ex.sets}×${ex.reps || "—"}` : ex.reps, formatWeight(ex.targetWeight, unit)].filter(Boolean).join(" · ")}
             </span>
             <button type="button" onClick={() => move(i, -1)} disabled={i === 0} className="text-muted text-xs px-1 disabled:opacity-30" aria-label="Subir">↑</button>
             <button type="button" onClick={() => move(i, 1)} disabled={i === items.length - 1} className="text-muted text-xs px-1 disabled:opacity-30" aria-label="Bajar">↓</button>
@@ -485,7 +488,7 @@ export function RoutinesView() {
                 )}
                 <input placeholder="Series" value={exForm.sets} onChange={(e) => setExForm({ ...exForm, sets: e.target.value })} className="bg-field text-ink text-sm rounded-lg px-3 py-2 outline-none" />
                 <input placeholder="Reps" value={exForm.reps} onChange={(e) => setExForm({ ...exForm, reps: e.target.value })} className="bg-field text-ink text-sm rounded-lg px-3 py-2 outline-none" />
-                <input placeholder="Peso sugerido (kg) - opcional" value={exForm.targetWeight} onChange={(e) => setExForm({ ...exForm, targetWeight: e.target.value })} className="col-span-2 bg-field text-ink text-sm rounded-lg px-3 py-2 outline-none mt-2" /><input placeholder="Descanso (min) - opcional" value={exForm.restMinutes} onChange={(e) => setExForm({ ...exForm, restMinutes: e.target.value })} className="col-span-2 bg-field text-ink text-sm rounded-lg px-3 py-2 outline-none mt-2" />
+                <WeightInput placeholder="Peso sugerido - opcional" valueKg={exForm.targetWeight} onChangeKg={(kg) => setExForm({ ...exForm, targetWeight: kg })} wrapperClassName="col-span-2 mt-2" className="w-full bg-field text-ink text-sm rounded-lg px-3 py-2 outline-none" /><input placeholder="Descanso (min) - opcional" value={exForm.restMinutes} onChange={(e) => setExForm({ ...exForm, restMinutes: e.target.value })} className="col-span-2 bg-field text-ink text-sm rounded-lg px-3 py-2 outline-none mt-2" />
               </div>
               <button onClick={addExerciseToDraft} className="mt-2 bg-field text-accent px-4 py-2 rounded-lg text-sm flex items-center gap-1"><Plus size={15} /> Agregar a la rutina</button>
               {catalog.length === 0 && <p className="text-muted text-xs italic mt-2">Todavía no hay ejercicios en tu catálogo — cargalos primero en la pestaña &quot;Ejercicios&quot;.</p>}
@@ -563,7 +566,7 @@ export function RoutinesView() {
                 )}
                 <input placeholder="Series" value={editExForm.sets} onChange={(e) => setEditExForm({ ...editExForm, sets: e.target.value })} className="bg-field text-ink text-sm rounded-lg px-3 py-2 outline-none" />
                 <input placeholder="Reps" value={editExForm.reps} onChange={(e) => setEditExForm({ ...editExForm, reps: e.target.value })} className="bg-field text-ink text-sm rounded-lg px-3 py-2 outline-none" />
-                <input placeholder="Peso sugerido (kg) - opcional" value={editExForm.targetWeight} onChange={(e) => setEditExForm({ ...editExForm, targetWeight: e.target.value })} className="col-span-2 bg-field text-ink text-sm rounded-lg px-3 py-2 outline-none mt-2" /><input placeholder="Descanso (min) - opcional" value={editExForm.restMinutes} onChange={(e) => setEditExForm({ ...editExForm, restMinutes: e.target.value })} className="col-span-2 bg-field text-ink text-sm rounded-lg px-3 py-2 outline-none mt-2" />
+                <WeightInput placeholder="Peso sugerido - opcional" valueKg={editExForm.targetWeight} onChangeKg={(kg) => setEditExForm({ ...editExForm, targetWeight: kg })} wrapperClassName="col-span-2 mt-2" className="w-full bg-field text-ink text-sm rounded-lg px-3 py-2 outline-none" /><input placeholder="Descanso (min) - opcional" value={editExForm.restMinutes} onChange={(e) => setEditExForm({ ...editExForm, restMinutes: e.target.value })} className="col-span-2 bg-field text-ink text-sm rounded-lg px-3 py-2 outline-none mt-2" />
               </div>
               <button onClick={addExerciseToEdit} className="mt-2 bg-field text-accent px-4 py-2 rounded-lg text-sm flex items-center gap-1"><Plus size={15} /> Agregar a la rutina</button>
               {catalog.length === 0 && <p className="text-muted text-xs italic mt-2">Todavía no hay ejercicios en tu catálogo — cargalos primero en la pestaña &quot;Ejercicios&quot;.</p>}

@@ -6,11 +6,13 @@ import { matchesSearch } from "@/lib/search";
 import { SearchInput } from "@/components/ui/Search";
 import { DayRoutinesEditor } from "@/components/coach/programs/DayRoutinesEditor";
 import { PanelLayout } from "./PanelLayout";
-import { toNumber } from "@/lib/numbers";
+import { UnitToggle } from "@/components/ui/WeightInput";
+import { formatWeight, kgToText, toKg, useWeightUnit } from "@/lib/weightUnits";
 import { currentOrNextPlan, planLastDay, planStart, planWeekOf } from "@/lib/trainingPlan";
 
 // Rutinas asignadas por día + pesos personalizados del alumno
 export function DaysPanel({ student, onClose, onChanged }) {
+  const [unit] = useWeightUnit();
   const [routines, setRoutines] = useState([]);
   const [dayAssignments, setDayAssignments] = useState({});
   const [savingDay, setSavingDay] = useState("");
@@ -80,7 +82,7 @@ export function DaysPanel({ student, onClose, onChanged }) {
 
   const saveCustomWeight = async (exerciseId, value) => {
     setSavingWeightId(exerciseId);
-    const weight = toNumber(value);
+    const weight = toKg(value, unit); // se escribe en kg o lb; se guarda en kg
     const { error } =
       weight === null
         ? await supabase.from("student_exercise_weights").delete().eq("user_id", student.id).eq("exercise_id", exerciseId)
@@ -104,7 +106,10 @@ export function DaysPanel({ student, onClose, onChanged }) {
 
       {studentExercises.length > 0 && (
         <div className="mt-6">
-          <h3 className="text-ink text-sm font-medium mb-1">Pesos personalizados</h3>
+          <div className="flex items-center justify-between gap-2 mb-1">
+            <h3 className="text-ink text-sm font-medium">Pesos personalizados</h3>
+            <UnitToggle />
+          </div>
           <p className="text-muted text-xs mb-3">Opcional: pisa el peso sugerido de la rutina solo para este alumno. Dejalo vacío para usar el peso general.</p>
           {studentExercises.length > 5 && (
             <SearchInput value={weightSearch} onChange={setWeightSearch} placeholder="Buscar ejercicio..." className="mb-2" />
@@ -114,13 +119,14 @@ export function DaysPanel({ student, onClose, onChanged }) {
               <div key={ex.exercise_id} className="flex items-center justify-between px-4 py-3 border-b border-field last:border-0">
                 <div>
                   <p className="text-ink text-sm">{ex.name}</p>
-                  <p className="text-muted text-[10px]">Peso general: {ex.baseWeight != null ? `${ex.baseWeight} kg` : "sin definir"}</p>
+                  <p className="text-muted text-[10px]">Peso general: {formatWeight(ex.baseWeight, unit) || "sin definir"}</p>
                 </div>
                 <input
+                  key={unit}
                   type="text" inputMode="decimal"
-                  placeholder={ex.baseWeight != null ? `${ex.baseWeight}` : "kg"}
-                  defaultValue={customWeights[ex.exercise_id] ?? ""}
-                  onBlur={(e) => saveCustomWeight(ex.exercise_id, e.target.value)}
+                  placeholder={kgToText(ex.baseWeight, unit) || unit}
+                  defaultValue={kgToText(customWeights[ex.exercise_id], unit)}
+                  onBlur={(e) => { if (e.target.value !== e.target.defaultValue) saveCustomWeight(ex.exercise_id, e.target.value); }}
                   disabled={savingWeightId === ex.exercise_id}
                   className="w-24 bg-field text-ink text-sm rounded-lg px-2 py-1.5 outline-none text-right"
                 />

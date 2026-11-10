@@ -8,11 +8,13 @@ import { appLocale, tr } from "@/lib/i18n";
 import { downloadRoutinePdf } from "@/lib/planPdf";
 import { supabase } from "@/lib/supabaseClient";
 import { safeHttpUrl } from "@/lib/url";
+import { formatWeight, useWeightUnit } from "@/lib/weightUnits";
 import { Confetti } from "@/components/ui/Confetti";
 import { RestTimer } from "@/components/student/RestTimer";
 import { SetLogger } from "@/components/student/SetLogger";
 
 export function RoutineScreen({ routine, userId, onClose, onToggle, onProgressChange }) {
+  const [unit] = useWeightUnit();
   const [detailIndex, setDetailIndex] = useState(null);
   const [loggerIndex, setLoggerIndex] = useState(null);
   const [rest, setRest] = useState(null); // { endsAt, total }
@@ -165,7 +167,7 @@ export function RoutineScreen({ routine, userId, onClose, onToggle, onProgressCh
                                   <div>
                                     <p className={`text-sm ${ex.completed ? "text-muted line-through" : "text-ink"}`}>{ex.name}</p>
                                     {(ex.rowLabel || ex.targetWeight != null) && (
-                                      <p className="text-muted text-xs">{[ex.rowLabel, ex.targetWeight != null ? `${ex.targetWeight} kg` : ""].filter(Boolean).join(" · ")}</p>
+                                      <p className="text-muted text-xs">{[ex.rowLabel, formatWeight(ex.targetWeight, unit)].filter(Boolean).join(" · ")}</p>
                                     )}
                                   </div>
                                 </div>
@@ -218,7 +220,7 @@ export function RoutineScreen({ routine, userId, onClose, onToggle, onProgressCh
             </div>
             {detail.sets && <p className="text-soft text-sm mb-4">{detail.sets}</p>}
             {detail.targetWeight != null && (
-              <p className="text-accent text-sm mb-4">{tr("Peso sugerido:")} {detail.targetWeight} {tr("kg")}</p>
+              <p className="text-accent text-sm mb-4">{tr("Peso sugerido:")} {formatWeight(detail.targetWeight, unit)}</p>
             )}
             {detail.restMinutes != null && (
               <p className="text-soft text-sm mb-4">{tr("Descanso:")} {detail.restMinutes} {tr("min")}</p>

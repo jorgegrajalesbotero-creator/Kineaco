@@ -5,7 +5,9 @@ import { Check, Plus, Timer, X } from "lucide-react";
 import { supabase } from "@/lib/supabaseClient";
 import { currentWeekStartISO } from "@/lib/dates";
 import { tr } from "@/lib/i18n";
-import { cleanDecimal, cleanInt, toNumber } from "@/lib/numbers";
+import { cleanInt, toNumber } from "@/lib/numbers";
+import { UnitToggle, WeightInput } from "@/components/ui/WeightInput";
+import { formatWeight, useWeightUnit } from "@/lib/weightUnits";
 
 // Primer número de las reps sugeridas ("8-10" → 8) para "Marcar todas como sugeridas"
 const firstNumber = (text) => {
@@ -21,6 +23,7 @@ export function SetLogger({ exercise, routine, userId, onClose, onComplete, onUn
   const [rows, setRows] = useState([]);
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
+  const [unit] = useWeightUnit(); // las series se guardan en kg; aquí se escriben en kg o lb
 
   const routineId = exercise.routineId || routine.id;
   const byItem = exercise.byItem && exercise.itemKey;
@@ -143,7 +146,7 @@ export function SetLogger({ exercise, routine, userId, onClose, onComplete, onUn
           {[
             exercise.setsCount ? tr("{p0} series", { p0: exercise.setsCount }) : "",
             exercise.targetReps ? tr("{p0} reps", { p0: exercise.targetReps }) : "",
-            exercise.targetWeight != null ? `${exercise.targetWeight} kg` : "",
+            formatWeight(exercise.targetWeight, unit),
           ].filter(Boolean).join(" · ") || tr("Registre lo que hizo en cada serie.")}
         </p>
 
@@ -151,9 +154,9 @@ export function SetLogger({ exercise, routine, userId, onClose, onComplete, onUn
           <div className="h-32 rounded-2xl bg-card animate-pulse" />
         ) : (
           <>
-            <div className="grid grid-cols-[40px_1fr_1fr_44px] gap-2 px-1 mb-2 text-muted text-[10px] uppercase tracking-wider">
+            <div className="grid grid-cols-[40px_1fr_1fr_44px] gap-2 items-center px-1 mb-2 text-muted text-[10px] uppercase tracking-wider">
               <span>{tr("Serie")}</span>
-              <span className="text-center">{tr("Peso (kg)")}</span>
+              <span className="flex items-center justify-center gap-1.5">{tr("Peso")} <UnitToggle t={tr} /></span>
               <span className="text-center">{tr("Reps")}</span>
               <span />
             </div>
@@ -161,13 +164,13 @@ export function SetLogger({ exercise, routine, userId, onClose, onComplete, onUn
               {rows.map((r, idx) => (
                 <div key={r.n} className={`grid grid-cols-[40px_1fr_1fr_44px] gap-2 items-center rounded-2xl p-1.5 ${r.done ? "bg-accent/[0.07]" : ""}`}>
                   <span className={`text-sm font-semibold text-center ${r.done ? "text-accent" : "text-soft"}`}>{r.n}</span>
-                  <input
-                    type="text"
-                    inputMode="decimal"
-                    value={r.weight}
-                    placeholder={targetWeight || "—"}
+                  <WeightInput
+                    valueKg={r.weight}
+                    onChangeKg={(kg) => update(idx, "weight", kg)}
+                    placeholderKg={targetWeight}
+                    placeholder="—"
+                    toggle={false}
                     disabled={r.done}
-                    onChange={(e) => update(idx, "weight", cleanDecimal(e.target.value))}
                     className={inputCls}
                   />
                   <input
