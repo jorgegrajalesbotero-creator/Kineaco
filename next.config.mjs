@@ -9,6 +9,11 @@ const supabaseHost = supabaseUrl.replace(/^https?:\/\//, "").replace(/\/$/, "");
 // Política de contenido: el navegador solo carga scripts, imágenes y conexiones
 // desde la propia app y desde Supabase. Bloquea código inyectado desde otros sitios.
 //
+// frame-src: la única página externa que se puede incrustar es el reproductor de
+// YouTube "sin cookies", para ver el video del ejercicio dentro de la rutina
+// (lib/youtube.js arma esa dirección a partir del identificador del video).
+// frame-ancestors sigue en 'none': nadie puede incrustar la app en otro sitio.
+//
 // SEG-M6 (riesgo aceptado): se mantiene 'unsafe-inline' en script-src. Quitarlo
 // exigiría nonces por petición (middleware), lo que forzaría render dinámico y
 // perdería el prerender estático actual. Dado que no hay vector XSS en la app
@@ -23,7 +28,7 @@ const contentSecurityPolicy = [
   `connect-src 'self'${supabaseHost ? ` https://${supabaseHost} wss://${supabaseHost}` : ""}${isDev ? " ws: wss:" : ""}`,
   "media-src 'self' blob:",
   "object-src 'none'",
-  "frame-src 'none'",
+  "frame-src https://www.youtube-nocookie.com",
   "frame-ancestors 'none'",
   "base-uri 'self'",
   "form-action 'self'",
