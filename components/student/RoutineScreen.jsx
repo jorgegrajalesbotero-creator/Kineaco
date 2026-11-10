@@ -9,6 +9,7 @@ import { downloadRoutinePdf } from "@/lib/planPdf";
 import { supabase } from "@/lib/supabaseClient";
 import { safeHttpUrl } from "@/lib/url";
 import { formatWeight, useWeightUnit } from "@/lib/weightUnits";
+import { youtubeVideo } from "@/lib/youtube";
 import { Confetti } from "@/components/ui/Confetti";
 import { RestTimer } from "@/components/student/RestTimer";
 import { SetLogger } from "@/components/student/SetLogger";
@@ -16,6 +17,9 @@ import { SetLogger } from "@/components/student/SetLogger";
 export function RoutineScreen({ routine, userId, onClose, onToggle, onProgressChange }) {
   const [unit] = useWeightUnit();
   const [detailIndex, setDetailIndex] = useState(null);
+  const [playing, setPlaying] = useState(false); // el video solo se carga cuando el alumno toca "Ver video"
+  const openDetail = (i) => { setPlaying(false); setDetailIndex(i); };
+  const closeDetail = () => { setPlaying(false); setDetailIndex(null); };
   const [loggerIndex, setLoggerIndex] = useState(null);
   const [rest, setRest] = useState(null); // { endsAt, total }
   const [celebrate, setCelebrate] = useState(false);
@@ -87,6 +91,8 @@ export function RoutineScreen({ routine, userId, onClose, onToggle, onProgressCh
 
   const startRest = (seconds) => setRest({ endsAt: Date.now() + seconds * 1000, total: seconds });
   const detail = detailIndex !== null ? routine.exercises[detailIndex] : null;
+  const videoLink = detail ? safeHttpUrl(detail.videoUrl) : null;
+  const video = detail ? youtubeVideo(detail.videoUrl) : null;
 
   return (
     <div className="flex-1 overflow-y-auto pb-4">
@@ -159,7 +165,7 @@ export function RoutineScreen({ routine, userId, onClose, onToggle, onProgressCh
                           {b.notes && <p className="text-soft text-xs bg-card rounded-lg px-3 py-2 mb-2">{b.notes}</p>}
                           <div className="space-y-2">
                             {items.map(({ ex, i }) => (
-                              <div key={i} onClick={() => setDetailIndex(i)} className={`flex items-center justify-between rounded-2xl px-4 py-3 group cursor-pointer transition duration-200 ease-out hover:scale-[1.02] hover:bg-card-hover active:scale-[0.99] ${ex.completed ? "bg-card/60" : "bg-card"}`}>
+                              <div key={i} onClick={() => openDetail(i)} className={`flex items-center justify-between rounded-2xl px-4 py-3 group cursor-pointer transition duration-200 ease-out hover:scale-[1.02] hover:bg-card-hover active:scale-[0.99] ${ex.completed ? "bg-card/60" : "bg-card"}`}>
                                 <div className="flex items-center gap-3">
                                   <button onClick={(e) => { e.stopPropagation(); toggle(i); }} className={`w-7 h-7 rounded-full flex items-center justify-center shrink-0 transition-all active:scale-90 ${ex.completed ? "bg-accent" : "border-2 border-field-strong"}`}>
                                     {ex.completed && <Check size={14} strokeWidth={3} className="text-app animate-check-pop" />}
@@ -171,7 +177,7 @@ export function RoutineScreen({ routine, userId, onClose, onToggle, onProgressCh
                                     )}
                                   </div>
                                 </div>
-                                <button onClick={(e) => { e.stopPropagation(); setDetailIndex(i); }} aria-label={tr("Ver ejercicio")} className="text-muted transition-colors group-hover:text-ink">
+                                <button onClick={(e) => { e.stopPropagation(); openDetail(i); }} aria-label={tr("Ver ejercicio")} className="text-muted transition-colors group-hover:text-ink">
                                   <ChevronRight size={16} />
                                 </button>
                               </div>
@@ -184,7 +190,7 @@ export function RoutineScreen({ routine, userId, onClose, onToggle, onProgressCh
                 ) : (
                   <div className="space-y-2">
                     {routine.exercises.map((ex, i) => ({ ex, i })).filter(({ ex }) => ex.partIndex === part.partIndex).map(({ ex, i }) => (
-                      <div key={i} onClick={() => setDetailIndex(i)} className={`flex items-center justify-between rounded-2xl px-4 py-3 group cursor-pointer transition duration-200 ease-out hover:scale-[1.02] hover:bg-card-hover active:scale-[0.99] ${ex.completed ? "bg-card/60" : "bg-card"}`}>
+                      <div key={i} onClick={() => openDetail(i)} className={`flex items-center justify-between rounded-2xl px-4 py-3 group cursor-pointer transition duration-200 ease-out hover:scale-[1.02] hover:bg-card-hover active:scale-[0.99] ${ex.completed ? "bg-card/60" : "bg-card"}`}>
                         <div className="flex items-center gap-3">
                           <button onClick={(e) => { e.stopPropagation(); toggle(i); }} className={`w-7 h-7 rounded-full flex items-center justify-center shrink-0 transition-all active:scale-90 ${ex.completed ? "bg-accent" : "border-2 border-field-strong"}`}>
                             {ex.completed && <Check size={14} strokeWidth={3} className="text-app animate-check-pop" />}
@@ -194,7 +200,7 @@ export function RoutineScreen({ routine, userId, onClose, onToggle, onProgressCh
                             {ex.sets && <p className="text-muted text-xs">{ex.sets}</p>}
                           </div>
                         </div>
-                        <button onClick={(e) => { e.stopPropagation(); setDetailIndex(i); }} aria-label={tr("Ver ejercicio")} className="text-muted transition-colors group-hover:text-ink">
+                        <button onClick={(e) => { e.stopPropagation(); openDetail(i); }} aria-label={tr("Ver ejercicio")} className="text-muted transition-colors group-hover:text-ink">
                           <ChevronRight size={16} />
                         </button>
                       </div>
@@ -212,11 +218,11 @@ export function RoutineScreen({ routine, userId, onClose, onToggle, onProgressCh
       </div>
 
       {detail && (
-        <div className="fixed inset-0 bg-black/60 flex items-end md:items-center justify-center z-50" onClick={() => setDetailIndex(null)}>
-          <div className="bg-deep w-full max-w-md rounded-t-2xl md:rounded-2xl p-5 pb-[calc(1.25rem+env(safe-area-inset-bottom))] md:pb-5" onClick={(e) => e.stopPropagation()}>
+        <div className="fixed inset-0 bg-black/60 flex items-end md:items-center justify-center z-50" onClick={closeDetail}>
+          <div className="bg-deep w-full max-w-md max-h-[92dvh] overflow-y-auto rounded-t-2xl md:rounded-2xl p-5 pb-[calc(1.25rem+env(safe-area-inset-bottom))] md:pb-5" onClick={(e) => e.stopPropagation()}>
             <div className="flex items-center justify-between mb-3">
               <h2 className="text-ink text-lg font-semibold">{detail.name}</h2>
-              <button onClick={() => setDetailIndex(null)} className="text-muted"><X size={20} /></button>
+              <button onClick={closeDetail} aria-label={tr("Cerrar")} className="text-muted"><X size={20} /></button>
             </div>
             {detail.sets && <p className="text-soft text-sm mb-4">{detail.sets}</p>}
             {detail.targetWeight != null && (
@@ -225,8 +231,30 @@ export function RoutineScreen({ routine, userId, onClose, onToggle, onProgressCh
             {detail.restMinutes != null && (
               <p className="text-soft text-sm mb-4">{tr("Descanso:")} {detail.restMinutes} {tr("min")}</p>
             )}
-            {safeHttpUrl(detail.videoUrl) ? (
-              <a href={safeHttpUrl(detail.videoUrl)} target="_blank" rel="noopener noreferrer" className="flex items-center justify-center gap-2 bg-accent text-app font-semibold py-3 rounded-xl">
+            {video && playing ? (
+              // Video de YouTube dentro de la ficha (Shorts en vertical). Se usa el reproductor "sin cookies".
+              <div className="animate-fade-in">
+                <div className={`relative mx-auto overflow-hidden rounded-xl bg-black ${video.vertical ? "aspect-[9/16] h-[58dvh] max-w-full" : "aspect-video w-full"}`}>
+                  <iframe
+                    src={video.embedUrl}
+                    title={detail.name}
+                    allow="autoplay; encrypted-media; picture-in-picture; fullscreen"
+                    allowFullScreen
+                    referrerPolicy="strict-origin-when-cross-origin"
+                    className="absolute inset-0 w-full h-full border-0"
+                  />
+                </div>
+                <a href={videoLink} target="_blank" rel="noopener noreferrer" className="block text-center text-muted text-xs mt-3 hover:text-ink transition-colors">
+                  {tr("Abrir en YouTube")}
+                </a>
+              </div>
+            ) : video ? (
+              <button type="button" onClick={() => setPlaying(true)} className="w-full flex items-center justify-center gap-2 bg-accent text-app font-semibold py-3 rounded-xl active:scale-[0.98] transition-transform">
+                <Play size={16} fill="#0F1512" /> {tr("Ver video")}
+              </button>
+            ) : videoLink ? (
+              // Enlaces que no son de YouTube: se abren en otra pestaña, como antes
+              <a href={videoLink} target="_blank" rel="noopener noreferrer" className="flex items-center justify-center gap-2 bg-accent text-app font-semibold py-3 rounded-xl">
                 <Play size={16} fill="#0F1512" /> {tr("Ver video")}
               </a>
             ) : (
