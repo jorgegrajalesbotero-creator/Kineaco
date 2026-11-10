@@ -54,6 +54,15 @@ lib/                      Lógica sin pantallas
 
 ```
 
+## Notificaciones push (barra del celular)
+
+- Cada fila nueva en `notifications` (la campanita) dispara en Supabase `send_push` → `POST /api/push` con el id y el encabezado `x-push-secret`. La ruta lee el aviso con la clave secreta, lo cifra y lo envía a cada celular guardado en `push_subscriptions` (`lib/webpush.js`, VAPID + aes128gcm sin librerías). Los celulares que ya no existen se borran solos.
+- `public/sw.js` muestra la notificación y, al tocarla, abre `/?aviso=<id>` o `/admin?aviso=<id>`; `useOpenNotification` (`lib/push.js`) abre la sección.
+- `/api/cron/daily` (Vercel Cron, `vercel.json`, 11:00 UTC = 6:00 a. m. Colombia) crea "Hoy le toca entrenar", el check-in del domingo y el aviso de acceso por vencer, con las mismas `dedupe_key` que la app.
+- Los avisos tipo `rest` (día de descanso) se quedan solo en la campanita.
+- En iPhone solo funciona con la app instalada en la pantalla de inicio (iOS 16.4+).
+- Variables (Vercel, Production): `NEXT_PUBLIC_VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY`, `VAPID_SUBJECT`, `PUSH_WEBHOOK_SECRET`, `CRON_SECRET`, `SUPABASE_SECRET_KEY`.
+
 ## Colores
 
 Definidos una sola vez en `app/globals.css` y usados como clases:

@@ -10,6 +10,8 @@ import { getWeightUnit } from "@/lib/weightUnits";
 import { fetchAllRows } from "@/lib/fetchAll";
 import { appLocale, dayLetters, detectLang, rememberLang, setLang, tr } from "@/lib/i18n";
 import { NotificationBell, addNotifications } from "@/lib/notifications";
+import { removePushOnLogout, syncPush, useOpenNotification } from "@/lib/push";
+import { PushPromptCard } from "@/components/ui/PushNotifications";
 import { supabase } from "@/lib/supabaseClient";
 import { signedAvatarUrl } from "@/lib/avatars";
 import { HomeScreen } from "@/components/student/HomeScreen";
@@ -589,6 +591,8 @@ export default function App() {
         .eq("read_by_alumno", false);
       setUnreadMessageCount((unreadMsgs || []).length);
       loadBodyWeight(user.id);
+      // Notificaciones del celular: si ya dio permiso, deja este celular conectado a su cuenta
+      syncPush(supabase, user.id);
 
       setRoutineReady(true);
     }
@@ -603,6 +607,12 @@ export default function App() {
     loadedDayRef.current = selectedDay;
     refreshRoutine(uidRef.current, selectedDay);
   }, [routineReady, selectedDay, accessBlocked]);
+
+  // Al tocar una notificación en la barra del celular, abre la sección de ese aviso
+  useOpenNotification(supabase, userId, routineReady && !accessBlocked && !needsConsent, (n) => {
+    openFromNotification(n);
+    setNotifKey((k) => k + 1);
+  });
   const handleSelectTab = (key) => {
     setShowRoutine(false);
     setShowCheckin(false);
@@ -614,6 +624,7 @@ export default function App() {
   };
 
   const signOutNow = async () => {
+    await removePushOnLogout(supabase); // este celular deja de recibir los avisos de esta cuenta
     await supabase.auth.signOut();
     window.location.href = "/login";
   };
@@ -676,6 +687,7 @@ export default function App() {
         hasNutritionProfile={hasNutritionProfile}
         needsIntake={!hasIntake}
         onOpenIntake={() => setEditingIntake(true)}
+        pushCard={<PushPromptCard userId={userId} t={tr} />}
         bell={<NotificationBell supabase={supabase} userId={userId} onNavigate={openFromNotification} refreshKey={notifKey} t={tr} locale={appLocale()} format={formatNotice} />}
       />
     );

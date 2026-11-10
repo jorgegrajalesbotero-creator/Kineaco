@@ -27,6 +27,9 @@ const contentSecurityPolicy = [
   "font-src 'self' data:",
   `connect-src 'self'${supabaseHost ? ` https://${supabaseHost} wss://${supabaseHost}` : ""}${isDev ? " ws: wss:" : ""}`,
   "media-src 'self' blob:",
+  // Service worker de las notificaciones (public/sw.js) y manifest de la app instalable
+  "worker-src 'self'",
+  "manifest-src 'self'",
   "object-src 'none'",
   "frame-src https://www.youtube-nocookie.com",
   "frame-ancestors 'none'",
@@ -59,7 +62,17 @@ const nextConfig = {
   // No anunciar qué tecnología usa el servidor
   poweredByHeader: false,
   async headers() {
-    return [{ source: "/:path*", headers: securityHeaders }];
+    return [
+      { source: "/:path*", headers: securityHeaders },
+      // El service worker se revisa siempre (sin caché) para que los cambios lleguen a todos los celulares
+      {
+        source: "/sw.js",
+        headers: [
+          { key: "Cache-Control", value: "no-cache, no-store, must-revalidate" },
+          { key: "Service-Worker-Allowed", value: "/" },
+        ],
+      },
+    ];
   },
 };
 
