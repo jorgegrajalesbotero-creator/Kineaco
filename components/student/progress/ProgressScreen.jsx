@@ -4,7 +4,8 @@ import { useState } from "react";
 import { Check, Download, Flame, TrendingUp } from "lucide-react";
 import { appLocale, tr } from "@/lib/i18n";
 import { supabase } from "@/lib/supabaseClient";
-import { downloadReportPdf } from "@/lib/planPdf";
+import { buildReportPdf } from "@/lib/planPdf";
+import { usePdfPreview } from "@/components/ui/PdfPreview";
 import { useWeightUnit, weightLabel } from "@/lib/weightUnits";
 import { currentOrNextPlan, loadSchedule } from "@/lib/trainingPlan";
 import { CountUp } from "@/components/ui/CountUp";
@@ -19,13 +20,14 @@ export function ProgressScreen({ streak, bestStreak, totalCompleted, weekStats, 
   const [unit] = useWeightUnit();
   const maxCount = Math.max(1, ...weekStats.map((d) => d.count));
   const [pdfBusy, setPdfBusy] = useState(false);
+  const [showPdf, pdfPreview] = usePdfPreview(tr);
 
   // Descargar todo el informe en PDF: progreso, medidas, nutrición y entrenamientos
   const downloadReport = async () => {
     setPdfBusy(true);
     try {
       const { plans, fixed } = await loadSchedule(supabase, userId, "id, title");
-      await downloadReportPdf({ supabase, userId, plan: currentOrNextPlan(plans), fixed, studentName: fullName, t: tr, locale: appLocale(), includeHealth: healthConsent });
+      showPdf(await buildReportPdf({ supabase, userId, plan: currentOrNextPlan(plans), fixed, studentName: fullName, t: tr, locale: appLocale(), includeHealth: healthConsent }));
     } catch {
       alert(tr("No se pudo generar el PDF: "));
     }
@@ -116,6 +118,7 @@ export function ProgressScreen({ streak, bestStreak, totalCompleted, weekStats, 
           ))
         )}
       </div>
+      {pdfPreview}
     </div>
   );
 }

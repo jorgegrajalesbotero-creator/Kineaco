@@ -5,7 +5,8 @@ import { Check, ChevronLeft, ChevronRight, Download, Play, X } from "lucide-reac
 import { blockTypeLabel } from "@/lib/blocks";
 import { currentWeekStartISO } from "@/lib/dates";
 import { appLocale, tr } from "@/lib/i18n";
-import { downloadRoutinePdf } from "@/lib/planPdf";
+import { buildRoutinePdf } from "@/lib/planPdf";
+import { usePdfPreview } from "@/components/ui/PdfPreview";
 import { supabase } from "@/lib/supabaseClient";
 import { safeHttpUrl } from "@/lib/url";
 import { formatWeight, useWeightUnit } from "@/lib/weightUnits";
@@ -24,11 +25,12 @@ export function RoutineScreen({ routine, userId, onClose, onToggle, onProgressCh
   const [rest, setRest] = useState(null); // { endsAt, total }
   const [celebrate, setCelebrate] = useState(false);
   const [pdfBusy, setPdfBusy] = useState(false);
+  const [showPdf, pdfPreview] = usePdfPreview(tr);
   const downloadPdf = async () => {
     setPdfBusy(true);
     try {
       const ids = (routine.parts || [routine]).map((p) => p.id);
-      await downloadRoutinePdf({ supabase, routineIds: ids, dayTitle: tr(routine.day_label), t: tr, locale: appLocale() });
+      showPdf(await buildRoutinePdf({ supabase, routineIds: ids, dayTitle: tr(routine.day_label), t: tr, locale: appLocale() }));
     } catch {
       alert(tr("No se pudo generar el PDF: "));
     }
@@ -284,6 +286,7 @@ export function RoutineScreen({ routine, userId, onClose, onToggle, onProgressCh
           onClose={() => setRest(null)}
         />
       )}
+      {pdfPreview}
     </div>
   );
 }

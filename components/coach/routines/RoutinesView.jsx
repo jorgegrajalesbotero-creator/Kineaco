@@ -7,7 +7,8 @@ import { filterItems, sortItems } from "@/lib/filters";
 import { useFilterState } from "@/lib/useFilterState";
 import { fetchAllRows } from "@/lib/fetchAll";
 import { supabase } from "@/lib/supabaseClient";
-import { downloadRoutinePdf } from "@/lib/planPdf";
+import { buildRoutinePdf } from "@/lib/planPdf";
+import { usePdfPreview } from "@/components/ui/PdfPreview";
 import { BlockEditor } from "@/components/coach/routines/BlockEditor";
 import { autoRoutineTitle, catalogOptions, loadRoutineContent, mergeRoutineContent, switchRoutineMode, writeRoutineContent } from "@/components/coach/routines/routineHelpers";
 import { ExerciseItemEditor } from "@/components/coach/routines/ExerciseItemEditor";
@@ -394,11 +395,12 @@ export function RoutinesView() {
     loadRoutines();
   };
 
-  // Descargar una rutina en PDF desde la lista
+  // PDF de una rutina desde la lista: primero la vista previa, y desde ahí se descarga
+  const [showPdf, pdfPreview] = usePdfPreview();
   const pdfFromList = async (r) => {
     setBusyId(r.id);
     try {
-      await downloadRoutinePdf({ supabase, routineIds: [r.id] });
+      showPdf(await buildRoutinePdf({ supabase, routineIds: [r.id] }));
     } catch {
       alert("No se pudo generar el PDF: ");
     }
@@ -717,6 +719,7 @@ export function RoutinesView() {
       </div>
 
       {assignRoutine && <AssignRoutineModal routine={assignRoutine} onClose={() => { setAssignRoutine(null); loadAssigned(); }} />}
+      {pdfPreview}
     </div>
   );
 }

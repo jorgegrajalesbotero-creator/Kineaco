@@ -7,7 +7,8 @@ import { blockTypeLabel } from "@/lib/blocks";
 import { localDateString } from "@/lib/dates";
 import { appLocale, dayLetters, tr } from "@/lib/i18n";
 import { addDays, currentOrNextPlan, dayLabelOf, loadSchedule, mondayOf, planFor, planLastDay, planStart, planWeekOf, routinesForDate } from "@/lib/trainingPlan";
-import { downloadReportPdf, downloadRoutinePdf, loadRoutineDetails } from "@/lib/planPdf";
+import { buildReportPdf, buildRoutinePdf, loadRoutineDetails } from "@/lib/planPdf";
+import { usePdfPreview } from "@/components/ui/PdfPreview";
 import { formatWeight, useWeightUnit } from "@/lib/weightUnits";
 
 const card = "rounded-2xl bg-gradient-to-b from-card to-deep border border-white/[0.06]";
@@ -73,10 +74,11 @@ export function CalendarScreen({ userId, studentName, healthConsent, onClose, on
   const monthTitle = cap(month.toLocaleDateString(locale, { month: "long", year: "numeric" }));
   const fmt = (d, opts) => d.toLocaleDateString(locale, opts);
 
+  const [showPdf, pdfPreview] = usePdfPreview(tr);
   const reportPdf = async () => {
     setBusy("plan");
     try {
-      await downloadReportPdf({ supabase, userId, plan, fixed, studentName, t: tr, locale, includeHealth: healthConsent });
+      showPdf(await buildReportPdf({ supabase, userId, plan, fixed, studentName, t: tr, locale, includeHealth: healthConsent }));
     } catch {
       alert(tr("No se pudo generar el PDF: "));
     }
@@ -86,7 +88,7 @@ export function CalendarScreen({ userId, studentName, healthConsent, onClose, on
     setBusy("day");
     try {
       const raw = fmt(selDate, { weekday: "long", day: "numeric", month: "long" });
-      await downloadRoutinePdf({ supabase, routineIds: selIds, dayTitle: raw.charAt(0).toUpperCase() + raw.slice(1), t: tr, locale });
+      showPdf(await buildRoutinePdf({ supabase, routineIds: selIds, dayTitle: raw.charAt(0).toUpperCase() + raw.slice(1), t: tr, locale }));
     } catch {
       alert(tr("No se pudo generar el PDF: "));
     }
@@ -235,6 +237,7 @@ export function CalendarScreen({ userId, studentName, healthConsent, onClose, on
           </>
         )}
       </div>
+      {pdfPreview}
     </div>
   );
 }
