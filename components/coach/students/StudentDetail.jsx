@@ -4,7 +4,8 @@ import { useState } from "react";
 import Link from "next/link";
 import { Activity, ArrowLeft, Calendar, Camera, ClipboardCheck, Download, Dumbbell, TrendingUp, Lock, MessageCircle, Ruler, Utensils } from "lucide-react";
 import { supabase } from "@/lib/supabaseClient";
-import { downloadReportPdf } from "@/lib/planPdf";
+import { buildReportPdf } from "@/lib/planPdf";
+import { usePdfPreview } from "@/components/ui/PdfPreview";
 import { currentOrNextPlan, loadSchedule } from "@/lib/trainingPlan";
 import { AccessPanel } from "./AccessPanel";
 import { CheckinPanel } from "./CheckinPanel";
@@ -42,12 +43,13 @@ const GROUPS = [
 export function StudentDetail({ student, onClose, onChanged, initialPanel = null }) {
   const [panel, setPanel] = useState(initialPanel);
   const [pdfBusy, setPdfBusy] = useState(false);
+  const [showPdf, pdfPreview] = usePdfPreview();
 
   const downloadReport = async () => {
     setPdfBusy(true);
     try {
       const { plans, fixed } = await loadSchedule(supabase, student.id, "id, title");
-      await downloadReportPdf({ supabase, userId: student.id, plan: currentOrNextPlan(plans), fixed, studentName: student.name, includeLoads: true });
+      showPdf(await buildReportPdf({ supabase, userId: student.id, plan: currentOrNextPlan(plans), fixed, studentName: student.name, includeLoads: true }));
     } catch {
       alert("No se pudo generar el PDF: ");
     }
@@ -129,6 +131,7 @@ export function StudentDetail({ student, onClose, onChanged, initialPanel = null
           </div>
         </div>
       ))}
+      {pdfPreview}
     </div>
   );
 }

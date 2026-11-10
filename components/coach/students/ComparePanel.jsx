@@ -5,7 +5,8 @@ import { Download } from "lucide-react";
 import { supabase } from "@/lib/supabaseClient";
 import { localDateString } from "@/lib/dates";
 import { BADGE_GROUPS, computeBadges, loadBadgeData } from "@/lib/badges";
-import { downloadReportPdf } from "@/lib/planPdf";
+import { buildReportPdf } from "@/lib/planPdf";
+import { usePdfPreview } from "@/components/ui/PdfPreview";
 import { currentOrNextPlan, loadSchedule } from "@/lib/trainingPlan";
 import { PanelLayout } from "./PanelLayout";
 import { formatWeight, useWeightUnit } from "@/lib/weightUnits";
@@ -18,13 +19,14 @@ export function ComparePanel({ student, onClose }) {
   const [coachBadges, setCoachBadges] = useState([]);
   const [loadingComparison, setLoadingComparison] = useState(true);
   const [pdfBusy, setPdfBusy] = useState(false);
+  const [showPdf, pdfPreview] = usePdfPreview();
 
   // Informe completo del alumno en PDF: progreso, medidas, nutrición y entrenamientos (con o sin plan)
   const downloadReport = async () => {
     setPdfBusy(true);
     try {
       const { plans, fixed } = await loadSchedule(supabase, student.id, "id, title");
-      await downloadReportPdf({ supabase, userId: student.id, plan: currentOrNextPlan(plans), fixed, studentName: student.name, includeLoads: true });
+      showPdf(await buildReportPdf({ supabase, userId: student.id, plan: currentOrNextPlan(plans), fixed, studentName: student.name, includeLoads: true }));
     } catch {
       alert("No se pudo generar el PDF: ");
     }
@@ -173,6 +175,7 @@ export function ComparePanel({ student, onClose }) {
           </div>
         </div>
       )}
+      {pdfPreview}
     </PanelLayout>
   );
 }
