@@ -7,11 +7,14 @@ import { catalogOptions, defaultBlockTitle, tmpKey } from "@/components/coach/ro
 import { SearchSelect } from "@/components/ui/Search";
 import { Select } from "@/components/ui/Select";
 import { ExerciseItemEditor } from "@/components/coach/routines/ExerciseItemEditor";
+import { WeightInput } from "@/components/ui/WeightInput";
+import { formatWeight, useWeightUnit } from "@/lib/weightUnits";
 
 export function BlockEditor({ blocks, setBlocks, catalog, onCreateExercise }) {
   const [newType, setNewType] = useState("principal");
   const [forms, setForms] = useState({});
   const [editing, setEditing] = useState(null); // { block: key, index }
+  const [unit] = useWeightUnit();
 
   const updateBlock = (key, patch) => setBlocks((bs) => bs.map((b) => (b.key === key ? { ...b, ...patch } : b)));
   const moveBlock = (index, dir) =>
@@ -136,7 +139,7 @@ export function BlockEditor({ blocks, setBlocks, catalog, onCreateExercise }) {
                   <div className="flex-1 min-w-0">
                     <button type="button" onClick={() => setEditing({ block: b.key, index: j })} className="text-ink text-sm truncate block max-w-full text-left hover:text-accent">{ex.name}</button>
                     <p className="text-muted text-xs">
-                      {[ex.reps && `${ex.reps} reps`, ex.targetWeight && `${ex.targetWeight} kg`, ex.restMinutes && `descanso ${ex.restMinutes} min`].filter(Boolean).join(" · ") || "Sin detalle"}
+                      {[ex.reps && `${ex.reps} reps`, ex.targetWeight && formatWeight(ex.targetWeight, unit), ex.restMinutes && `descanso ${ex.restMinutes} min`].filter(Boolean).join(" · ") || "Sin detalle"}
                     </p>
                   </div>
                   <button type="button" onClick={() => moveExercise(b, j, -1)} disabled={j === 0} className="text-muted text-xs px-1 disabled:opacity-30" aria-label="Subir">↑</button>
@@ -165,7 +168,7 @@ export function BlockEditor({ blocks, setBlocks, catalog, onCreateExercise }) {
                 </>
               )}
               <input placeholder="Reps" value={f.reps} onChange={(e) => setForm(b.key, { reps: e.target.value })} className={inputCls} />
-              <input placeholder="Peso (kg)" value={f.targetWeight} onChange={(e) => setForm(b.key, { targetWeight: e.target.value })} className={inputCls} />
+              <WeightInput placeholder="Peso" valueKg={f.targetWeight} onChangeKg={(kg) => setForm(b.key, { targetWeight: kg })} className={`${inputCls} w-full`} />
               <input placeholder="Descanso" value={f.restMinutes} onChange={(e) => setForm(b.key, { restMinutes: e.target.value })} className={inputCls} />
             </div>
             <button type="button" onClick={() => addExercise(b)} disabled={addingKey === b.key} className="mt-2 bg-field text-accent px-4 py-2 rounded-lg text-sm flex items-center gap-1 disabled:opacity-60">
