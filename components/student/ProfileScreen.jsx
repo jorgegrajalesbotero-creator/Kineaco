@@ -7,6 +7,7 @@ import { shrinkAvatar } from "@/lib/images";
 import { supabase } from "@/lib/supabaseClient";
 import { signedAvatarUrl } from "@/lib/avatars";
 import { PrivacySection } from "@/components/student/PrivacySection";
+import { ChangePassword } from "@/components/ui/ChangePassword";
 
 export function ProfileScreen({ fullName, email, avatarUrl, userId, onProfileUpdate, onOpenIntake, onOpenAnnouncements, isCoach, onLogout, lang, onChangeLang, healthConsent, onHealthChange }) {
   const [nameDraft, setNameDraft] = useState(fullName);
@@ -122,6 +123,8 @@ export function ProfileScreen({ fullName, email, avatarUrl, userId, onProfileUpd
           </div>
         </div>
       )}
+
+      <ChangePassword t={tr} />
 
       {isCoach && (
         <a href="/admin" className="w-full flex items-center justify-between bg-accent/10 border border-accent/30 rounded-2xl px-4 py-3 mb-4">

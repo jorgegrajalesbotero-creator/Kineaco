@@ -6,6 +6,7 @@ import { shrinkAvatar } from "@/lib/images";
 import { supabase } from "@/lib/supabaseClient";
 import { signedAvatarUrl } from "@/lib/avatars";
 import { Skeleton } from "@/components/ui/Skeleton";
+import { ChangePassword } from "@/components/ui/ChangePassword";
 
 export function ProfileView({ onProfileUpdate }) {
   const [form, setForm] = useState({ fullName: "", email: "", specialty: "", bio: "", avatarUrl: "" });
@@ -125,6 +126,11 @@ export function ProfileView({ onProfileUpdate }) {
       <button onClick={handleSave} className="bg-accent text-app font-semibold px-6 py-2.5 rounded-lg text-sm flex items-center gap-2">
         {saved ? <><Check size={15} /> Guardado</> : "Guardar cambios"}
       </button>
+
+      <div className="mt-8">
+        <h3 className="text-ink text-base font-semibold mb-3">Seguridad</h3>
+        <ChangePassword />
+      </div>
     </div>
   );
 }
