@@ -59,7 +59,7 @@ export function PdfPreview({ file, onClose, t = plain }) {
           canvas.className = "block w-full h-auto rounded-lg bg-white shadow-lg animate-fade-in";
           canvas.setAttribute("role", "img");
           canvas.setAttribute("aria-label", `${n} / ${doc.numPages}`);
-          await page.render({ canvas, viewport }).promise;
+          await page.render({ canvasContext: canvas.getContext("2d"), viewport }).promise;
           if (cancelled) return;
           box.appendChild(canvas);
           setProgress({ page: n, total: doc.numPages });

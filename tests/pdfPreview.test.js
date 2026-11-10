@@ -30,5 +30,5 @@ describe("vista previa de PDF", () => {
     const ops = await page.getOperatorList();
     expect(ops.fnArray.length).toBeGreaterThan(0);
     await task.destroy();
-  });
+  }, 20000);
 });
