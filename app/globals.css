@@ -35,6 +35,9 @@
   --animate-panel-in: panel-in 0.22s cubic-bezier(0.16, 1, 0.3, 1) both;
   --animate-sheet-in: sheet-in 0.34s cubic-bezier(0.16, 1, 0.3, 1) both;
   --animate-fade-in: fade-in 0.2s ease-out both;
+  --animate-fade-out: fade-out 0.15s ease-in both;
+  --animate-panel-out: panel-out 0.15s ease-in both;
+  --animate-bell-ring: bell-ring 0.9s ease-in-out both;
 
   --font-sans: var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif;
   --font-mono: var(--font-geist-mono), ui-monospace, monospace;
@@ -99,6 +102,13 @@ body {
   }
 }
 
+/* Botón de quitar un aviso: con mouse aparece al pasar el cursor; en celular siempre se ve */
+@media (hover: hover) {
+  .notice-dismiss { opacity: 0; }
+  .group:hover .notice-dismiss,
+  .notice-dismiss:focus-visible { opacity: 1; }
+}
+
 /* Respeta a quien prefiere menos movimiento en su celular */
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after {
@@ -123,4 +133,21 @@ body {
 @keyframes fade-in {
   from { opacity: 0; }
   to { opacity: 1; }
+}
+/* Campana de avisos: cierre del panel y campanazo cuando llega un aviso nuevo */
+@keyframes fade-out {
+  from { opacity: 1; }
+  to { opacity: 0; }
+}
+@keyframes panel-out {
+  from { opacity: 1; transform: translateY(0) scale(1); }
+  to { opacity: 0; transform: translateY(-6px) scale(0.98); }
+}
+@keyframes bell-ring {
+  0%, 100% { transform: rotate(0); }
+  15% { transform: rotate(14deg); }
+  30% { transform: rotate(-12deg); }
+  45% { transform: rotate(8deg); }
+  60% { transform: rotate(-6deg); }
+  75% { transform: rotate(3deg); }
 }
