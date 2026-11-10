@@ -2,6 +2,8 @@
 
 import { useEffect, useState } from "react";
 import { NotificationBell, addNotifications } from "@/lib/notifications";
+import { removePushOnLogout, syncPush, useOpenNotification } from "@/lib/push";
+import { PushPromptCard } from "@/components/ui/PushNotifications";
 import { supabase } from "@/lib/supabaseClient";
 import { AnnouncementsView } from "@/components/coach/AnnouncementsView";
 import { ExercisesView } from "@/components/coach/ExercisesView";
@@ -48,10 +50,25 @@ export default function AdminPanel() {
       setIsAdmin(profile?.role === "admin");
       setCoachId(user.id);
       setChecking(false);
+      syncPush(supabase, user.id);
       createCoachNotices(user.id).catch(() => { });
     }
     checkAccess();
   }, []);
+
+  const openFromNotification = (n) => {
+    setMenuOpen(false);
+    if (n.student_id && ["messages", "nutrition", "access", "photos", "progress", "checkin", "measurements"].includes(n.link)) {
+      setPendingStudentAction({ id: n.student_id, action: n.link });
+    }
+    setTab("alumnos");
+  };
+
+  // Al tocar una notificación en la barra del celular, abre el aviso en el panel
+  useOpenNotification(supabase, coachId, !checking, (n) => {
+    openFromNotification(n);
+    setNotifKey((k) => k + 1);
+  });
 
   if (checking) {
     return (
@@ -83,14 +100,6 @@ export default function AdminPanel() {
     setNotifKey((k) => k + 1);
   }
 
-  const openFromNotification = (n) => {
-    setMenuOpen(false);
-    if (n.student_id && ["messages", "nutrition", "access", "photos", "progress", "checkin", "measurements"].includes(n.link)) {
-      setPendingStudentAction({ id: n.student_id, action: n.link });
-    }
-    setTab("alumnos");
-  };
-
   const bell = coachId ? (
     <NotificationBell supabase={supabase} userId={coachId} onNavigate={openFromNotification} refreshKey={notifKey} />
   ) : null;
@@ -102,6 +111,7 @@ export default function AdminPanel() {
     fullName,
     isAdmin,
     onLogout: async () => {
+      await removePushOnLogout(supabase);
       await supabase.auth.signOut();
       window.location.href = "/login";
     },
@@ -136,6 +146,9 @@ export default function AdminPanel() {
         )}
 
         <div className="flex-1 min-h-0 bg-app overflow-y-auto pb-[env(safe-area-inset-bottom)]">
+          <div className="px-4 pt-4 md:px-8 md:pt-6 empty:hidden">
+            {coachId && <PushPromptCard userId={coachId} className="mb-0!" />}
+          </div>
           {tab === "rutinas" && <RoutinesView />}
           {tab === "ejercicios" && <ExercisesView />}
           {tab === "alumnos" && (

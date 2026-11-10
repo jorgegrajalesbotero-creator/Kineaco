@@ -8,6 +8,7 @@ import { supabase } from "@/lib/supabaseClient";
 import { signedAvatarUrl } from "@/lib/avatars";
 import { PrivacySection } from "@/components/student/PrivacySection";
 import { ChangePassword } from "@/components/ui/ChangePassword";
+import { PushToggle } from "@/components/ui/PushNotifications";
 
 export function ProfileScreen({ fullName, email, avatarUrl, userId, onProfileUpdate, onOpenIntake, onOpenAnnouncements, isCoach, onLogout, lang, onChangeLang, healthConsent, onHealthChange }) {
   const [nameDraft, setNameDraft] = useState(fullName);
@@ -124,6 +125,7 @@ export function ProfileScreen({ fullName, email, avatarUrl, userId, onProfileUpd
         </div>
       )}
 
+      <PushToggle userId={userId} t={tr} />
       <ChangePassword t={tr} />
 
       {isCoach && (

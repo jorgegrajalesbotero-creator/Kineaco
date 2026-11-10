@@ -7,6 +7,7 @@ import { supabase } from "@/lib/supabaseClient";
 import { signedAvatarUrl } from "@/lib/avatars";
 import { Skeleton } from "@/components/ui/Skeleton";
 import { ChangePassword } from "@/components/ui/ChangePassword";
+import { PushToggle } from "@/components/ui/PushNotifications";
 
 export function ProfileView({ onProfileUpdate }) {
   const [form, setForm] = useState({ fullName: "", email: "", specialty: "", bio: "", avatarUrl: "" });
@@ -128,7 +129,8 @@ export function ProfileView({ onProfileUpdate }) {
       </button>
 
       <div className="mt-8">
-        <h3 className="text-ink text-base font-semibold mb-3">Seguridad</h3>
+        <h3 className="text-ink text-base font-semibold mb-3">Notificaciones y seguridad</h3>
+        {userId && <PushToggle userId={userId} />}
         <ChangePassword />
       </div>
     </div>

@@ -44,7 +44,7 @@ function ProgressRing({ done, total, size = 76 }) {
   );
 }
 
-export function HomeScreen({ userId, onNavigate, onOpenCheckin, onOpenAnnouncements, onAnnouncementRead, onOpenRoutine, onOpenCalendar, fullName, avatarUrl, routine, loading, selectedDay, onSelectDay, streak, onGoToNutrition, hasNutritionProfile, needsIntake, onOpenIntake, bell }) {
+export function HomeScreen({ userId, onNavigate, onOpenCheckin, onOpenAnnouncements, onAnnouncementRead, onOpenRoutine, onOpenCalendar, fullName, avatarUrl, routine, loading, selectedDay, onSelectDay, streak, onGoToNutrition, hasNutritionProfile, needsIntake, onOpenIntake, bell, pushCard }) {
   const extras = useHomeExtras(userId);
   const doneCount = routine ? routine.exercises.filter((e) => e.completed).length : 0;
   const total = routine ? routine.exercises.length : 0;
@@ -93,6 +93,7 @@ export function HomeScreen({ userId, onNavigate, onOpenCheckin, onOpenAnnounceme
           </button>
         )}
 
+        {pushCard}
         <AnnouncementCard userId={userId} onOpenAll={onOpenAnnouncements} onRead={onAnnouncementRead} />
         <CheckinCard extras={extras} onOpen={onOpenCheckin} />
         <div className="lg:grid lg:grid-cols-2 lg:gap-8 lg:items-start">
