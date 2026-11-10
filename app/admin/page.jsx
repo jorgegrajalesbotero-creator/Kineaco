@@ -1,11 +1,12 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { NotificationBell, addNotifications } from "@/lib/notifications";
 import { removePushOnLogout, syncPush, useOpenNotification } from "@/lib/push";
 import { PushPromptCard } from "@/components/ui/PushNotifications";
 import { supabase } from "@/lib/supabaseClient";
 import { AnnouncementsView } from "@/components/coach/AnnouncementsView";
+import { MessagesInbox } from "@/components/coach/MessagesInbox";
 import { ExercisesView } from "@/components/coach/ExercisesView";
 import { ProfileView } from "@/components/coach/ProfileView";
 import { ProgramsView } from "@/components/coach/programs/ProgramsView";
@@ -23,6 +24,18 @@ export default function AdminPanel() {
   const [coachId, setCoachId] = useState(null);
   const [isAdmin, setIsAdmin] = useState(false);
   const [notifKey, setNotifKey] = useState(0);
+  const [unreadMessages, setUnreadMessages] = useState(0);
+  const [inboxStudent, setInboxStudent] = useState(null);
+
+  // Mensajes sin leer de los alumnos (número en "Mensajes" del menú); se revisa cada minuto
+  const refreshUnread = useCallback(async () => {
+    const { count } = await supabase
+      .from("messages")
+      .select("id", { count: "exact", head: true })
+      .eq("read_by_coach", false);
+    if (typeof count === "number") setUnreadMessages(count);
+  }, []);
+  const clearInboxStudent = useCallback(() => setInboxStudent(null), []);
   const [checking, setChecking] = useState(true);
   const [userEmail, setUserEmail] = useState("");
   const [fullName, setFullName] = useState("");
@@ -51,13 +64,28 @@ export default function AdminPanel() {
       setCoachId(user.id);
       setChecking(false);
       syncPush(supabase, user.id);
+      refreshUnread();
       createCoachNotices(user.id).catch(() => { });
     }
     checkAccess();
   }, []);
 
+  useEffect(() => {
+    if (checking) return undefined;
+    const tick = () => { if (document.visibilityState === "visible") refreshUnread(); };
+    const timer = setInterval(tick, 60000);
+    document.addEventListener("visibilitychange", tick);
+    return () => { clearInterval(timer); document.removeEventListener("visibilitychange", tick); };
+  }, [checking, refreshUnread, notifKey]);
+
   const openFromNotification = (n) => {
     setMenuOpen(false);
+    // Los mensajes se abren en la bandeja, en la conversación de ese alumno
+    if (n.link === "messages" && n.student_id) {
+      setInboxStudent(n.student_id);
+      setTab("mensajes");
+      return;
+    }
     if (n.student_id && ["messages", "nutrition", "access", "photos", "progress", "checkin", "measurements"].includes(n.link)) {
       setPendingStudentAction({ id: n.student_id, action: n.link });
     }
@@ -104,8 +132,9 @@ export default function AdminPanel() {
     <NotificationBell supabase={supabase} userId={coachId} onNavigate={openFromNotification} refreshKey={notifKey} />
   ) : null;
 
-  const tabLabels = { rutinas: "Rutinas", ejercicios: "Ejercicios", alumnos: "Alumnos", reporte: "Reporte semanal", anuncios: "Anuncios", programas: "Programas", usuarios: "Usuarios", perfil: "Mi perfil" };
+  const tabLabels = { mensajes: "Mensajes", rutinas: "Rutinas", ejercicios: "Ejercicios", alumnos: "Alumnos", reporte: "Reporte semanal", anuncios: "Anuncios", programas: "Programas", usuarios: "Usuarios", perfil: "Mi perfil" };
   const sidebarProps = {
+    unreadMessages,
     active: tab,
     email: userEmail,
     fullName,
@@ -121,8 +150,9 @@ export default function AdminPanel() {
     <div className="fixed inset-0 md:static md:min-h-screen bg-app md:bg-night flex">
       <div className="flex flex-col md:flex-row w-full max-w-6xl mx-auto md:my-6 md:rounded-2xl md:overflow-hidden md:border md:border-field">
         <div className="md:hidden flex items-center gap-3 px-4 pb-3 pt-[calc(0.75rem+env(safe-area-inset-top))] bg-panel border-b border-field">
-          <button onClick={() => setMenuOpen(true)} aria-label="Abrir menú" className="w-10 h-10 -ml-2 flex items-center justify-center text-ink">
+          <button onClick={() => setMenuOpen(true)} aria-label="Abrir menú" className="relative w-10 h-10 -ml-2 flex items-center justify-center text-ink">
             <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M4 6h16M4 12h16M4 18h16" /></svg>
+            {unreadMessages > 0 && <span className="absolute top-1.5 right-1.5 w-2.5 h-2.5 rounded-full bg-accent ring-2 ring-panel" />}
           </button>
           <BrandMark size={30} />
           <div className="min-w-0 flex-1">
@@ -149,6 +179,9 @@ export default function AdminPanel() {
           <div className="px-4 pt-4 md:px-8 md:pt-6 empty:hidden">
             {coachId && <PushPromptCard userId={coachId} className="mb-0!" />}
           </div>
+          {tab === "mensajes" && (
+            <MessagesInbox onUnreadChange={setUnreadMessages} initialStudentId={inboxStudent} onInitialDone={clearInboxStudent} />
+          )}
           {tab === "rutinas" && <RoutinesView />}
           {tab === "ejercicios" && <ExercisesView />}
           {tab === "alumnos" && (
