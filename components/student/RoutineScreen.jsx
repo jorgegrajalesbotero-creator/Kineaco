@@ -159,9 +159,9 @@ export function RoutineScreen({ routine, userId, onClose, onToggle, onProgressCh
                           {b.notes && <p className="text-soft text-xs bg-card rounded-lg px-3 py-2 mb-2">{b.notes}</p>}
                           <div className="space-y-2">
                             {items.map(({ ex, i }) => (
-                              <div key={i} className={`flex items-center justify-between rounded-2xl px-4 py-3 transition-colors ${ex.completed ? "bg-card/60" : "bg-card"}`}>
+                              <div key={i} onClick={() => setDetailIndex(i)} className={`flex items-center justify-between rounded-2xl px-4 py-3 group cursor-pointer transition duration-200 ease-out hover:scale-[1.02] hover:bg-card-hover active:scale-[0.99] ${ex.completed ? "bg-card/60" : "bg-card"}`}>
                                 <div className="flex items-center gap-3">
-                                  <button onClick={() => toggle(i)} className={`w-7 h-7 rounded-full flex items-center justify-center shrink-0 transition-all active:scale-90 ${ex.completed ? "bg-accent" : "border-2 border-field-strong"}`}>
+                                  <button onClick={(e) => { e.stopPropagation(); toggle(i); }} className={`w-7 h-7 rounded-full flex items-center justify-center shrink-0 transition-all active:scale-90 ${ex.completed ? "bg-accent" : "border-2 border-field-strong"}`}>
                                     {ex.completed && <Check size={14} strokeWidth={3} className="text-app animate-check-pop" />}
                                   </button>
                                   <div>
@@ -171,7 +171,7 @@ export function RoutineScreen({ routine, userId, onClose, onToggle, onProgressCh
                                     )}
                                   </div>
                                 </div>
-                                <button onClick={() => setDetailIndex(i)} className="text-muted">
+                                <button onClick={(e) => { e.stopPropagation(); setDetailIndex(i); }} aria-label={tr("Ver ejercicio")} className="text-muted transition-colors group-hover:text-ink">
                                   <ChevronRight size={16} />
                                 </button>
                               </div>
@@ -184,9 +184,9 @@ export function RoutineScreen({ routine, userId, onClose, onToggle, onProgressCh
                 ) : (
                   <div className="space-y-2">
                     {routine.exercises.map((ex, i) => ({ ex, i })).filter(({ ex }) => ex.partIndex === part.partIndex).map(({ ex, i }) => (
-                      <div key={i} className={`flex items-center justify-between rounded-2xl px-4 py-3 transition-colors ${ex.completed ? "bg-card/60" : "bg-card"}`}>
+                      <div key={i} onClick={() => setDetailIndex(i)} className={`flex items-center justify-between rounded-2xl px-4 py-3 group cursor-pointer transition duration-200 ease-out hover:scale-[1.02] hover:bg-card-hover active:scale-[0.99] ${ex.completed ? "bg-card/60" : "bg-card"}`}>
                         <div className="flex items-center gap-3">
-                          <button onClick={() => toggle(i)} className={`w-7 h-7 rounded-full flex items-center justify-center shrink-0 transition-all active:scale-90 ${ex.completed ? "bg-accent" : "border-2 border-field-strong"}`}>
+                          <button onClick={(e) => { e.stopPropagation(); toggle(i); }} className={`w-7 h-7 rounded-full flex items-center justify-center shrink-0 transition-all active:scale-90 ${ex.completed ? "bg-accent" : "border-2 border-field-strong"}`}>
                             {ex.completed && <Check size={14} strokeWidth={3} className="text-app animate-check-pop" />}
                           </button>
                           <div>
@@ -194,7 +194,7 @@ export function RoutineScreen({ routine, userId, onClose, onToggle, onProgressCh
                             {ex.sets && <p className="text-muted text-xs">{ex.sets}</p>}
                           </div>
                         </div>
-                        <button onClick={() => setDetailIndex(i)} className="text-muted">
+                        <button onClick={(e) => { e.stopPropagation(); setDetailIndex(i); }} aria-label={tr("Ver ejercicio")} className="text-muted transition-colors group-hover:text-ink">
                           <ChevronRight size={16} />
                         </button>
                       </div>
