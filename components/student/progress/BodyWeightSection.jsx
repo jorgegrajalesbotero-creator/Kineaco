@@ -3,9 +3,10 @@
 import { useState } from "react";
 import { Check, Pencil, Trash2, X } from "lucide-react";
 import { appLocale, tr } from "@/lib/i18n";
-import { cleanDecimal, toNumber } from "@/lib/numbers";
+import { toNumber } from "@/lib/numbers";
+import { WeightInput } from "@/components/ui/WeightInput";
+import { useWeightUnit, weightLabel, weightNumber } from "@/lib/weightUnits";
 
-const fmtKg = (v) => Number(v).toFixed(1).replace(/\.0$/, "");
 const fmtDate = (iso) => new Date(iso).toLocaleDateString(appLocale(), { day: "2-digit", month: "short", year: "numeric" });
 
 // Línea del peso en el tiempo (sin librerías)
@@ -28,7 +29,10 @@ function Sparkline({ points }) {
 }
 
 // Progreso → Peso corporal: un solo historial que también se llena desde Nutrición, Medidas, Check-in y Fotos
+// Los registros se guardan en kg; aquí se escriben y se muestran en la unidad elegida.
 export function BodyWeightSection({ logs, onAdd, onUpdate, onDelete }) {
+  const [unit] = useWeightUnit();
+  const num = (kg) => weightNumber(kg, unit);
   const [adding, setAdding] = useState(false);
   const [draft, setDraft] = useState("");
   const [editId, setEditId] = useState(null);
@@ -50,7 +54,7 @@ export function BodyWeightSection({ logs, onAdd, onUpdate, onDelete }) {
 
   const add = async () => {
     const n = valid(draft);
-    if (n === null) return alert(tr("Escriba un peso válido en kg."));
+    if (n === null) return alert(tr("Escriba un peso válido."));
     setBusy(true);
     await onAdd(n);
     setBusy(false);
@@ -60,7 +64,7 @@ export function BodyWeightSection({ logs, onAdd, onUpdate, onDelete }) {
 
   const saveEdit = async (w) => {
     const n = valid(editDraft);
-    if (n === null) return alert(tr("Escriba un peso válido en kg."));
+    if (n === null) return alert(tr("Escriba un peso válido."));
     setBusy(true);
     await onUpdate(w.id, n);
     setBusy(false);
@@ -68,7 +72,7 @@ export function BodyWeightSection({ logs, onAdd, onUpdate, onDelete }) {
   };
 
   const remove = async (w) => {
-    if (!confirm(tr("¿Borrar el registro de {p0} kg del {p1}?", { p0: fmtKg(w.weight_kg), p1: fmtDate(w.logged_at) }))) return;
+    if (!confirm(tr("¿Borrar el registro de {p0} del {p1}?", { p0: weightLabel(w.weight_kg, unit), p1: fmtDate(w.logged_at) }))) return;
     setBusy(true);
     await onDelete(w.id);
     setBusy(false);
@@ -87,14 +91,13 @@ export function BodyWeightSection({ logs, onAdd, onUpdate, onDelete }) {
 
       {adding && (
         <div className="bg-card rounded-2xl p-3 mb-3 flex gap-2">
-          <input
-            type="text"
-            inputMode="decimal"
-            placeholder={tr("Peso en kg, ej. 64,5")}
-            value={draft}
-            onChange={(e) => setDraft(cleanDecimal(e.target.value))}
+          <WeightInput
+            placeholder={tr("Peso corporal")}
+            valueKg={draft}
+            onChangeKg={setDraft}
             onKeyDown={(e) => e.key === "Enter" && add()}
-            className="flex-1 min-w-0 bg-field text-ink text-sm rounded-lg px-3 py-2 outline-none"
+            wrapperClassName="flex-1"
+            className="w-full bg-field text-ink text-sm rounded-lg px-3 py-2 outline-none"
             autoFocus
           />
           <button onClick={add} disabled={busy} className="bg-accent text-app font-semibold px-4 rounded-lg text-sm disabled:opacity-50">
@@ -111,16 +114,16 @@ export function BodyWeightSection({ logs, onAdd, onUpdate, onDelete }) {
             <div className="flex items-end justify-between gap-3">
               <div>
                 <p className="text-ink text-3xl font-semibold tracking-tight tabular-nums">
-                  {fmtKg(latest.weight_kg)} <span className="text-soft text-base font-medium">kg</span>
+                  {num(latest.weight_kg)} <span className="text-soft text-base font-medium">{unit}</span>
                 </p>
                 <p className="text-muted text-xs mt-0.5">{tr("Último registro:")} {fmtDate(latest.logged_at)}</p>
               </div>
               <div className="text-right">
                 {diff !== null && diff !== 0 && (
-                  <p className="text-soft text-xs tabular-nums">{diff > 0 ? "+" : ""}{fmtKg(diff)} kg {tr("vs. anterior")}</p>
+                  <p className="text-soft text-xs tabular-nums">{diff > 0 ? "+" : ""}{num(diff)} {unit} {tr("vs. anterior")}</p>
                 )}
                 {total !== null && total !== 0 && (
-                  <p className="text-muted text-[11px] tabular-nums">{total > 0 ? "+" : ""}{fmtKg(total)} kg {tr("desde el {p0}", { p0: fmtDate(first.logged_at) })}</p>
+                  <p className="text-muted text-[11px] tabular-nums">{total > 0 ? "+" : ""}{num(total)} {unit} {tr("desde el {p0}", { p0: fmtDate(first.logged_at) })}</p>
                 )}
               </div>
             </div>
@@ -134,13 +137,12 @@ export function BodyWeightSection({ logs, onAdd, onUpdate, onDelete }) {
                   <span className="text-muted text-xs flex-1">{fmtDate(w.logged_at)}</span>
                   {editId === w.id ? (
                     <>
-                      <input
-                        type="text"
-                        inputMode="decimal"
-                        value={editDraft}
-                        onChange={(e) => setEditDraft(cleanDecimal(e.target.value))}
+                      <WeightInput
+                        valueKg={editDraft}
+                        onChangeKg={setEditDraft}
                         onKeyDown={(e) => e.key === "Enter" && saveEdit(w)}
-                        className="w-20 bg-field text-ink text-sm text-right rounded-lg px-2 py-1 outline-none"
+                        wrapperClassName="w-28"
+                        className="w-full bg-field text-ink text-sm text-right rounded-lg px-2 py-1 outline-none"
                         autoFocus
                       />
                       <button onClick={() => saveEdit(w)} disabled={busy} aria-label={tr("Guardar")} className="text-accent p-1"><Check size={16} /></button>
@@ -148,7 +150,7 @@ export function BodyWeightSection({ logs, onAdd, onUpdate, onDelete }) {
                     </>
                   ) : (
                     <>
-                      <span className="text-ink text-sm tabular-nums">{fmtKg(w.weight_kg)} kg</span>
+                      <span className="text-ink text-sm tabular-nums">{weightLabel(w.weight_kg, unit)}</span>
                       {w.id && (
                         <>
                           <button onClick={() => { setEditId(w.id); setEditDraft(String(w.weight_kg)); }} aria-label={tr("Corregir")} className="text-muted hover:text-ink p-1"><Pencil size={14} /></button>

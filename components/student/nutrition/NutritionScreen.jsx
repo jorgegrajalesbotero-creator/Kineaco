@@ -6,6 +6,7 @@ import { tr } from "@/lib/i18n";
 import { supabase } from "@/lib/supabaseClient";
 import { MealLogSection } from "@/components/student/nutrition/MealLogSection";
 import { cleanDecimal, toNumber } from "@/lib/numbers";
+import { WeightInput } from "@/components/ui/WeightInput";
 
 export const ACTIVITY_LEVELS = [
   { key: "sedentario", get label() { return tr("Sedentario"); }, get desc() { return tr("Poco o nada de ejercicio"); }, factor: 1.2 },
@@ -126,13 +127,18 @@ export function NutritionScreen({ userId, onFirstRoutineAssigned }) {
         </div>
         <div className="grid grid-cols-3 gap-2 mb-4">
           {[
-            { get label() { return tr("Peso (kg)"); }, value: weight, set: setWeight },
+            { get label() { return tr("Peso"); }, value: weight, set: setWeight, isWeight: true },
             { get label() { return tr("Altura (cm)"); }, value: height, set: setHeight },
             { get label() { return tr("Edad"); }, value: age, set: (v) => setAge(String(v).replace(/\D/g, "")) },
           ].map((f) => (
             <div key={f.label}>
               <p className="text-muted text-[10px] mb-1">{f.label}</p>
-              <input type="text" inputMode="decimal" value={f.value} onChange={(e) => f.set(cleanDecimal(e.target.value, 1))} className="block w-full bg-field text-ink text-sm rounded-lg px-2.5 py-2 outline-none focus:ring-1 focus:ring-accent" />
+              {f.isWeight ? (
+                // El peso se guarda en kg (las calorías se calculan con kg); se escribe en kg o lb
+                <WeightInput valueKg={f.value} onChangeKg={f.set} className="block w-full bg-field text-ink text-sm rounded-lg px-2.5 py-2 outline-none focus:ring-1 focus:ring-accent" />
+              ) : (
+                <input type="text" inputMode="decimal" value={f.value} onChange={(e) => f.set(cleanDecimal(e.target.value, 1))} className="block w-full bg-field text-ink text-sm rounded-lg px-2.5 py-2 outline-none focus:ring-1 focus:ring-accent" />
+              )}
             </div>
           ))}
         </div>

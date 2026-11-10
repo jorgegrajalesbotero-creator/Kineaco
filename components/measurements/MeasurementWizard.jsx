@@ -8,6 +8,7 @@ import { plain, ALL_COLUMNS, TAPE_FIELDS, TIPS, col, computeResults } from "@/li
 import { BodyFigure } from "@/components/ui/BodyFigure";
 import { Skeleton } from "@/components/ui/Skeleton";
 import { cleanDecimal } from "@/lib/numbers";
+import { WeightInput } from "@/components/ui/WeightInput";
 
 const inputCls =
   "w-full min-w-0 bg-app/60 border border-white/[0.07] text-ink text-lg text-center rounded-xl px-3 py-3 outline-none focus:border-accent/60 tabular-nums";
@@ -207,7 +208,11 @@ export function MeasurementWizard({ userId, onClose, t = plain, coachMode = fals
               ].map(([k, label, unit]) => (
                 <label key={k} className="block">
                   <span className="text-muted text-xs">{label}</span>
-                  <input type="text" inputMode="decimal" value={draft[k]} placeholder={unit} onChange={(e) => set(k, cleanDecimal(e.target.value))} className={`${inputCls} mt-1 text-base! py-2.5!`} />
+                  {k === "weight_kg" ? (
+                    <WeightInput valueKg={draft[k]} onChangeKg={(kg) => set(k, kg)} className={`${inputCls} mt-1 text-base! py-2.5!`} />
+                  ) : (
+                    <input type="text" inputMode="decimal" value={draft[k]} placeholder={unit} onChange={(e) => set(k, cleanDecimal(e.target.value))} className={`${inputCls} mt-1 text-base! py-2.5!`} />
+                  )}
                 </label>
               ))}
             </div>

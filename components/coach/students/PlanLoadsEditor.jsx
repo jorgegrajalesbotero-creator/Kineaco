@@ -7,6 +7,8 @@ import { cleanDecimal, cleanInt } from "@/lib/numbers";
 import { SearchInput } from "@/components/ui/Search";
 import { matchesSearch } from "@/lib/search";
 import { Select } from "@/components/ui/Select";
+import { UnitToggle, WeightInput } from "@/components/ui/WeightInput";
+import { fromKg, roundingStep, useWeightUnit } from "@/lib/weightUnits";
 
 const CELL_W = 72;
 
@@ -15,6 +17,8 @@ const CELL_W = 72;
 // cells = { "exId:week": { value, reps, sets } } · weekOv = { [week]: { pct, reps, sets } }
 export function PlanLoadsEditor({ weeks, exercises, loads, cells, weekOv, onLoads, onCells, onWeekOv }) {
   const [search, setSearch] = useState("");
+  // Las bases y casillas se guardan en kg; se escriben, se calculan y se redondean en la unidad elegida
+  const [unit] = useWeightUnit();
   const total = weeks.length;
   const field = "bg-field text-ink text-sm rounded-lg px-2.5 py-2 outline-none focus:ring-1 focus:ring-accent";
 
@@ -130,6 +134,10 @@ export function PlanLoadsEditor({ weeks, exercises, loads, cells, weekOv, onLoad
         </p>
       ) : (
         <>
+          <div className="flex items-center justify-end gap-2 mb-3">
+            <span className="text-muted text-xs">Pesos en</span>
+            <UnitToggle />
+          </div>
           {exercises.length > 5 && <div className="mb-3"><SearchInput value={search} onChange={setSearch} placeholder="Buscar ejercicio..." /></div>}
           <div className="space-y-3">
             {list.map((ex) => {
@@ -142,8 +150,8 @@ export function PlanLoadsEditor({ weeks, exercises, loads, cells, weekOv, onLoad
                     <p className="text-ink text-sm font-medium truncate">{ex.name}{ex.missing ? <span className="text-muted text-xs font-normal"> · ya no está en las rutinas del plan</span> : null}</p>
                     <div className="flex items-center gap-2 shrink-0">
                       <Select size="sm" aria-label="Redondeo" value={String(rounding)} onChange={(e) => setRounding(ex.exercise_id, Number(e.target.value))} disabled={exLoads.length === 0}>
-                        <option value="2.5">Redondeo 2,5 kg</option>
-                        <option value="1">Redondeo 1 kg</option>
+                        <option value="2.5">Redondeo {fmtNum(roundingStep(2.5, unit))} {unit}</option>
+                        <option value="1">Redondeo {fmtNum(roundingStep(1, unit))} {unit}</option>
                       </Select>
                       {hasManual && (
                         <button onClick={() => resetRow(ex.exercise_id)} className="text-soft text-xs flex items-center gap-1 hover:text-ink" title="Volver todo al cálculo">
@@ -178,8 +186,8 @@ export function PlanLoadsEditor({ weeks, exercises, loads, cells, weekOv, onLoad
                               <option value="rm">RM (1 repetición)</option>
                               <option value="work">Peso × reps</option>
                             </Select>
-                            <input inputMode="decimal" value={l.weight_kg} onChange={(e) => updateLoad(l, { weight_kg: cleanDecimal(e.target.value) })} placeholder="kg" className={`${field} w-20 py-1.5`} />
-                            <span className="text-muted text-xs">kg</span>
+                            <WeightInput toggle={false} valueKg={l.weight_kg} onChangeKg={(kg) => updateLoad(l, { weight_kg: kg })} placeholder={unit} wrapperClassName="w-20" className={`${field} w-full py-1.5`} />
+                            <span className="text-muted text-xs">{unit}</span>
                             {l.base_type === "work" && (
                               <>
                                 <span className="text-muted text-xs">×</span>
@@ -188,7 +196,7 @@ export function PlanLoadsEditor({ weeks, exercises, loads, cells, weekOv, onLoad
                               </>
                             )}
                             {l.base_type === "work" && rm != null && reps > 1 && (
-                              <span className="text-soft text-xs">RM estimado: {fmtNum(Math.round(rm * 10) / 10)} kg</span>
+                              <span className="text-soft text-xs">RM estimado: {fmtNum(Math.round(fromKg(rm, unit) * 10) / 10)} {unit}</span>
                             )}
                             {l.base_type === "work" && reps > EPLEY_MAX_REPS && (
                               <span className="text-warning text-xs flex items-center gap-1"><AlertTriangle size={12} /> Con más de {EPLEY_MAX_REPS} reps la estimación es poco precisa</span>
@@ -210,12 +218,12 @@ export function PlanLoadsEditor({ weeks, exercises, loads, cells, weekOv, onLoad
                       {headerRow}
                       <div className="flex gap-1 mt-1">
                         {weeks.map((w) => {
-                          const r = loadFor({ weeks, loads, cells, exerciseId: ex.exercise_id, week: w.week });
+                          const r = loadFor({ weeks, loads, cells, exerciseId: ex.exercise_id, week: w.week, unit });
                           const cell = cells[cellKey(ex.exercise_id, w.week)] || {};
                           return (
                             <div key={w.week} style={{ width: CELL_W }} className="shrink-0">
-                              <input inputMode="decimal" value={cell.value ?? ""} placeholder={r.auto == null ? "—" : fmtNum(r.auto)}
-                                onChange={(e) => setCell(ex.exercise_id, w.week, { value: cleanDecimal(e.target.value) })}
+                              <WeightInput toggle={false} valueKg={cell.value ?? ""} placeholder={r.auto == null ? "—" : fmtNum(fromKg(r.auto, unit))}
+                                onChangeKg={(kg) => setCell(ex.exercise_id, w.week, { value: kg })}
                                 aria-label={`Peso semana ${w.week}`}
                                 className={`w-full text-center text-sm rounded-md py-1.5 bg-field outline-none focus:ring-1 focus:ring-accent placeholder:text-ink ${r.manual ? "text-accent ring-1 ring-accent/60" : "text-ink"}`} />
                               <input inputMode="numeric" value={cell.sets ?? ""} placeholder={r.setsAuto == null ? "series" : `${r.setsAuto} s`}

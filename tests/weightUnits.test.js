@@ -44,3 +44,47 @@ describe("textos", () => {
     expect(formatWeight("", "kg")).toBe("");
   });
 });
+
+import { roundWeight, roundingStep, weightLabel, weightNumber, weightStep } from "@/lib/weightUnits";
+import { loadFor, planWeeks } from "@/lib/loadCalc";
+import { nextGoal } from "@/lib/exerciseHistory";
+
+describe("mostrar pesos", () => {
+  it("weightNumber y weightLabel usan 1 decimal", () => {
+    expect(weightNumber(64.52, "kg")).toBe("64.5");
+    expect(weightNumber(64.5, "lb")).toBe("142.2");
+    expect(weightLabel(70, "lb")).toBe("154.3 lb");
+    expect(weightLabel(null, "kg")).toBe("");
+  });
+  it("convierte diferencias negativas", () => {
+    expect(weightNumber(-1.5, "lb")).toBe("-3.3");
+  });
+});
+
+describe("cálculo en la unidad elegida", () => {
+  it("los saltos cambian con la unidad", () => {
+    expect(weightStep("kg")).toBe(2.5);
+    expect(weightStep("lb")).toBe(5);
+    expect(roundingStep(2.5, "lb")).toBe(5);
+    expect(roundingStep(1, "lb")).toBe(2.5);
+    expect(roundingStep(1, "kg")).toBe(1);
+  });
+  it("roundWeight redondea en kg o en lb y devuelve kg", () => {
+    expect(roundWeight(61, 2.5, "kg")).toBe(60);
+    // 61 kg = 134,48 lb → 135 lb → 61,235 kg
+    expect(roundWeight(61, 2.5, "lb")).toBe(61.235);
+  });
+  it("loadFor: en kg sale redondo en kg y en lb sale redondo en lb", () => {
+    const weeks = planWeeks([{ weeks: 1, pct_start: 70, order_index: 0 }], 1);
+    const loads = [{ exercise_id: "a", from_week: 1, base_type: "rm", weight_kg: 100, rounding: 2.5 }];
+    expect(loadFor({ weeks, loads, exerciseId: "a", week: 1 }).kg).toBe(70);
+    // 70 kg = 154,32 lb → 155 lb
+    const lb = loadFor({ weeks, loads, exerciseId: "a", week: 1, unit: "lb" }).kg;
+    expect(Math.round((lb / 0.45359237) * 100) / 100).toBe(155);
+  });
+  it("nextGoal sube 2,5 kg o 5 lb", () => {
+    expect(nextGoal(60)).toBe(62.5);
+    expect(nextGoal(135, "lb")).toBe(140);
+    expect(nextGoal(20, "lb")).toBe(22.5);
+  });
+});

@@ -11,6 +11,8 @@ import { SearchSelect } from "@/components/ui/Search";
 import { Skeleton } from "@/components/ui/Skeleton";
 import { PanelLayout } from "./PanelLayout";
 import { Select } from "@/components/ui/Select";
+import { UnitToggle, useWeightText } from "@/components/ui/WeightInput";
+import { formatWeight, useWeightUnit, weightStep } from "@/lib/weightUnits";
 
 const MONTHS = ["Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio", "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre"];
 const THIS_YEAR = new Date().getFullYear();
@@ -34,6 +36,7 @@ const emptyForm = (exercise = null) => ({
 // Progreso por ejercicio del alumno, visto por el coach DÍA A DÍA,
 // con el historial de antes de la app para cargar, corregir y borrar.
 export function ExerciseHistoryPanel({ student, onClose }) {
+  const [unit] = useWeightUnit();
   const [entries, setEntries] = useState(null);
   const [catalog, setCatalog] = useState([]);
   const [exerciseKey, setExerciseKey] = useState(null);
@@ -207,7 +210,7 @@ export function ExerciseHistoryPanel({ student, onClose }) {
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-4">
-            <Stepper label="Peso (kg)" value={form.weight} step={2.5} decimal onChange={(v) => set({ weight: v })} />
+            <WeightStepper valueKg={form.weight} onChangeKg={(kg) => set({ weight: kg })} />
             <Stepper label="Reps" value={form.reps} step={1} onChange={(v) => set({ reps: v })} />
             <Stepper label="Series" value={form.sets} step={1} onChange={(v) => set({ sets: v })} />
           </div>
@@ -266,7 +269,7 @@ export function ExerciseHistoryPanel({ student, onClose }) {
               <div key={e.uid} className="flex items-center gap-3 px-4 py-3">
                 <div className="flex-1 min-w-0">
                   <p className="text-ink text-sm">
-                    {[e.weight != null && `${e.weight} kg`, e.reps != null && `${e.reps} reps`, e.sets != null && `${e.sets} ${e.sets === 1 ? "serie" : "series"}`].filter(Boolean).join(" × ")}
+                    {[e.weight != null && formatWeight(e.weight, unit), e.reps != null && `${e.reps} reps`, e.sets != null && `${e.sets} ${e.sets === 1 ? "serie" : "series"}`].filter(Boolean).join(" × ")}
                   </p>
                   <p className="text-muted text-xs truncate">
                     {formatEntryDate(e.date, e.precision)}
@@ -293,8 +296,14 @@ export function ExerciseHistoryPanel({ student, onClose }) {
   );
 }
 
+// Peso del registro: se escribe en kg o lb (sube de 2,5 kg o de 5 lb) y se guarda en kg
+function WeightStepper({ valueKg, onChangeKg }) {
+  const { text, setText, unit } = useWeightText(valueKg, onChangeKg);
+  return <Stepper label={<span className="flex items-center gap-2">Peso <UnitToggle /></span>} name="peso" value={text} step={weightStep(unit)} decimal onChange={setText} />;
+}
+
 // Campo numérico con botones − y + (cómodo en celular)
-function Stepper({ label, value, step, decimal = false, onChange }) {
+function Stepper({ label, name = label, value, step, decimal = false, onChange }) {
   const n = toNumber(value);
   const bump = (dir) => {
     const next = Math.max(0, Math.round(((n ?? 0) + dir * step) * 100) / 100);
@@ -304,7 +313,7 @@ function Stepper({ label, value, step, decimal = false, onChange }) {
     <div>
       <span className="text-muted text-[11px] uppercase tracking-wider mb-1.5 block">{label}</span>
       <div className="flex items-center gap-1.5">
-        <button type="button" onClick={() => bump(-1)} aria-label={`Bajar ${label}`} className="w-10 h-10 shrink-0 rounded-lg bg-field text-ink flex items-center justify-center active:scale-95"><Minus size={16} /></button>
+        <button type="button" onClick={() => bump(-1)} aria-label={`Bajar ${name}`} className="w-10 h-10 shrink-0 rounded-lg bg-field text-ink flex items-center justify-center active:scale-95"><Minus size={16} /></button>
         <input
           inputMode={decimal ? "decimal" : "numeric"}
           value={value}
@@ -312,7 +321,7 @@ function Stepper({ label, value, step, decimal = false, onChange }) {
           placeholder="—"
           className="w-full min-w-0 h-10 bg-app/60 border border-white/[0.07] text-ink text-base text-center rounded-lg outline-none focus:border-accent/50"
         />
-        <button type="button" onClick={() => bump(1)} aria-label={`Subir ${label}`} className="w-10 h-10 shrink-0 rounded-lg bg-field text-ink flex items-center justify-center active:scale-95"><Plus size={16} /></button>
+        <button type="button" onClick={() => bump(1)} aria-label={`Subir ${name}`} className="w-10 h-10 shrink-0 rounded-lg bg-field text-ink flex items-center justify-center active:scale-95"><Plus size={16} /></button>
       </div>
     </div>
   );

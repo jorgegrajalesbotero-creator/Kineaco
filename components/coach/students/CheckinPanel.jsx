@@ -5,6 +5,7 @@ import { supabase } from "@/lib/supabaseClient";
 import { DAILY_FIELDS, WELLBEING_FIELDS, formatWeek } from "@/lib/checkin";
 import { Skeleton } from "@/components/ui/Skeleton";
 import { PanelLayout } from "./PanelLayout";
+import { useWeightUnit, weightLabel } from "@/lib/weightUnits";
 
 // Color según el valor: en estrés y hambre, alto es malo
 const HIGH_IS_BAD = new Set(["stress", "hunger", "soreness"]);
@@ -98,6 +99,7 @@ function DailyList({ student }) {
 
 // Check-ins del alumno: diario (antes de entrenar) y semanal (con respuesta del coach)
 export function CheckinPanel({ student, onClose }) {
+  const [unit] = useWeightUnit();
   const [tab, setTab] = useState("diario");
   const [items, setItems] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -167,7 +169,7 @@ export function CheckinPanel({ student, onClose }) {
               <div className="grid grid-cols-2 sm:grid-cols-3 gap-x-4 gap-y-2 text-xs mb-3">
                 <div><p className="text-muted">Entrenos</p><p className="text-ink">{c.training_adherence}%</p></div>
                 <div><p className="text-muted">Alimentación</p><p className="text-ink">{c.diet_adherence}%</p></div>
-                <div><p className="text-muted">Peso</p><p className="text-ink">{c.weight_kg != null ? `${c.weight_kg} kg` : "—"}</p></div>
+                <div><p className="text-muted">Peso</p><p className="text-ink">{weightLabel(c.weight_kg, unit) || "—"}</p></div>
                 <div className="col-span-2 sm:col-span-3">
                   <p className="text-muted">Dolor o molestias</p>
                   <p className={c.pain ? (c.pain_level >= 7 ? "text-danger" : "text-ink") : "text-ink"}>

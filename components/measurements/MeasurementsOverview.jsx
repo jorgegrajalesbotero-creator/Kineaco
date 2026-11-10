@@ -6,6 +6,7 @@ import { plain, computeResults } from "@/lib/measurements";
 import { BodyFigure } from "@/components/ui/BodyFigure";
 import { MeasurementResults } from "./MeasurementResults";
 import { Select } from "@/components/ui/Select";
+import { useWeightUnit, weightLabel } from "@/lib/weightUnits";
 
 const fmt = (v) => (v == null ? "—" : Number(v).toFixed(1).replace(/\.0$/, ""));
 
@@ -27,6 +28,7 @@ export const formatMeasureDate = (d, locale = "es-CO") =>
 
 // Figura + resultados + historial de las medidas de un alumno (lo usan el alumno y el coach)
 export function MeasurementsOverview({ rows, userId, t = plain, locale = "es-CO", fallbackSex = "mujer", wide = false }) {
+  const [unit] = useWeightUnit();
   const [sel, setSel] = useState(0);
   const [cmp, setCmp] = useState(1);
   const [showHistory, setShowHistory] = useState(false);
@@ -64,7 +66,7 @@ export function MeasurementsOverview({ rows, userId, t = plain, locale = "es-CO"
       <div className="flex items-center justify-between gap-2 px-1">
         <p className="text-ink text-sm font-medium">{formatMeasureDate(m.measured_on, locale)}</p>
         <p className="text-muted text-[11px]">
-          {[m.weight_kg ? `${fmt(m.weight_kg)} kg` : null, m.height_cm ? `${fmt(m.height_cm)} cm` : null, byCoach ? t("Tomada por su coach") : null].filter(Boolean).join(" · ")}
+          {[m.weight_kg ? weightLabel(m.weight_kg, unit) : null, m.height_cm ? `${fmt(m.height_cm)} cm` : null, byCoach ? t("Tomada por su coach") : null].filter(Boolean).join(" · ")}
         </p>
       </div>
       <BodyFigure sex={sex} values={{ ...m, sex }} previous={prev ? { ...prev, sex } : null} labels t={t} className="w-full max-w-md mx-auto block" />

@@ -7,7 +7,8 @@ import { appLocale, tr } from "@/lib/i18n";
 import { shrinkImage } from "@/lib/images";
 import { supabase } from "@/lib/supabaseClient";
 import { Skeleton } from "@/components/ui/Skeleton";
-import { cleanDecimal } from "@/lib/numbers";
+import { WeightInput } from "@/components/ui/WeightInput";
+import { useWeightUnit, weightLabel } from "@/lib/weightUnits";
 
 export const PHOTO_ANGLES = [
   { key: "frente", get label() { return tr("Frente"); } },
@@ -22,6 +23,7 @@ export function formatPhotoDate(dateStr) {
 }
 
 export function ProgressPhotosSection({ userId, latestWeight }) {
+  const [unit] = useWeightUnit();
   const [sets, setSets] = useState([]);
   const [urls, setUrls] = useState({});
   const [loading, setLoading] = useState(true);
@@ -233,12 +235,10 @@ export function ProgressPhotosSection({ userId, latestWeight }) {
           </div>
 
           <div className="space-y-2 mb-3">
-            <input
-              type="text"
-              inputMode="decimal"
-              placeholder={tr("Peso en kg (opcional)")}
-              value={weightDraft}
-              onChange={(e) => setWeightDraft(cleanDecimal(e.target.value))}
+            <WeightInput
+              placeholder={tr("Peso (opcional)")}
+              valueKg={weightDraft}
+              onChangeKg={setWeightDraft}
               className="block w-full bg-field text-ink text-sm rounded-lg px-3 py-2 outline-none"
             />
             <input
@@ -286,7 +286,7 @@ export function ProgressPhotosSection({ userId, latestWeight }) {
                 <div className="flex items-center justify-between mb-3">
                   <div>
                     <p className="text-ink text-sm font-medium">{formatPhotoDate(s.taken_on)}</p>
-                    {s.weight_kg != null && <p className="text-muted text-xs">{s.weight_kg} {tr("kg")}</p>}
+                    {s.weight_kg != null && <p className="text-muted text-xs">{weightLabel(s.weight_kg, unit)}</p>}
                   </div>
                   <button
                     onClick={() => deleteRecord(s)}
