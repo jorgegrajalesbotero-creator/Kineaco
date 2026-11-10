@@ -6,6 +6,7 @@ import { blockUsesProgression } from "@/lib/blocks";
 import { WEEK_DAYS, currentWeekStartISO, localDateString, todayDayLabel } from "@/lib/dates";
 import { addDays, loadSchedule, mondayOf, planFor, planWeekOf, routinesForDate } from "@/lib/trainingPlan";
 import { loadMapForWeek } from "@/lib/loadCalc";
+import { getWeightUnit } from "@/lib/weightUnits";
 import { fetchAllRows } from "@/lib/fetchAll";
 import { appLocale, dayLetters, detectLang, rememberLang, setLang, tr } from "@/lib/i18n";
 import { NotificationBell, addNotifications } from "@/lib/notifications";
@@ -128,7 +129,7 @@ export default function App() {
       supabase.from("training_plan_loads").select("*").eq("plan_id", plan.id),
       supabase.from("training_plan_load_cells").select("*").eq("plan_id", plan.id),
     ]);
-    return loadMapForWeek({ phases: phases || [], totalWeeks: plan.weeks, weekRows, loads, cellRows, week });
+    return loadMapForWeek({ phases: phases || [], totalWeeks: plan.weeks, weekRows, loads, cellRows, week, unit: getWeightUnit() });
   };
 
   const buildRoutine = async (uid, assignment) => {

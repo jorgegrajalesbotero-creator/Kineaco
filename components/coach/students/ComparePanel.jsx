@@ -8,10 +8,12 @@ import { BADGE_GROUPS, computeBadges, loadBadgeData } from "@/lib/badges";
 import { downloadReportPdf } from "@/lib/planPdf";
 import { currentOrNextPlan, loadSchedule } from "@/lib/trainingPlan";
 import { PanelLayout } from "./PanelLayout";
+import { formatWeight, useWeightUnit } from "@/lib/weightUnits";
 import { Skeleton } from "@/components/ui/Skeleton";
 
 // Últimos ejercicios marcados: peso sugerido vs. peso real, y logros del alumno
 export function ComparePanel({ student, onClose }) {
+  const [unit] = useWeightUnit();
   const [comparisonData, setComparisonData] = useState([]);
   const [coachBadges, setCoachBadges] = useState([]);
   const [loadingComparison, setLoadingComparison] = useState(true);
@@ -120,16 +122,16 @@ export function ComparePanel({ student, onClose }) {
                     <div className="flex flex-wrap gap-1 mt-1.5">
                       {c.sets.map((st) => (
                         <span key={st.set_number} className="text-[10px] text-soft bg-field rounded-md px-1.5 py-0.5 tabular-nums">
-                          {st.weight_kg != null ? `${st.weight_kg} kg` : "—"} × {st.reps ?? "—"}
+                          {formatWeight(st.weight_kg, unit) || "—"} × {st.reps ?? "—"}
                         </span>
                       ))}
                     </div>
                   )}
                 </div>
                 <span className="text-soft text-xs">{c.day}</span>
-                <span className="text-soft text-xs">{c.target != null ? `${c.target} kg` : "—"}</span>
+                <span className="text-soft text-xs">{formatWeight(c.target, unit) || "—"}</span>
                 <span className={`text-xs font-medium ${match ? "text-accent" : short ? "text-danger" : "text-soft"}`}>
-                  {c.actual != null ? `${c.actual} kg` : "—"}
+                  {formatWeight(c.actual, unit) || "—"}
                 </span>
               </div>
             );

@@ -6,7 +6,8 @@ import { supabase } from "@/lib/supabaseClient";
 import { REVERSED, SCALE_FACES, WELLBEING_FIELDS, checkinWeekStart, formatWeek } from "@/lib/checkin";
 import { appLocale, tr } from "@/lib/i18n";
 import { Skeleton } from "@/components/ui/Skeleton";
-import { cleanDecimal, toNumber } from "@/lib/numbers";
+import { toNumber } from "@/lib/numbers";
+import { WeightInput } from "@/components/ui/WeightInput";
 
 const EMPTY = {
   sleep: null, energy: null, stress: null, mood: null, hunger: null,
@@ -182,12 +183,10 @@ export function CheckinScreen({ userId, onClose, healthConsent = true }) {
           <section>
             <p className={label}>{tr("Peso y comentarios")}</p>
             <div className={`${card} space-y-3`}>
-              <input
-                type="text"
-                inputMode="decimal"
-                value={form.weight_kg}
-                onChange={(e) => set("weight_kg", cleanDecimal(e.target.value))}
-                placeholder={tr("Peso de esta semana en kg (opcional)")}
+              <WeightInput
+                valueKg={form.weight_kg}
+                onChangeKg={(kg) => set("weight_kg", kg)}
+                placeholder={tr("Peso de esta semana (opcional)")}
                 className="w-full bg-app/60 border border-white/[0.07] text-ink text-sm rounded-xl px-3 py-2.5 outline-none focus:border-accent/50"
               />
               <textarea

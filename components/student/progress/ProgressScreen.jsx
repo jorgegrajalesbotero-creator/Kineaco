@@ -5,6 +5,7 @@ import { Check, Download, Flame, TrendingUp } from "lucide-react";
 import { appLocale, tr } from "@/lib/i18n";
 import { supabase } from "@/lib/supabaseClient";
 import { downloadReportPdf } from "@/lib/planPdf";
+import { useWeightUnit, weightLabel } from "@/lib/weightUnits";
 import { currentOrNextPlan, loadSchedule } from "@/lib/trainingPlan";
 import { CountUp } from "@/components/ui/CountUp";
 import { BadgesSection } from "@/components/student/progress/BadgesSection";
@@ -15,6 +16,7 @@ import { ProgressPhotosSection } from "@/components/student/progress/ProgressPho
 import { ExerciseProgressSection } from "@/components/student/progress/ExerciseProgressSection";
 
 export function ProgressScreen({ streak, bestStreak, totalCompleted, weekStats, recentActivity, bodyWeightLogs, onAddWeight, onUpdateWeight, onDeleteWeight, userId, fullName, onOpenCheckin, onOpenMeasure, healthConsent = true }) {
+  const [unit] = useWeightUnit();
   const maxCount = Math.max(1, ...weekStats.map((d) => d.count));
   const [pdfBusy, setPdfBusy] = useState(false);
 
@@ -107,7 +109,7 @@ export function ProgressScreen({ streak, bestStreak, totalCompleted, weekStats, 
                 <p className="text-muted text-xs">{tr(r.day_label)}</p>
               </div>
               <span className="text-muted text-xs">
-                {r.weight_kg ? tr("{p0} kg · ", { p0: r.weight_kg }) : ""}
+                {r.weight_kg ? `${weightLabel(r.weight_kg, unit, 2)} · ` : ""}
                 {new Date(r.completed_at).toLocaleDateString(appLocale(), { day: "2-digit", month: "short" })}
               </span>
             </div>

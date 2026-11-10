@@ -4,10 +4,12 @@ import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabaseClient";
 import { localDateString } from "@/lib/dates";
 import { PanelLayout } from "./PanelLayout";
+import { useWeightUnit, weightLabel } from "@/lib/weightUnits";
 import { Skeleton } from "@/components/ui/Skeleton";
 
 // Datos de nutrición del alumno y sus comidas de los últimos 14 días
 export function NutritionPanel({ student, onClose }) {
+  const [unit] = useWeightUnit();
   const [nutritionData, setNutritionData] = useState(null);
   const [mealLogs, setMealLogs] = useState([]);
   const [loadingNutrition, setLoadingNutrition] = useState(true);
@@ -47,7 +49,7 @@ export function NutritionPanel({ student, onClose }) {
       ) : (
         <div className="bg-card rounded-xl p-5 space-y-3">
           <div className="grid grid-cols-2 gap-3">
-            <div><p className="text-muted text-xs mb-0.5">Peso</p><p className="text-ink text-sm">{nutritionData.weight_kg} kg</p></div>
+            <div><p className="text-muted text-xs mb-0.5">Peso</p><p className="text-ink text-sm">{weightLabel(nutritionData.weight_kg, unit) || "—"}</p></div>
             <div><p className="text-muted text-xs mb-0.5">Altura</p><p className="text-ink text-sm">{nutritionData.height_cm} cm</p></div>
             <div><p className="text-muted text-xs mb-0.5">Edad</p><p className="text-ink text-sm">{nutritionData.age} años</p></div>
             <div><p className="text-muted text-xs mb-0.5">Sexo</p><p className="text-ink text-sm capitalize">{nutritionData.gender}</p></div>

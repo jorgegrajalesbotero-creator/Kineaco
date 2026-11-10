@@ -27,10 +27,9 @@ export function UnitToggle({ className = "", t = (s) => s }) {
   );
 }
 
-// Campo de peso que se escribe en kg o en lb, pero siempre entrega kilogramos.
-// valueKg / onChangeKg trabajan en kg (texto); lo que ve la persona está en su unidad.
-// toggle: muestra dentro del campo el botón para cambiar de unidad.
-export function WeightInput({ valueKg, onChangeKg, placeholderKg, placeholder, toggle = true, className = "", wrapperClassName = "", ...props }) {
+// Texto de un campo de peso: la persona escribe en su unidad y el dueño del dato recibe kilogramos.
+// valueKg / onChangeKg trabajan en kg (texto o número). Devuelve { text, setText, unit, setUnit }.
+export function useWeightText(valueKg, onChangeKg) {
   const [unit, setUnit] = useWeightUnit();
   const [state, setState] = useState({ text: kgToText(valueKg, unit), kg: valueKg, unit });
 
@@ -39,13 +38,20 @@ export function WeightInput({ valueKg, onChangeKg, placeholderKg, placeholder, t
     setState({ text: kgToText(valueKg, unit), kg: valueKg, unit });
   }
 
-  const change = (e) => {
-    const text = cleanDecimal(e.target.value);
+  const setText = (raw) => {
+    const text = cleanDecimal(raw);
     const kg = textToKg(text, unit);
     setState({ text, kg, unit });
     onChangeKg(kg);
   };
 
+  return { text: state.text, setText, unit, setUnit };
+}
+
+// Campo de peso que se escribe en kg o en lb, pero siempre entrega kilogramos.
+// toggle: muestra dentro del campo el botón para cambiar de unidad.
+export function WeightInput({ valueKg, onChangeKg, placeholderKg, placeholder, toggle = true, className = "", wrapperClassName = "", ...props }) {
+  const { text, setText, unit, setUnit } = useWeightText(valueKg, onChangeKg);
   const other = unit === "kg" ? "lb" : "kg";
   const hint = placeholderKg != null && placeholderKg !== "" ? kgToText(placeholderKg, unit) : placeholder;
 
@@ -54,8 +60,8 @@ export function WeightInput({ valueKg, onChangeKg, placeholderKg, placeholder, t
       <input
         type="text"
         inputMode="decimal"
-        value={state.text}
-        onChange={change}
+        value={text}
+        onChange={(e) => setText(e.target.value)}
         placeholder={hint}
         className={`${className} ${toggle ? "pr-11" : ""}`}
         {...props}

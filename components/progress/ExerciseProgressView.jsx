@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { firstVsLast, formatEntryDate, markRecords, nextGoal, spanText } from "@/lib/exerciseHistory";
+import { fromKg, useWeightUnit } from "@/lib/weightUnits";
 
 const LIME = "#D6FF5C";
 const BG = "#0F1512";
@@ -27,7 +28,13 @@ function niceMax(v) {
 
 // Vista de progreso de UN ejercicio: escalera de récords + antes vs. ahora.
 // points: salida de buildPoints(). La usan el alumno (por mes) y el coach (por día).
-export function ExerciseProgressView({ points: allPoints, t = plainT, locale = "es-CO", showSource = false }) {
+export function ExerciseProgressView({ points: rawPoints, t = plainT, locale = "es-CO", showSource = false }) {
+  // Los registros vienen en kg; todo lo que sigue (récords, metas, volumen) se calcula en la unidad elegida
+  const [wUnit] = useWeightUnit();
+  const allPoints = useMemo(
+    () => (wUnit === "kg" ? rawPoints : rawPoints.map((p) => (p.weight == null ? p : { ...p, weight: fromKg(p.weight, wUnit) }))),
+    [rawPoints, wUnit]
+  );
   const [range, setRange] = useState("all");
   const [selected, setSelected] = useState(null);
   const scrollRef = useRef(null);
@@ -60,7 +67,7 @@ export function ExerciseProgressView({ points: allPoints, t = plainT, locale = "
 
   // Si el ejercicio nunca tuvo peso (ej. dominadas), el gráfico va por reps
   const metric = points.some((p) => p.weight != null) ? "weight" : "reps";
-  const unit = metric === "weight" ? t("kg") : t("reps");
+  const unit = metric === "weight" ? wUnit : t("reps");
   const valueOf = (p) => (metric === "weight" ? p.weight : p.reps);
 
   const records = useMemo(() => {
@@ -98,7 +105,7 @@ export function ExerciseProgressView({ points: allPoints, t = plainT, locale = "
   const best = records.maxWeight;
   const delta = firstVal != null && best != null ? best - firstVal : null;
   const pct = firstVal ? Math.round((delta / firstVal) * 100) : null;
-  const goal = metric === "weight" ? nextGoal(best) : best != null ? best + 1 : null;
+  const goal = metric === "weight" ? nextGoal(best, wUnit) : best != null ? best + 1 : null;
 
   // Dimensiones del gráfico (en píxeles reales; si hay muchos puntos se desplaza de lado)
   const H = 190;
@@ -219,7 +226,7 @@ export function ExerciseProgressView({ points: allPoints, t = plainT, locale = "
             <span className={`text-[10px] font-medium rounded-full px-2 py-0.5 ${sel.kind === "pr" || sel.kind === "reps" ? "bg-accent/15 text-accent" : "bg-field text-soft"}`}>{kindLabel[sel.kind]}</span>
           </div>
           <p className="text-soft text-sm mt-1">
-            {[sel.weight != null && `${fmt(sel.weight)} ${t("kg")}`, sel.reps != null && `${fmt(sel.reps)} ${t("reps")}`, sel.sets != null && (sel.sets === 1 ? t("1 serie") : t("{p0} series", { p0: sel.sets }))].filter(Boolean).join(" × ") || "—"}
+            {[sel.weight != null && `${fmt(sel.weight)} ${wUnit}`, sel.reps != null && `${fmt(sel.reps)} ${t("reps")}`, sel.sets != null && (sel.sets === 1 ? t("1 serie") : t("{p0} series", { p0: sel.sets }))].filter(Boolean).join(" × ") || "—"}
           </p>
           {showSource && <p className="text-muted text-[11px] mt-1">{sel.sources.includes("history") && sel.sources.includes("app") ? t("Historial y app") : sel.sources.includes("history") ? t("Historial cargado por el coach") : t("Registrado en la app")}{sel.count > 1 ? ` · ${t("{p0} registros", { p0: sel.count })}` : ""}</p>}
         </div>
@@ -241,13 +248,13 @@ export function ExerciseProgressView({ points: allPoints, t = plainT, locale = "
         <div>
           <p className="text-muted text-[11px] font-medium uppercase tracking-[0.14em] mb-1">{t("Antes vs. ahora")}</p>
           <p className="text-soft text-xs mb-3">{formatEntryDate(pts[0].date, pts[0].precision, locale)} → {formatEntryDate(pts[n - 1].date, pts[n - 1].precision, locale)}</p>
-          <CompareRow label={t("Peso")} unit={t("kg")} data={cmp.weight} fmt={fmt} />
+          <CompareRow label={t("Peso")} unit={wUnit} data={cmp.weight} fmt={fmt} />
           <CompareRow label={t("Reps por serie")} data={cmp.reps} fmt={fmt} />
           <CompareRow label={t("Series")} data={cmp.sets} fmt={fmt} />
           {cmp.volume && (
             <div className="flex items-center justify-between bg-app/60 border border-white/[0.06] rounded-xl px-3.5 py-2.5 mt-1">
-              <span className="text-soft text-xs">{t("Kilos movidos por sesión")}</span>
-              <span className="text-sm font-medium"><span className="text-soft">{fmt(cmp.volume.from)}</span> <span className="text-muted">→</span> <span className={cmp.volume.to >= cmp.volume.from ? "text-accent" : "text-ink"}>{fmt(cmp.volume.to)} {t("kg")}</span></span>
+              <span className="text-soft text-xs">{wUnit === "lb" ? t("Libras movidas por sesión") : t("Kilos movidos por sesión")}</span>
+              <span className="text-sm font-medium"><span className="text-soft">{fmt(cmp.volume.from)}</span> <span className="text-muted">→</span> <span className={cmp.volume.to >= cmp.volume.from ? "text-accent" : "text-ink"}>{fmt(cmp.volume.to)} {wUnit}</span></span>
             </div>
           )}
         </div>

@@ -6,6 +6,7 @@ import { supabase } from "@/lib/supabaseClient";
 import { computeBadges, loadBadgeData } from "@/lib/badges";
 import { WEEK_DAYS, currentWeekStartISO, daysSince, localDateString } from "@/lib/dates";
 import { appLocale, tr } from "@/lib/i18n";
+import { useWeightUnit, weightNumber } from "@/lib/weightUnits";
 import { PHOTO_REMINDER_DAYS } from "@/components/student/progress/ProgressPhotosSection";
 import { checkinWeekStart, isCheckinDay } from "@/lib/checkin";
 import { addDays, currentOrNextPlan, loadSchedule, mondayOf, planWeekOf, routinesForDate } from "@/lib/trainingPlan";
@@ -190,6 +191,7 @@ export function CoachMessage({ extras, onOpen }) {
 
 // Próxima insignia, peso y aviso de fotos
 export function GoalsAndReminders({ extras, onOpenProgress }) {
+  const [unit] = useWeightUnit();
   if (!extras) return null;
   const { nextBadge, weights, photoDue, lastPhoto } = extras;
   const latest = weights[0];
@@ -226,11 +228,11 @@ export function GoalsAndReminders({ extras, onOpenProgress }) {
           {latest ? (
             <>
               <p className="text-ink text-2xl font-semibold tabular-nums leading-tight">
-                {latest.weight_kg} <span className="text-muted text-xs font-normal">kg</span>
+                {weightNumber(latest.weight_kg, unit)} <span className="text-muted text-xs font-normal">{unit}</span>
               </p>
               {diff != null && (
                 <p className="text-soft text-[11px] mt-1 tabular-nums">
-                  {diff > 0 ? "+" : ""}{diff} kg {tr("desde el registro anterior")}
+                  {diff > 0 ? "+" : ""}{weightNumber(diff, unit)} {unit} {tr("desde el registro anterior")}
                 </p>
               )}
             </>

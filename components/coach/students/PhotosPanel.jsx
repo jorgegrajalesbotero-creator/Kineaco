@@ -3,11 +3,13 @@
 import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabaseClient";
 import { PanelLayout } from "./PanelLayout";
+import { useWeightUnit, weightLabel } from "@/lib/weightUnits";
 import { Skeleton } from "@/components/ui/Skeleton";
 import { Select } from "@/components/ui/Select";
 
 // Fotos de progreso del alumno: comparador "antes vs. ahora" y línea de tiempo
 export function PhotosPanel({ student, onClose }) {
+  const [unit] = useWeightUnit();
   const [photoSets, setPhotoSets] = useState([]);
   const [photoUrls, setPhotoUrls] = useState({});
   const [loadingPhotos, setLoadingPhotos] = useState(true);
@@ -93,7 +95,7 @@ export function PhotosPanel({ student, onClose }) {
                     >
                       {photoSets.map((s) => (
                         <option key={s.id} value={s.id}>
-                          {fmtPhotoDate(s.taken_on)}{s.weight_kg != null ? ` · ${s.weight_kg} kg` : ""}
+                          {fmtPhotoDate(s.taken_on)}{s.weight_kg != null ? ` · ${weightLabel(s.weight_kg, unit)}` : ""}
                         </option>
                       ))}
                     </Select>
@@ -123,7 +125,7 @@ export function PhotosPanel({ student, onClose }) {
               <div key={s.id} className="bg-card rounded-xl p-4">
                 <div className="flex items-center justify-between mb-3">
                   <p className="text-ink text-sm font-medium">{fmtPhotoDate(s.taken_on)}</p>
-                  {s.weight_kg != null && <span className="text-accent text-xs">{s.weight_kg} kg</span>}
+                  {s.weight_kg != null && <span className="text-accent text-xs">{weightLabel(s.weight_kg, unit)}</span>}
                 </div>
                 <div className="grid grid-cols-3 gap-3">
                   {angles.map((a) => (

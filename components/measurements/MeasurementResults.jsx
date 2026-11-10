@@ -1,6 +1,7 @@
 "use client";
 
 import { plain, TONE_CHIP, computeResults } from "@/lib/measurements";
+import { KG_PER_LB, useWeightUnit } from "@/lib/weightUnits";
 
 const fmt = (v, d = 1) => (v == null ? "—" : Number(v).toFixed(d).replace(/\.0+$/, ""));
 
@@ -69,6 +70,9 @@ const card = "rounded-2xl bg-gradient-to-b from-card to-deep border border-white
 
 // Resultados de una medición, con lenguaje claro y las fórmulas citadas
 export function MeasurementResults({ m, previous, t = plain }) {
+  const [unit] = useWeightUnit();
+  // Masas calculadas en kg → unidad elegida
+  const inUnit = (kg) => (kg == null ? null : unit === "lb" ? kg / KG_PER_LB : kg);
   const r = computeResults(m);
   const p = previous ? computeResults(previous) : {};
   const diff = (a, b) => (a != null && b != null ? Math.round((a - b) * 100) / 100 : null);
@@ -128,14 +132,14 @@ export function MeasurementResults({ m, previous, t = plain }) {
           <p className="text-muted text-[11px] font-medium uppercase tracking-[0.14em] mb-3">{t("Composición")}</p>
           <div className="grid grid-cols-2 gap-2 mb-1">
             <div className="rounded-xl bg-white/[0.04] p-3">
-              <p className="text-ink text-xl font-semibold tabular-nums">{fmt(r.fatKg)} <span className="text-soft text-xs">kg</span></p>
+              <p className="text-ink text-xl font-semibold tabular-nums">{fmt(inUnit(r.fatKg))} <span className="text-soft text-xs">{unit}</span></p>
               <p className="text-muted text-[11px]">{t("Masa grasa")}</p>
-              <Delta value={diff(r.fatKg, p.fatKg)} unit=" kg" t={t} />
+              <Delta value={inUnit(diff(r.fatKg, p.fatKg))} unit={` ${unit}`} t={t} />
             </div>
             <div className="rounded-xl bg-white/[0.04] p-3">
-              <p className="text-ink text-xl font-semibold tabular-nums">{fmt(r.leanKg)} <span className="text-soft text-xs">kg</span></p>
+              <p className="text-ink text-xl font-semibold tabular-nums">{fmt(inUnit(r.leanKg))} <span className="text-soft text-xs">{unit}</span></p>
               <p className="text-muted text-[11px]">{t("Masa libre de grasa")}</p>
-              <Delta value={diff(r.leanKg, p.leanKg)} unit=" kg" t={t} />
+              <Delta value={inUnit(diff(r.leanKg, p.leanKg))} unit={` ${unit}`} t={t} />
             </div>
           </div>
           <p className="text-muted text-[11px] mb-1">{t("Masa libre de grasa = músculo, huesos, agua y órganos.")}</p>
