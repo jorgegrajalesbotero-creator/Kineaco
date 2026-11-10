@@ -5,6 +5,7 @@ import { supabase } from "@/lib/supabaseClient";
 import { detectLang, setLang, tr } from "@/lib/i18n";
 import { friendlyAuthError } from "@/lib/authErrors";
 import { BrandMark } from "@/components/ui/BrandMark";
+import { PasswordInput } from "@/components/ui/PasswordInput";
 
 // Página a la que llega el alumno desde el correo de "Recuperar contraseña"
 export default function ResetPasswordPage() {
@@ -75,8 +76,8 @@ export default function ResetPasswordPage() {
               <h1 className="text-ink text-2xl font-semibold tracking-tight mb-1">{tr("Nueva contraseña")}</h1>
               <p className="text-soft text-sm mb-6">{tr("Escriba su contraseña nueva dos veces.")}</p>
               <div className="space-y-3 mb-5">
-                <input type="password" placeholder={tr("Contraseña nueva")} value={password} onChange={(e) => setPassword(e.target.value)} required minLength={8} autoComplete="new-password" className={inputCls} />
-                <input type="password" placeholder={tr("Repita la contraseña")} value={confirm} onChange={(e) => setConfirm(e.target.value)} required minLength={8} autoComplete="new-password" className={inputCls} />
+                <PasswordInput showLabel={tr("Mostrar contraseña")} hideLabel={tr("Ocultar contraseña")} placeholder={tr("Contraseña nueva")} value={password} onChange={(e) => setPassword(e.target.value)} required minLength={8} autoComplete="new-password" className={inputCls} />
+                <PasswordInput showLabel={tr("Mostrar contraseña")} hideLabel={tr("Ocultar contraseña")} placeholder={tr("Repita la contraseña")} value={confirm} onChange={(e) => setConfirm(e.target.value)} required minLength={8} autoComplete="new-password" className={inputCls} />
                 <p className="text-muted text-[11px] px-1">{tr("Mínimo 8 caracteres.")}</p>
               </div>
               {error && <p className="text-danger text-xs mb-4 bg-danger/10 border border-danger/20 rounded-xl px-3 py-2">{error}</p>}

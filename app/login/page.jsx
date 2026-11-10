@@ -3,6 +3,7 @@ import { useState, useEffect } from "react";
 import { supabase } from "@/lib/supabaseClient";
 import { tr, setLang, detectLang, rememberLang } from "@/lib/i18n";
 import { BrandMark } from "@/components/ui/BrandMark";
+import { PasswordInput } from "@/components/ui/PasswordInput";
 import { friendlyAuthError } from "@/lib/authErrors";
 import { EMPTY_CONSENT, consentRecord, validateConsent } from "@/lib/legal";
 import { ConsentFields } from "@/components/legal/ConsentFields";
@@ -140,8 +141,9 @@ export default function LoginPage() {
               className={inputCls}
             />
             {mode !== "reset" && (
-              <input
-                type="password"
+              <PasswordInput
+                showLabel={tr("Mostrar contraseña")}
+                hideLabel={tr("Ocultar contraseña")}
                 placeholder={tr("Contraseña")}
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
