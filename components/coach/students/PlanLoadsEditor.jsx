@@ -80,7 +80,7 @@ export function PlanLoadsEditor({ weeks, routines, catalog, changes, onChanges, 
     const adds = rChanges.filter((c) => c.action === "add");
     return applyPlanChanges(routine.items, adds.map((c) => ({ ...c, from_week: 1 })), routine.id, 1);
   }, [routine, rChanges]);
-  const blocksOrder = routine?.blocks || [];
+  const blocksOrder = useMemo(() => routine?.blocks || [], [routine]);
   const groups = useMemo(() => {
     const out = blocksOrder.map((b) => ({ key: b.id, label: b.title || blockTypeLabel(b.block_type), items: [] }));
     const loose = { key: "sin-bloque", label: blocksOrder.length ? "Sin bloque" : "Ejercicios", items: [] };
@@ -385,7 +385,7 @@ export function PlanLoadsEditor({ weeks, routines, catalog, changes, onChanges, 
       </div>
 
       {routines.length === 0 ? (
-        <p className="text-muted text-sm bg-card rounded-xl p-4">Primero asigná rutinas en las semanas del plan (pestaña "Rutinas por semana"). Acá aparecen todos sus ejercicios.</p>
+        <p className="text-muted text-sm bg-card rounded-xl p-4">Primero asigná rutinas en las semanas del plan (pestaña «Rutinas por semana»). Acá aparecen todos sus ejercicios.</p>
       ) : (
         <>
           <div className="flex flex-wrap items-center justify-between gap-2 mb-3">
