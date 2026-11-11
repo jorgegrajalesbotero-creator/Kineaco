@@ -10,7 +10,6 @@ import { DayRoutinesEditor } from "@/components/coach/programs/DayRoutinesEditor
 import { PanelLayout } from "./PanelLayout";
 import { PlanPhasesEditor, ATR_PRESET } from "./PlanPhasesEditor";
 import { PlanLoadsEditor } from "./PlanLoadsEditor";
-import { blockUsesProgression } from "@/lib/blocks";
 import { cellKey, phaseType, planWeeks } from "@/lib/loadCalc";
 import { Select } from "@/components/ui/Select";
 
@@ -75,9 +74,11 @@ export function PlanPanel({ student, onClose }) {
   const [pdfBusy, setPdfBusy] = useState(null);
   const [tab, setTab] = useState("rutinas"); // rutinas | cargas
   const [templates, setTemplates] = useState([]);
-  const [planExercises, setPlanExercises] = useState([]);
+  const [planRoutines, setPlanRoutines] = useState([]); // rutinas del plan con sus bloques y ejercicios (para Cargas)
+  const [extraLoads, setExtraLoads] = useState([]); // ejercicios con cargas que ya no están en las rutinas
+  const [catalog, setCatalog] = useState([]); // catálogo de ejercicios (para sustituir / agregar)
 
-  // Ejercicios de trabajo principal (o de rutinas sin bloques) de las rutinas del plan
+  // Todas las rutinas del plan, con TODOS sus bloques y ejercicios (en el orden en que se ven)
   const routineKey = editing ? [...new Set(editing.data.flatMap((w) => Object.values(w).flat()))].sort().join(",") : "";
   useEffect(() => {
     if (!editing) return;
@@ -85,42 +86,52 @@ export function PlanPanel({ student, onClose }) {
     (async () => {
       const ids = routineKey ? routineKey.split(",") : [];
       let rex = [];
+      let blocks = [];
       if (ids.length > 0) {
-        const { data } = await supabase
-          .from("routine_exercises")
-          .select("exercise_id, block_id, order_index, routine_blocks(block_type), exercises(name)")
-          .in("routine_id", ids);
-        rex = data || [];
+        const [ex, bl] = await Promise.all([
+          supabase
+            .from("routine_exercises")
+            .select("routine_id, exercise_id, block_id, item_key, sets, reps, order_index, target_weight_kg, rest_minutes, exercises(name)")
+            .in("routine_id", ids)
+            .order("order_index"),
+          supabase.from("routine_blocks").select("id, routine_id, block_type, title, order_index").in("routine_id", ids).order("order_index"),
+        ]);
+        rex = ex.data || [];
+        blocks = bl.data || [];
       }
-      const seen = new Set();
-      const list = [];
-      rex.forEach((r) => {
-        if (r.block_id && !blockUsesProgression(r.routine_blocks?.block_type)) return;
-        const k = String(r.exercise_id);
-        if (seen.has(k)) return;
-        seen.add(k);
-        list.push({ exercise_id: r.exercise_id, name: r.exercises?.name || "Ejercicio" });
-      });
-      // Ejercicios con cargas guardadas que ya no están en las rutinas del plan
-      const missing = (editing.loads || []).filter((l) => !seen.has(String(l.exercise_id)));
-      if (missing.length > 0) {
-        const mids = [...new Set(missing.map((l) => l.exercise_id))];
+      const titleOf = (id) => routines.find((r) => String(r.id) === String(id))?.title || "Rutina";
+      const list = ids.map((id) => {
+        const rb = blocks.filter((b) => String(b.routine_id) === String(id));
+        const pos = (blockId) => { const i = rb.findIndex((b) => b.id === blockId); return i < 0 ? 999 : i; };
+        const items = rex
+          .filter((r) => String(r.routine_id) === String(id))
+          .sort((a, b) => pos(a.block_id) - pos(b.block_id) || (a.order_index ?? 0) - (b.order_index ?? 0));
+        return { id, title: titleOf(id), blocks: rb, items };
+      }).sort((a, b) => a.title.localeCompare(b.title, "es"));
+
+      // Ejercicios con cargas guardadas que ya no están en ninguna rutina del plan (ni en sus cambios)
+      const seen = new Set(rex.map((r) => String(r.exercise_id)));
+      (editing.changes || []).forEach((c) => { if (c.exercise_id) seen.add(String(c.exercise_id)); });
+      const mids = [...new Set((editing.loads || []).map((l) => String(l.exercise_id)).filter((id) => !seen.has(id)))];
+      let extra = [];
+      if (mids.length > 0) {
         const { data: exs } = await supabase.from("exercises").select("id, name").in("id", mids);
-        (exs || []).forEach((x) => { if (!seen.has(String(x.id))) { seen.add(String(x.id)); list.push({ exercise_id: x.id, name: x.name, missing: true }); } });
+        extra = (exs || []).map((x) => ({ exercise_id: x.id, name: x.name }));
       }
-      list.sort((a, b) => a.name.localeCompare(b.name, "es"));
-      if (!cancel) setPlanExercises(list);
+      if (!cancel) { setPlanRoutines(list); setExtraLoads(extra); }
     })();
     return () => { cancel = true; };
-  }, [routineKey, editing?.id, !!editing]);
+  }, [routineKey, editing?.id, !!editing, routines]);
 
   async function load() {
     setLoading(true);
-    const [schedule, { data: lib }, { data: tpls }] = await Promise.all([
+    const [schedule, { data: lib }, { data: tpls }, { data: cat }] = await Promise.all([
       loadSchedule(supabase, student.id, "id, title"),
       supabase.from("routines").select("id, title, level, goal").order("title"),
       supabase.from("plan_templates").select("id, name, plan_template_phases(*), plan_template_days(*)").order("name"),
+      supabase.from("exercises").select("id, name").order("name"),
     ]);
+    setCatalog(cat || []);
     setTemplates(tpls || []);
     setPlans(schedule.plans);
     setFixed(schedule.fixed);
@@ -130,7 +141,7 @@ export function PlanPanel({ student, onClose }) {
   useEffect(() => { load(); }, [student.id]);
 
   const startNew = () => {
-    setEditing({ id: null, name: "", start: suggestedStart(plans), weeks: 4, data: emptyWeeks(4), phases: [], weekOv: {}, loads: [], cells: {} });
+    setEditing({ id: null, name: "", start: suggestedStart(plans), weeks: 4, data: emptyWeeks(4), phases: [], weekOv: {}, loads: [], cells: {}, changes: [] });
     setTab("rutinas");
     setWeek(0);
   };
@@ -146,7 +157,7 @@ export function PlanPanel({ student, onClose }) {
       const w = data[d.week_index - 1];
       if (w) w[d.day_label] = [...(w[d.day_label] || []), d.routine_id];
     });
-    setEditing({ id: null, name: tpl.name, start: suggestedStart(plans), weeks: n, data, phases, weekOv: {}, loads: [], cells: {} });
+    setEditing({ id: null, name: tpl.name, start: suggestedStart(plans), weeks: n, data, phases, weekOv: {}, loads: [], cells: {}, changes: [] });
     setWeek(0);
     setTab("rutinas");
   };
@@ -176,11 +187,13 @@ export function PlanPanel({ student, onClose }) {
   };
 
   const startEdit = async (plan) => {
-    const [{ data: ph }, { data: wk }, { data: ld }, { data: cl }] = await Promise.all([
+    const [{ data: ph }, { data: wk }, { data: ld }, { data: cl }, { data: ch }] = await Promise.all([
       supabase.from("training_plan_phases").select("*").eq("plan_id", plan.id).order("order_index"),
       supabase.from("training_plan_weeks").select("*").eq("plan_id", plan.id),
       supabase.from("training_plan_loads").select("*").eq("plan_id", plan.id),
       supabase.from("training_plan_load_cells").select("*").eq("plan_id", plan.id),
+      // Si la tabla todavía no existe (SQL pendiente), simplemente no hay cambios
+      supabase.from("training_plan_exercise_changes").select("*, exercises(name)").eq("plan_id", plan.id).order("order_index"),
     ]);
     const weekOv = {};
     (wk || []).forEach((r) => { weekOv[r.week_index] = { pct: str(r.pct), reps: r.reps || "", sets: str(r.sets) }; });
@@ -192,6 +205,7 @@ export function PlanPanel({ student, onClose }) {
       weekOv,
       loads: (ld || []).map((l) => ({ exercise_id: l.exercise_id, from_week: l.from_week, base_type: l.base_type, weight_kg: str(l.weight_kg), reps: str(l.reps), rounding: Number(l.rounding) || 2.5 })),
       cells,
+      changes: (ch || []).map((c) => ({ ...c })),
     });
     setWeek(0);
     setTab("rutinas");
@@ -216,6 +230,7 @@ export function PlanPanel({ student, onClose }) {
       const cells = shiftCells(e.cells, at + 1, 1);
       Object.entries(e.cells).forEach(([k, v]) => { const [ex, w] = k.split(":"); if (Number(w) === at) cells[cellKey(ex, at + 1)] = { ...v }; });
       const loads = e.loads.map((l) => (Number(l.from_week) > at ? { ...l, from_week: Number(l.from_week) + 1 } : l));
+      const changes = (e.changes || []).map((c) => (Number(c.from_week) > at ? { ...c, from_week: Number(c.from_week) + 1 } : c));
       let phases = e.phases;
       if (phases.length > 0) {
         let cursor = 0;
@@ -226,7 +241,7 @@ export function PlanPanel({ student, onClose }) {
           return hit ? { ...p, weeks: String(n + 1) } : p;
         });
       }
-      return { ...e, weeks: e.weeks + 1, data, weekOv, cells, loads, phases };
+      return { ...e, weeks: e.weeks + 1, data, weekOv, cells, loads, phases, changes };
     });
   // Quitar la semana actual: las siguientes se corren hacia atrás
   const removeWeek = () =>
@@ -236,6 +251,7 @@ export function PlanPanel({ student, onClose }) {
       const weekOv = shiftWeekKeys(Object.fromEntries(Object.entries(e.weekOv).filter(([k]) => Number(k) !== at)), at + 1, -1);
       const cells = shiftCells(Object.fromEntries(Object.entries(e.cells).filter(([k]) => Number(k.split(":")[1]) !== at)), at + 1, -1);
       const loads = e.loads.map((l) => (Number(l.from_week) > at ? { ...l, from_week: Number(l.from_week) - 1 } : l));
+      const changes = (e.changes || []).map((c) => (Number(c.from_week) > at ? { ...c, from_week: Math.max(1, Number(c.from_week) - 1) } : c));
       let phases = e.phases;
       if (phases.length > 0) {
         let cursor = 0;
@@ -248,7 +264,7 @@ export function PlanPanel({ student, onClose }) {
           })
           .filter((p) => Number(p.weeks) > 0);
       }
-      return { ...e, weeks: e.weeks - 1, data: e.data.filter((_, i) => i !== week), weekOv, cells, loads, phases };
+      return { ...e, weeks: e.weeks - 1, data: e.data.filter((_, i) => i !== week), weekOv, cells, loads, phases, changes };
     });
   const setDay = (day, list) =>
     setEditing((e) => ({ ...e, data: e.data.map((w, i) => (i === week ? { ...w, [day]: list } : w)) }));
@@ -315,9 +331,9 @@ export function PlanPanel({ student, onClose }) {
       .filter((r) => r.pct != null || r.reps || r.sets != null);
     const seenBase = new Set();
     const loadRows = editing.loads
-      .filter((l) => nOrNull(l.weight_kg) > 0 && Number(l.from_week) <= n && (l.base_type === "rm" || Number(l.reps) > 0))
+      .filter((l) => Number(l.from_week) <= n && (l.base_type === "reps" || (nOrNull(l.weight_kg) > 0 && (l.base_type === "rm" || Number(l.reps) > 0))))
       .filter((l) => { const k = `${l.exercise_id}:${l.from_week}`; if (seenBase.has(k)) return false; seenBase.add(k); return true; })
-      .map((l) => ({ plan_id: planId, exercise_id: l.exercise_id, from_week: Number(l.from_week) || 1, base_type: l.base_type, weight_kg: nOrNull(l.weight_kg), reps: l.base_type === "work" ? Number(l.reps) : null, rounding: Number(l.rounding) || 2.5 }));
+      .map((l) => ({ plan_id: planId, exercise_id: l.exercise_id, from_week: Number(l.from_week) || 1, base_type: l.base_type, weight_kg: l.base_type === "reps" ? null : nOrNull(l.weight_kg), reps: l.base_type === "work" ? Number(l.reps) : null, rounding: Number(l.rounding) || 2.5 }));
     const cellRows = Object.entries(editing.cells)
       .map(([k, v]) => { const [ex, w] = k.split(":"); return { plan_id: planId, exercise_id: ex, week_index: Number(w), value_type: "kg", value: nOrNull(v.value), reps: (v.reps || "").trim() || null, sets: setsOrNull(v.sets) }; })
       .filter((c) => c.week_index <= n && (c.value != null || c.reps || c.sets != null));
@@ -326,6 +342,22 @@ export function PlanPanel({ student, onClose }) {
     ].filter(([, r]) => r.length > 0);
     const res = await Promise.all(inserts.map(([t, r]) => supabase.from(t).insert(r)));
     if (res.some((r) => r.error)) { setSaving(false); return alert("El plan se guardó, pero hubo un error con las fases o las cargas."); }
+
+    // Cambios de ejercicios (quitar / sustituir / agregar) de este alumno
+    const changeRows = (editing.changes || [])
+      .filter((c) => Number(c.from_week) <= n)
+      .map((c, i) => ({
+        plan_id: planId, routine_id: c.routine_id, from_week: Number(c.from_week) || 1, action: c.action,
+        item_key: c.item_key || null, exercise_id: c.exercise_id || null, after_item_key: c.after_item_key || null,
+        ...(c.new_item_key ? { new_item_key: c.new_item_key } : {}),
+        sets: setsOrNull(c.sets), reps: (c.reps || "").toString().trim() || null, rest_minutes: nOrNull(c.rest_minutes), order_index: i,
+      }));
+    const { error: chDelErr } = await supabase.from("training_plan_exercise_changes").delete().eq("plan_id", planId);
+    if (chDelErr && changeRows.length > 0) { setSaving(false); return alert("El plan se guardó, pero no se pudieron guardar los cambios de ejercicios (¿falta correr el SQL en Supabase?)."); }
+    if (changeRows.length > 0) {
+      const { error: chErr } = await supabase.from("training_plan_exercise_changes").insert(changeRows);
+      if (chErr) { setSaving(false); return alert("El plan se guardó, pero hubo un error con los cambios de ejercicios."); }
+    }
     setSaving(false);
     setEditing(null);
     load();
@@ -397,7 +429,7 @@ export function PlanPanel({ student, onClose }) {
         </div>
 
         <div className="flex gap-1 bg-card rounded-xl p-1 mb-4">
-          {[["rutinas", "Rutinas por semana"], ["cargas", "Cargas"]].map(([k, l]) => (
+          {[["rutinas", "Rutinas por semana"], ["cargas", "Cargas y ejercicios"]].map(([k, l]) => (
             <button key={k} onClick={() => setTab(k)} className={`flex-1 rounded-lg py-2 text-sm font-medium ${tab === k ? "bg-accent text-app" : "text-soft hover:text-ink"}`}>{l}</button>
           ))}
         </div>
@@ -406,7 +438,11 @@ export function PlanPanel({ student, onClose }) {
           <div className="mb-6">
             <PlanLoadsEditor
               weeks={weeksInfo}
-              exercises={planExercises}
+              routines={planRoutines}
+              extra={extraLoads}
+              catalog={catalog}
+              changes={editing.changes || []}
+              onChanges={(changes) => setEditing((e) => ({ ...e, changes }))}
               loads={editing.loads}
               cells={editing.cells}
               weekOv={editing.weekOv}

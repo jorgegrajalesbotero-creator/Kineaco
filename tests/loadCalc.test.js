@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { cellKey, roundTo, fmtNum, rmOf, baseFor, planWeeks } from "@/lib/loadCalc";
+import { cellKey, roundTo, fmtNum, rmOf, baseFor, planWeeks, loadFor, loadMapForWeek } from "@/lib/loadCalc";
 
 describe("cellKey", () => {
   it("compone la clave ejercicio:semana", () => {
@@ -80,5 +80,41 @@ describe("planWeeks", () => {
     expect(weeks).toHaveLength(4);
     expect(weeks[3].phase).toBeNull();
     expect(weeks[3].pctAuto).toBeNull();
+  });
+});
+
+describe("modo solo series y reps", () => {
+  const phases = [{ phase_type: "acumulacion", weeks: 2, order_index: 0, pct_start: 65, pct_end: 75, reps_start: "12", reps_end: "10", sets_start: 3, sets_end: 4 }];
+  const weeks = planWeeks(phases, 2);
+  const loads = [{ exercise_id: "plancha", from_week: 1, base_type: "reps", weight_kg: null }];
+
+  it("sigue series y reps de la fase sin peso", () => {
+    expect(baseFor(loads, "plancha", 1)).toBeTruthy();
+    const w1 = loadFor({ weeks, loads, exerciseId: "plancha", week: 1 });
+    expect(w1.kg).toBe(null);
+    expect(w1.repsOnly).toBe(true);
+    expect(w1.reps).toBe("12");
+    expect(w1.sets).toBe(3);
+    const w2 = loadFor({ weeks, loads, exerciseId: "plancha", week: 2 });
+    expect(w2.reps).toBe("10");
+    expect(w2.sets).toBe(4);
+  });
+
+  it("las reps y series escritas a mano mandan, y llegan al alumno", () => {
+    const cells = { [cellKey("plancha", 2)]: { reps: "30 s", sets: "5" } };
+    const w2 = loadFor({ weeks, loads, cells, exerciseId: "plancha", week: 2 });
+    expect(w2.reps).toBe("30 s");
+    expect(w2.sets).toBe(5);
+    const map = loadMapForWeek({ phases, totalWeeks: 2, weekRows: [], loads, cellRows: [{ exercise_id: "plancha", week_index: 2, reps: "30 s", sets: 5 }], week: 2 });
+    expect(map.plancha).toEqual({ value_type: "kg", value: null, reps: "30 s", sets: 5 });
+  });
+
+  it("reps por casilla también en ejercicios con peso", () => {
+    const withKg = [{ exercise_id: "sq", from_week: 1, base_type: "rm", weight_kg: 100, rounding: 2.5 }];
+    const cells = { [cellKey("sq", 1)]: { reps: "8" } };
+    const r = loadFor({ weeks, loads: withKg, cells, exerciseId: "sq", week: 1 });
+    expect(r.kg).toBe(65);
+    expect(r.reps).toBe("8");
+    expect(r.repsManual).toBe(true);
   });
 });

@@ -7,7 +7,7 @@ import { blockTypeLabel } from "@/lib/blocks";
 import { localDateString } from "@/lib/dates";
 import { appLocale, dayLetters, tr } from "@/lib/i18n";
 import { addDays, currentOrNextPlan, dayLabelOf, loadSchedule, mondayOf, planFor, planLastDay, planStart, planWeekOf, routinesForDate } from "@/lib/trainingPlan";
-import { buildReportPdf, buildRoutinePdf, loadRoutineDetails } from "@/lib/planPdf";
+import { buildReportPdf, buildRoutinePdf, loadPlanChanges, loadRoutineDetails } from "@/lib/planPdf";
 import { usePdfPreview } from "@/components/ui/PdfPreview";
 import { formatWeight, useWeightUnit } from "@/lib/weightUnits";
 
@@ -24,6 +24,7 @@ export function CalendarScreen({ userId, studentName, healthConsent, onClose, on
   const [selected, setSelected] = useState(() => localDateString());
   const [trained, setTrained] = useState(new Set());
   const [details, setDetails] = useState({});
+  const [planChanges, setPlanChanges] = useState([]);
   const [busy, setBusy] = useState(null);
 
   useEffect(() => {
@@ -62,12 +63,21 @@ export function CalendarScreen({ userId, studentName, healthConsent, onClose, on
   const selIds = selInfo.items.map((a) => a.routines?.id).filter(Boolean);
   const inThisWeek = selDate >= weekStart && selDate < addDays(weekStart, 7);
 
-  // Detalle (ejercicios) de las rutinas del día elegido
+  // Cambios de ejercicios de sus planes (quitar / sustituir / agregar desde una semana)
   useEffect(() => {
-    const missing = selIds.filter((id) => !details[id]);
+    if (!schedule) return;
+    loadPlanChanges(supabase, (schedule.plans || []).map((p) => p.id)).then(setPlanChanges);
+  }, [schedule]);
+  const selChanges = selInfo.plan ? planChanges.filter((c) => c.plan_id === selInfo.plan.id) : [];
+  const detailKey = (id) => `${id}:${selInfo.plan?.id || "-"}:${selInfo.week || 0}`;
+
+  // Detalle (ejercicios) de las rutinas del día elegido, con los cambios de esa semana del plan
+  useEffect(() => {
+    const missing = selIds.filter((id) => !details[detailKey(id)]);
     if (missing.length === 0) return;
-    loadRoutineDetails(supabase, missing).then((d) => setDetails((prev) => ({ ...prev, ...d })));
-  }, [selected, schedule]);
+    loadRoutineDetails(supabase, missing, { changes: selChanges, week: selInfo.week || 0 }).then((d) =>
+      setDetails((prev) => ({ ...prev, ...Object.fromEntries(Object.entries(d).map(([id, v]) => [detailKey(id), v])) })));
+  }, [selected, schedule, planChanges]);
 
   const locale = appLocale();
   const cap = (x) => x.charAt(0).toUpperCase() + x.slice(1);
@@ -88,7 +98,7 @@ export function CalendarScreen({ userId, studentName, healthConsent, onClose, on
     setBusy("day");
     try {
       const raw = fmt(selDate, { weekday: "long", day: "numeric", month: "long" });
-      showPdf(await buildRoutinePdf({ supabase, routineIds: selIds, dayTitle: raw.charAt(0).toUpperCase() + raw.slice(1), t: tr, locale }));
+      showPdf(await buildRoutinePdf({ supabase, routineIds: selIds, dayTitle: raw.charAt(0).toUpperCase() + raw.slice(1), t: tr, locale, changes: selChanges, week: selInfo.week || 0 }));
     } catch {
       alert(tr("No se pudo generar el PDF: "));
     }
@@ -195,7 +205,7 @@ export function CalendarScreen({ userId, studentName, healthConsent, onClose, on
         ) : (
           <>
             {selIds.map((id) => {
-              const r = details[id];
+              const r = details[detailKey(id)];
               const base = selInfo.items.find((a) => a.routines?.id === id)?.routines;
               return (
                 <div key={id} className="mt-4">
