@@ -154,10 +154,6 @@ export function PlanLoadsEditor({ weeks, routines, catalog, changes, onChanges, 
             {others.length > 0 && <p className="text-muted text-[11px]">Misma progresión en: {others.join(", ")}</p>}
           </div>
           <div className="flex items-center gap-2 shrink-0">
-            <Select size="sm" aria-label="Tipo de progresión" value={repsOnly ? "reps" : "kg"} onChange={(e) => setMode(exId, e.target.value)}>
-              <option value="kg">Con peso</option>
-              <option value="reps">Solo series y reps</option>
-            </Select>
             {!repsOnly && (
               <Select size="sm" aria-label="Redondeo" value={String(rounding)} onChange={(e) => setRounding(exId, Number(e.target.value))} disabled={kgLoads.length === 0}>
                 <option value="2.5">Redondeo {fmtNum(roundingStep(2.5, unit))} {unit}</option>
@@ -170,6 +166,19 @@ export function PlanLoadsEditor({ weeks, routines, catalog, changes, onChanges, 
               </button>
             )}
           </div>
+        </div>
+
+        {/* Tipo de progresión: con peso (RM o peso × reps) o solo series y reps */}
+        <div className="flex gap-1 bg-field rounded-lg p-1 mb-3 w-full sm:w-auto sm:inline-flex" role="group" aria-label="Tipo de progresión">
+          {[["kg", "Con peso"], ["reps", "Solo series y reps"]].map(([k, l]) => {
+            const on = (k === "reps") === repsOnly;
+            return (
+              <button key={k} type="button" aria-pressed={on} onClick={() => { if (!on) setMode(exId, k); }}
+                className={`flex-1 sm:flex-none text-xs rounded-md px-3 py-1.5 transition-colors ${on ? "bg-accent text-app font-semibold" : "text-soft hover:text-ink"}`}>
+                {l}
+              </button>
+            );
+          })}
         </div>
 
         {!repsOnly && (kgLoads.length === 0 ? (
