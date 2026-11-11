@@ -6,6 +6,7 @@ import { blockUsesProgression } from "@/lib/blocks";
 import { WEEK_DAYS, currentWeekStartISO, localDateString, todayDayLabel } from "@/lib/dates";
 import { addDays, loadSchedule, mondayOf, planFor, planWeekOf, routinesForDate } from "@/lib/trainingPlan";
 import { loadMapForWeek } from "@/lib/loadCalc";
+import { applyPlanChanges } from "@/lib/planChanges";
 import { getWeightUnit } from "@/lib/weightUnits";
 import { fetchAllRows } from "@/lib/fetchAll";
 import { appLocale, dayLetters, detectLang, rememberLang, setLang, tr } from "@/lib/i18n";
@@ -119,24 +120,30 @@ export default function App() {
   };
 
   // Cargas de la semana actual del plan (fases + RM → peso calculado, o casillas escritas por el coach)
-  const loadProgressionMap = async (uid) => {
+  // + los cambios de ejercicios del plan (quitar / sustituir / agregar desde una semana)
+  const loadPlanContext = async (uid) => {
     const today = new Date();
     const { data: plans } = await supabase.from("training_plans").select("id, start_date, weeks").eq("user_id", uid);
     const plan = planFor(plans || [], today);
-    if (!plan) return {};
+    if (!plan) return { map: {}, changes: [], week: 0 };
     const week = planWeekOf(plan, today);
-    const [{ data: phases }, { data: weekRows }, { data: loads }, { data: cellRows }] = await Promise.all([
+    const [{ data: phases }, { data: weekRows }, { data: loads }, { data: cellRows }, { data: changes }] = await Promise.all([
       supabase.from("training_plan_phases").select("*").eq("plan_id", plan.id),
       supabase.from("training_plan_weeks").select("*").eq("plan_id", plan.id),
       supabase.from("training_plan_loads").select("*").eq("plan_id", plan.id),
       supabase.from("training_plan_load_cells").select("*").eq("plan_id", plan.id),
+      supabase.from("training_plan_exercise_changes").select("*, exercises(name, video_url)").eq("plan_id", plan.id),
     ]);
-    return loadMapForWeek({ phases: phases || [], totalWeeks: plan.weeks, weekRows, loads, cellRows, week, unit: getWeightUnit() });
+    return {
+      map: loadMapForWeek({ phases: phases || [], totalWeeks: plan.weeks, weekRows, loads, cellRows, week, unit: getWeightUnit() }),
+      changes: changes || [],
+      week,
+    };
   };
 
   const buildRoutine = async (uid, assignment) => {
     const routineId = assignment.routines.id;
-    const [{ data: exercises }, { data: blocks }, { data: customWeights }, progressionMap, { data: progressRows }] = await Promise.all([
+    const [{ data: routineExercises }, { data: blocks }, { data: customWeights }, planCtx, { data: progressRows }] = await Promise.all([
       supabase
         .from("routine_exercises")
         .select("exercise_id, block_id, item_key, sets, reps, order_index, target_weight_kg, rest_minutes, exercises(name, video_url)")
@@ -148,7 +155,7 @@ export default function App() {
         .eq("routine_id", routineId)
         .order("order_index"),
       supabase.from("student_exercise_weights").select("exercise_id, target_weight_kg").eq("user_id", uid),
-      loadProgressionMap(uid),
+      loadPlanContext(uid),
       supabase
         .from("progress")
         .select("exercise_id, item_key")
@@ -163,6 +170,11 @@ export default function App() {
     const blockList = blocks || [];
     const blockMap = {};
     blockList.forEach((b) => { blockMap[b.id] = b; });
+    const progressionMap = planCtx.map;
+    // Cambios de ejercicios de su plan (la rutina original no cambia)
+    const exercises = applyPlanChanges(routineExercises || [], planCtx.changes, routineId, planCtx.week);
+    // Si un ejercicio está también en el trabajo principal, la progresión va solo ahí
+    const mainIds = new Set(exercises.filter((x) => blockUsesProgression(x.block_id ? blockMap[x.block_id]?.block_type : null)).map((x) => String(x.exercise_id)));
     const hasBlocks = blockList.length > 0;
     const doneItemKeys = new Set((progressRows || []).filter((p) => p.item_key).map((p) => p.item_key));
     const doneExerciseIds = new Set((progressRows || []).map((p) => p.exercise_id));
@@ -170,14 +182,18 @@ export default function App() {
     return {
       ...assignment.routines,
       day_label: assignment.day_label,
+      planChanges: planCtx.changes,
+      planWeek: planCtx.week,
       blocks: hasBlocks ? blockList : [],
       exercises: (exercises || []).map((e) => {
         const block = e.block_id ? blockMap[e.block_id] : null;
         const blockSets = block?.sets ?? e.sets;
         const usesProgression = blockUsesProgression(block?.block_type);
-        const reps = (usesProgression && progressionMap[e.exercise_id]?.reps) || e.reps;
+        // El plan aplica en el trabajo principal y también en los demás bloques cuando el coach le hizo progresión a ese ejercicio
+        const planApplies = !!progressionMap[e.exercise_id] && (usesProgression || !mainIds.has(String(e.exercise_id)));
+        const reps = (planApplies && progressionMap[e.exercise_id]?.reps) || e.reps;
         // Series: las de la semana del plan (si las tiene) mandan sobre las de la rutina o el bloque
-        const planSets = usesProgression ? progressionMap[e.exercise_id]?.sets || null : null;
+        const planSets = planApplies ? progressionMap[e.exercise_id]?.sets || null : null;
         const routineSets = block ? blockSets : e.sets;
         const setsN = planSets || routineSets;
         const setsDiffer = !!(block && planSets && Number(planSets) !== Number(blockSets));
@@ -198,7 +214,9 @@ export default function App() {
           completed: hasBlocks ? doneItemKeys.has(e.item_key) : doneExerciseIds.has(e.exercise_id),
           targetWeight: usesProgression
             ? resolveTargetWeight(e.exercise_id, e.target_weight_kg, customWeightMap[e.exercise_id], progressionMap)
-            : e.target_weight_kg,
+            : planApplies && progressionMap[e.exercise_id]?.value != null
+              ? progressionMap[e.exercise_id].value
+              : e.target_weight_kg,
           restMinutes: e.rest_minutes,
           setsCount: parseInt(setsN, 10) || 0,
           targetReps: reps ? String(reps) : "",
@@ -373,6 +391,8 @@ export default function App() {
       parts,
       blocks: [],
       exercises: parts.flatMap((p) => p.exercises),
+      planChanges: parts[0].planChanges || [],
+      planWeek: parts[0].planWeek || 0,
     };
   };
 

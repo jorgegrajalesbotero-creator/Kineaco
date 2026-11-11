@@ -30,7 +30,7 @@ export function RoutineScreen({ routine, userId, onClose, onToggle, onProgressCh
     setPdfBusy(true);
     try {
       const ids = (routine.parts || [routine]).map((p) => p.id);
-      showPdf(await buildRoutinePdf({ supabase, routineIds: ids, dayTitle: tr(routine.day_label), t: tr, locale: appLocale() }));
+      showPdf(await buildRoutinePdf({ supabase, routineIds: ids, dayTitle: tr(routine.day_label), t: tr, locale: appLocale(), changes: routine.planChanges || [], week: routine.planWeek || 0 }));
     } catch {
       alert(tr("No se pudo generar el PDF: "));
     }
