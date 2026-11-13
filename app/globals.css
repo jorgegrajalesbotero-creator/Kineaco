@@ -151,3 +151,22 @@ body {
   60% { transform: rotate(-6deg); }
   75% { transform: rotate(3deg); }
 }
+
+/* Camaleón compañero (components/ui/Chameleon.jsx) */
+@keyframes cham-breathe { 0%, 100% { transform: scale(1, 1); } 50% { transform: scale(1.02, 1.04); } }
+@keyframes cham-tail { 0%, 100% { transform: rotate(0); } 50% { transform: rotate(-7deg); } }
+@keyframes cham-tail-fast { 0%, 100% { transform: rotate(0); } 50% { transform: rotate(-14deg); } }
+@keyframes cham-bob { 0%, 100% { transform: rotate(0); } 50% { transform: rotate(-4deg); } }
+@keyframes cham-shake { 0%, 100% { transform: translateX(0); } 25% { transform: translateX(-0.8px); } 75% { transform: translateX(0.8px); } }
+@keyframes cham-tongue { 0%, 72%, 100% { stroke-dashoffset: 44; } 78%, 86% { stroke-dashoffset: 0; } }
+@keyframes cham-float { 0%, 100% { transform: translateY(0); opacity: 0.9; } 50% { transform: translateY(-5px); opacity: 0.5; } }
+.cham-breathe { transform-box: fill-box; transform-origin: 50% 100%; animation: cham-breathe 3.2s ease-in-out infinite; }
+.cham-tail { transform-box: view-box; transform-origin: 60px 100px; animation: cham-tail 2.8s ease-in-out infinite; }
+.cham-tail-fast { animation: cham-tail-fast 1.1s ease-in-out infinite; }
+.cham-bob { transform-box: view-box; transform-origin: 132px 88px; animation: cham-bob 1.4s ease-in-out infinite; }
+.cham-shake { transform-box: view-box; transform-origin: 132px 88px; animation: cham-shake 0.35s linear infinite; }
+.cham-tongue { stroke-dasharray: 44; stroke-dashoffset: 44; animation: cham-tongue 3.6s ease-in-out infinite; }
+.cham-float { animation: cham-float 2.4s ease-in-out infinite; }
+@media (prefers-reduced-motion: reduce) {
+  .cham-breathe, .cham-tail, .cham-tail-fast, .cham-bob, .cham-shake, .cham-tongue, .cham-float { animation: none; }
+}

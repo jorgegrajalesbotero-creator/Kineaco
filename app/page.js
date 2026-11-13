@@ -14,8 +14,9 @@ import { signedAvatarUrl } from "@/lib/avatars";
 import { HomeScreen } from "@/components/student/HomeScreen";
 import { IntakeScreen } from "@/components/student/IntakeScreen";
 import { CheckinScreen } from "@/components/student/CheckinScreen";
-import { checkinWeekStart, dailyCheckinKey, isCheckinDay } from "@/lib/checkin";
-import { DailyCheckinSheet } from "@/components/student/DailyCheckinSheet";
+import { checkinWeekStart, isCheckinDay } from "@/lib/checkin";
+import { PetCheckin } from "@/components/student/PetCheckin";
+import { petMood } from "@/lib/chameleon";
 import { MEASURE_DAYS } from "@/lib/measurements";
 import { MeasurementWizard } from "@/components/measurements/MeasurementWizard";
 import { AnnouncementsScreen } from "@/components/student/Announcements";
@@ -63,7 +64,10 @@ export default function App() {
   const [editingIntake, setEditingIntake] = useState(false);
   const [showCheckin, setShowCheckin] = useState(false);
   const [showCalendar, setShowCalendar] = useState(false);
-  const [showDaily, setShowDaily] = useState(false);
+  // Camaleón: nombre y check-in de hoy (si la columna pet_name no existe todavía, la función queda apagada)
+  const [pet, setPet] = useState({ enabled: false, name: "", changes: 0 });
+  const [todayCheckin, setTodayCheckin] = useState(null);
+  const [checkinReady, setCheckinReady] = useState(false);
   const [showMeasure, setShowMeasure] = useState(false);
   const [showAnnouncements, setShowAnnouncements] = useState(false);
   const [hasNutritionProfile, setHasNutritionProfile] = useState(false);
@@ -253,18 +257,18 @@ export default function App() {
     return !!dayRoutine;
   };
 
-  // Antes de abrir la rutina de HOY se ofrece el check-in diario (opcional), una sola vez por día
-  const openRoutineWithCheckin = async (day = selectedDay) => {
-    if (day !== todayDayLabel() || !userId) return setShowRoutine(true);
-    const today = localDateString();
-    let seen = false;
-    try { seen = localStorage.getItem(dailyCheckinKey(userId, today)) === "1"; } catch { }
-    if (!seen) {
-      const { data } = await supabase.from("daily_checkins").select("id").eq("user_id", userId).eq("check_date", today).maybeSingle();
-      seen = !!data;
-    }
-    if (seen) setShowRoutine(true);
-    else setShowDaily(true);
+  // El check-in diario ahora se hace al abrir la app (con el camaleón), así que la rutina abre directo
+  const openRoutineWithCheckin = () => setShowRoutine(true);
+
+  // Camaleón: nombre + check-in de hoy. Si falta la columna pet_name (SQL sin correr), no se bloquea nada.
+  const loadPet = async (uid) => {
+    const [{ data: p, error: e }, { data: ck }] = await Promise.all([
+      supabase.from("profiles").select("pet_name, pet_name_changes").eq("id", uid).maybeSingle(),
+      supabase.from("daily_checkins").select("*").eq("user_id", uid).eq("check_date", localDateString()).maybeSingle(),
+    ]);
+    setPet({ enabled: !e, name: p?.pet_name || "", changes: p?.pet_name_changes || 0 });
+    setTodayCheckin(ck || null);
+    setCheckinReady(true);
   };
 
   const goToAssignedRoutine = async () => {
@@ -435,6 +439,8 @@ export default function App() {
         return;
       }
 
+      await loadPet(user.id);
+
       // Rutina del día actual (al montar, el día seleccionado es hoy).
       const today = todayDayLabel();
       const todayRoutine = await buildDay(user.id, today);
@@ -534,7 +540,7 @@ export default function App() {
       />
     );
   } else if (showRoutine && routine) {
-    content = <RoutineScreen routine={routine} userId={userId} onClose={() => setShowRoutine(false)} onToggle={handleToggleExercise} onProgressChange={() => { loadStreak(userId); loadRecentActivity(userId); }} />;
+    content = <RoutineScreen routine={routine} userId={userId} pet={pet.enabled ? { name: pet.name, mood: petMood(todayCheckin) } : null} onClose={() => setShowRoutine(false)} onToggle={handleToggleExercise} onProgressChange={() => { loadStreak(userId); loadRecentActivity(userId); }} />;
   } else if (tab === "nutrition") {
     content = <NutritionScreen userId={userId} onFirstRoutineAssigned={goToAssignedRoutine} />;
   } else if (tab === "home") {
@@ -549,6 +555,7 @@ export default function App() {
         onOpenCalendar={() => setShowCalendar(true)}
         fullName={fullName}
         avatarUrl={avatarUrl}
+        pet={pet.enabled ? { name: pet.name, mood: petMood(todayCheckin) } : null}
         routine={routine}
         loading={loadingRoutine}
         selectedDay={selectedDay}
@@ -586,6 +593,8 @@ export default function App() {
           setAvatarUrl(avatar);
         }}
         onEmailUpdate={setUserEmail}
+        pet={pet.enabled ? { ...pet, mood: petMood(todayCheckin) } : null}
+        onPetRenamed={(name) => setPet((p) => ({ ...p, name, changes: (p.changes || 0) + 1 }))}
       />
     ) : (
       <div className="flex-1 flex items-center justify-center">
@@ -594,10 +603,13 @@ export default function App() {
     );
   }
   const selectTab = (key) => { setEditingIntake(false); handleSelectTab(key); };
+  // Check-in diario obligatorio: al abrir la app cada día, hasta que lo responda
+  const needsPetCheckin = pet.enabled && checkinReady && !needsConsent && !todayCheckin;
+  const hideNav = accessBlocked || needsConsent || needsPetCheckin;
 
   return (
     <div className="fixed inset-0 bg-app flex overflow-hidden">
-      {!accessBlocked && !needsConsent && (
+      {!hideNav && (
         <SideNav
           active={tab}
           onSelect={selectTab}
@@ -622,6 +634,14 @@ export default function App() {
               onSaved={() => { setHasIntake(true); setEditingIntake(false); }}
               onSignOut={hasIntake ? null : signOutNow}
             />
+          ) : !accessBlocked && needsPetCheckin ? (
+            <PetCheckin
+              userId={userId}
+              petName={pet.name}
+              healthConsent={healthConsent}
+              onPetNamed={(name) => setPet((p) => ({ ...p, name }))}
+              onDone={(row) => { setTodayCheckin(row); setNotifKey((k) => k + 1); }}
+            />
           ) : accessBlocked ? (
             <div className="flex-1 flex flex-col items-center justify-center text-center p-8">
               <h1 className="text-ink text-lg font-semibold mb-2">{accessNeverGranted ? tr("¡Ficha recibida!") : tr("Su acceso venció")}</h1>
@@ -643,14 +663,7 @@ export default function App() {
             content
           )}
         </main>
-        {showDaily && (
-          <DailyCheckinSheet
-            userId={userId}
-            healthConsent={healthConsent}
-            onDone={() => { setShowDaily(false); setShowRoutine(true); }}
-          />
-        )}
-        {!accessBlocked && !needsConsent && (
+        {!hideNav && (
           <div className="md:hidden absolute inset-x-0 bottom-[max(0.75rem,calc(env(safe-area-inset-bottom)-0.5rem))] z-40 pointer-events-none">
             <BottomNav active={tab} onSelect={selectTab} unreadCount={unreadMessageCount} isCoach={isCoach} />
           </div>

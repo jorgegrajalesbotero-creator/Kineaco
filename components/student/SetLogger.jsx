@@ -8,6 +8,7 @@ import { tr } from "@/lib/i18n";
 import { cleanInt, toNumber } from "@/lib/numbers";
 import { UnitToggle, WeightInput } from "@/components/ui/WeightInput";
 import { formatWeight, useWeightUnit } from "@/lib/weightUnits";
+import { Chameleon } from "@/components/ui/Chameleon";
 
 // Primer número de las reps sugeridas ("8-10" → 8) para "Marcar todas como sugeridas"
 const firstNumber = (text) => {
@@ -20,7 +21,7 @@ const inputCls =
 
 // Hoja para registrar cada serie de un ejercicio (peso y reps)
 // readOnly = el entrenamiento ya se finalizó: solo se ven las series, no se cambian
-export function SetLogger({ exercise, routine, userId, onClose, onComplete, onUncomplete, onStartRest, readOnly = false }) {
+export function SetLogger({ exercise, routine, userId, onClose, onComplete, onUncomplete, onStartRest, readOnly = false, pet = null }) {
   const [rows, setRows] = useState([]);
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
@@ -233,7 +234,18 @@ export function SetLogger({ exercise, routine, userId, onClose, onComplete, onUn
             )}
             </>
             )}
-            <p className="text-muted text-[11px] text-center mt-2">{tr("{p0} de {p1} series hechas", { p0: doneCount, p1: rows.length })}</p>
+            {pet && pet.mood ? (
+              <div className="flex items-center justify-center gap-2 mt-2">
+                <Chameleon mood={doneCount >= rows.length && rows.length > 0 ? 5 : pet.mood} size={64} />
+                <p className="text-soft text-xs">
+                  {doneCount >= rows.length && rows.length > 0
+                    ? tr("¡Series completas! {p0} lo celebra.", { p0: pet.name || tr("Su camaleón") })
+                    : tr("{p0} de {p1} series hechas", { p0: doneCount, p1: rows.length })}
+                </p>
+              </div>
+            ) : (
+              <p className="text-muted text-[11px] text-center mt-2">{tr("{p0} de {p1} series hechas", { p0: doneCount, p1: rows.length })}</p>
+            )}
           </>
         )}
       </div>

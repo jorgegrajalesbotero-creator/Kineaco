@@ -4,6 +4,8 @@ import { CalendarDays, Check, ChevronRight, Clock, Dumbbell, Flame, Info, Play, 
 import { WEEK_DAYS } from "@/lib/dates";
 import { appLocale, dayLetters, tr } from "@/lib/i18n";
 import { AnnouncementCard } from "@/components/student/Announcements";
+import { Chameleon } from "@/components/ui/Chameleon";
+import { PET_SAYINGS } from "@/lib/chameleon";
 import { CheckinCard, CoachMessage, GoalsAndReminders, TodayNutrition, WeekSummary, useHomeExtras } from "@/components/student/HomeExtras";
 
 function greeting() {
@@ -44,7 +46,7 @@ function ProgressRing({ done, total, size = 76 }) {
   );
 }
 
-export function HomeScreen({ userId, onNavigate, onOpenCheckin, onOpenAnnouncements, onAnnouncementRead, onOpenRoutine, onOpenCalendar, fullName, avatarUrl, routine, loading, selectedDay, onSelectDay, streak, onGoToNutrition, hasNutritionProfile, needsIntake, onOpenIntake, bell, pushCard }) {
+export function HomeScreen({ userId, onNavigate, onOpenCheckin, onOpenAnnouncements, onAnnouncementRead, onOpenRoutine, onOpenCalendar, fullName, avatarUrl, pet, routine, loading, selectedDay, onSelectDay, streak, onGoToNutrition, hasNutritionProfile, needsIntake, onOpenIntake, bell, pushCard }) {
   const extras = useHomeExtras(userId);
   const doneCount = routine ? routine.exercises.filter((e) => e.completed).length : 0;
   const total = routine ? routine.exercises.length : 0;
@@ -79,6 +81,16 @@ export function HomeScreen({ userId, onNavigate, onOpenCheckin, onOpenAnnounceme
             {bell}
           </div>
         </div>
+
+        {pet && pet.mood && (
+          <div className="relative flex items-center gap-3 bg-card border border-white/[0.05] rounded-3xl pl-4 pr-2 py-2 mb-5 animate-fade-up">
+            <div className="flex-1 min-w-0">
+              <p className="text-accent text-[11px] font-medium">{pet.name || tr("Su camaleón")}</p>
+              <p className="text-ink text-sm leading-snug">{tr(PET_SAYINGS[pet.mood])}</p>
+            </div>
+            <Chameleon mood={pet.mood} size={118} className="shrink-0" />
+          </div>
+        )}
 
         {needsIntake && (
           <button onClick={onOpenIntake} className="relative w-full flex items-center gap-3 bg-accent/[0.08] border border-accent/25 rounded-2xl p-3.5 mb-5 text-left active:scale-[0.99] transition-transform">
