@@ -1,12 +1,13 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Activity, Calendar, ChevronLeft, ChevronRight, Eye } from "lucide-react";
+import { Activity, Calendar, ChevronLeft, ChevronRight, Eye, Lock, LockOpen } from "lucide-react";
 import { supabase } from "@/lib/supabaseClient";
 import { WEEK_DAYS, todayDayLabel } from "@/lib/dates";
 import { addDays, loadSchedule, mondayOf, routinesForDate } from "@/lib/trainingPlan";
 import { buildDay } from "@/lib/studentRoutine";
 import { saveExerciseNote } from "@/lib/exerciseNotes";
+import { fmtFinished, isLocked, loadSession, setSessionUnlocked, weekStartISO } from "@/lib/workoutSession";
 import { RoutineScreen } from "@/components/student/RoutineScreen";
 import { Skeleton } from "@/components/ui/Skeleton";
 import { PanelLayout } from "./PanelLayout";
@@ -27,6 +28,8 @@ export function RoutinePreviewPanel({ student, onClose, onOpenPanel }) {
   const [routine, setRoutine] = useState(null);
   const [loading, setLoading] = useState(true);
   const [editing, setEditing] = useState(null); // ejercicio al que se le escribe la observación
+  const [session, setSession] = useState(null); // ¿el alumno ya finalizó este día?
+  const [sessionBusy, setSessionBusy] = useState(false);
 
   async function loadWeekSchedule() {
     setSchedule(await loadSchedule(supabase, student.id, "*"));
@@ -36,12 +39,31 @@ export function RoutinePreviewPanel({ student, onClose, onOpenPanel }) {
   async function loadRoutine(sched, d, offset) {
     setLoading(true);
     try {
-      setRoutine(await buildDay(supabase, student.id, d, { weekOffset: offset, schedule: sched }));
+      const [r, s] = await Promise.all([
+        buildDay(supabase, student.id, d, { weekOffset: offset, schedule: sched }),
+        loadSession(supabase, student.id, weekStartISO(offset), d),
+      ]);
+      setRoutine(r);
+      setSession(s);
     } catch {
       setRoutine(null);
+      setSession(null);
     }
     setLoading(false);
   }
+
+  const toggleLock = async () => {
+    if (!session) return;
+    setSessionBusy(true);
+    const { data, error } = await setSessionUnlocked(supabase, session.id, isLocked(session));
+    setSessionBusy(false);
+    if (error) return alert("No se pudo cambiar. Revisá que el SQL de «Finalizar entrenamiento» esté aplicado en Supabase.");
+    setSession(data);
+  };
+
+  // El coach corrigió una serie: se actualiza el "hecho" del ejercicio en la vista
+  const onToggle = (i, value) =>
+    setRoutine((r) => cloneWith(r, { exercises: r.exercises.map((e, idx) => (idx === i ? cloneWith(e, { completed: value }) : e)) }));
   useEffect(() => { if (schedule) loadRoutine(schedule, day, weekOffset); }, [schedule, day, weekOffset]);
 
   const monday = addDays(mondayOf(new Date()), weekOffset * 7);
@@ -127,6 +149,21 @@ export function RoutinePreviewPanel({ student, onClose, onOpenPanel }) {
         <p className="text-muted text-sm bg-card rounded-xl p-4">{day}: día de descanso, no tiene rutina asignada.</p>
       ) : (
         <>
+          <div className="bg-card rounded-xl px-3.5 py-3 mb-3 flex flex-wrap items-center justify-between gap-2">
+            {!session?.finished_at ? (
+              <p className="text-muted text-xs">Sin finalizar: el alumno todavía puede marcar y cambiar este día.</p>
+            ) : isLocked(session) ? (
+              <p className="text-ink text-xs flex items-center gap-1.5"><Lock size={13} className="text-accent" /> Finalizado el {fmtFinished(session.finished_at)} · el alumno ya no puede cambiarlo</p>
+            ) : (
+              <p className="text-ink text-xs flex items-center gap-1.5"><LockOpen size={13} className="text-warning" /> Edición habilitada: el alumno puede corregir y volver a finalizar</p>
+            )}
+            {session?.finished_at && (
+              <button onClick={toggleLock} disabled={sessionBusy} className={`text-xs rounded-lg px-3 py-1.5 flex items-center gap-1.5 disabled:opacity-50 ${isLocked(session) ? "bg-field text-ink hover:bg-field-hover" : "bg-accent text-app font-semibold"}`}>
+                {isLocked(session) ? <><LockOpen size={12} /> Habilitar edición</> : <><Lock size={12} /> Volver a bloquear</>}
+              </button>
+            )}
+          </div>
+          {weekOffset === 0 && <p className="text-muted text-[11px] mb-2">Para corregir vos un peso o unas reps: abrí el ejercicio → «Corregir peso y reps de cada serie».</p>}
           {noteCount > 0 && <p className="text-accent text-xs mb-2">{noteCount} ejercicio{noteCount > 1 ? "s" : ""} con observación este día</p>}
           <div className="rounded-2xl border border-white/[0.06] overflow-hidden">
             <RoutineScreen
@@ -135,8 +172,9 @@ export function RoutinePreviewPanel({ student, onClose, onOpenPanel }) {
               userId={student.id}
               preview
               onEditNote={setEditing}
+              coachEdit={weekOffset === 0}
               onClose={onClose}
-              onToggle={() => {}}
+              onToggle={onToggle}
               onProgressChange={() => {}}
             />
           </div>
