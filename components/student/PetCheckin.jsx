@@ -24,9 +24,9 @@ const QUESTIONS = [
 
 const btn = "block w-full rounded-2xl py-3.5 text-sm font-semibold active:scale-[0.98] transition-transform disabled:opacity-60";
 
-// Check-in diario con el camaleón. Sale al abrir la app cada día y NO se puede saltar.
-// La primera vez, el alumno le pone nombre a su camaleón (se puede cambiar una sola vez desde Perfil).
-export function PetCheckin({ userId, petName, healthConsent = true, onPetNamed, onDone }) {
+// Check-in diario con el camaleón. La primera vez es obligatorio (le pone nombre al camaleón y responde);
+// después es opcional (optional = muestra "Ahora no" → onSkip). El nombre se puede cambiar una vez desde Perfil.
+export function PetCheckin({ userId, petName, healthConsent = true, optional = false, onPetNamed, onDone, onSkip }) {
   const needsName = !petName;
   const [step, setStep] = useState(needsName ? -1 : 0);
   const [name, setName] = useState("");
@@ -190,6 +190,11 @@ export function PetCheckin({ userId, petName, healthConsent = true, onPetNamed, 
             {Array.from({ length: steps }, (_, i) => (
               <div key={i} className={`flex-1 h-1 rounded-full ${i < progress ? "bg-accent" : "bg-white/10"}`} />
             ))}
+          </div>
+        )}
+        {optional && !saved && (
+          <div className="flex justify-end -mt-2 mb-2">
+            <button onClick={onSkip} className="text-soft text-xs bg-white/[0.04] border border-white/[0.06] rounded-full px-3 py-1.5">{tr("Ahora no")}</button>
           </div>
         )}
         <p className="text-muted text-[11px] font-medium uppercase tracking-[0.14em] text-center">{step === -1 ? tr("Bienvenida") : tr("Check-in de hoy")}</p>

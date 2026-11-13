@@ -46,7 +46,7 @@ function ProgressRing({ done, total, size = 76 }) {
   );
 }
 
-export function HomeScreen({ userId, onNavigate, onOpenCheckin, onOpenAnnouncements, onAnnouncementRead, onOpenRoutine, onOpenCalendar, fullName, avatarUrl, pet, routine, loading, selectedDay, onSelectDay, streak, onGoToNutrition, hasNutritionProfile, needsIntake, onOpenIntake, bell, pushCard }) {
+export function HomeScreen({ userId, onNavigate, onOpenCheckin, onOpenAnnouncements, onAnnouncementRead, onOpenRoutine, onOpenPetCheckin, onOpenCalendar, fullName, avatarUrl, pet, routine, loading, selectedDay, onSelectDay, streak, onGoToNutrition, hasNutritionProfile, needsIntake, onOpenIntake, bell, pushCard }) {
   const extras = useHomeExtras(userId);
   const doneCount = routine ? routine.exercises.filter((e) => e.completed).length : 0;
   const total = routine ? routine.exercises.length : 0;
@@ -81,6 +81,17 @@ export function HomeScreen({ userId, onNavigate, onOpenCheckin, onOpenAnnounceme
             {bell}
           </div>
         </div>
+
+        {pet && pet.name && !pet.mood && (
+          <button onClick={onOpenPetCheckin} className="relative w-full flex items-center gap-3 bg-accent/[0.08] border border-accent/25 rounded-3xl pl-4 pr-2 py-2 mb-5 text-left animate-fade-up active:scale-[0.99] transition-transform">
+            <div className="flex-1 min-w-0">
+              <p className="text-ink text-sm font-medium">{tr("¿Quiere activar a {p0}?", { p0: pet.name })}</p>
+              <p className="text-soft text-xs leading-snug">{tr("Está dormido. Haga su check-in de hoy para despertarlo y que lo acompañe.")}</p>
+              <span className="inline-block mt-2 bg-accent text-app text-xs font-semibold rounded-full px-3 py-1">{tr("Hacer check-in")}</span>
+            </div>
+            <Chameleon sleeping size={110} className="shrink-0" />
+          </button>
+        )}
 
         {pet && pet.mood && (
           <div className="relative flex items-center gap-3 bg-card border border-white/[0.05] rounded-3xl pl-4 pr-2 py-2 mb-5 animate-fade-up">

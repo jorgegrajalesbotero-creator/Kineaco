@@ -14,7 +14,7 @@ import { signedAvatarUrl } from "@/lib/avatars";
 import { HomeScreen } from "@/components/student/HomeScreen";
 import { IntakeScreen } from "@/components/student/IntakeScreen";
 import { CheckinScreen } from "@/components/student/CheckinScreen";
-import { checkinWeekStart, isCheckinDay } from "@/lib/checkin";
+import { checkinWeekStart, dailyCheckinKey, isCheckinDay } from "@/lib/checkin";
 import { PetCheckin } from "@/components/student/PetCheckin";
 import { petMood } from "@/lib/chameleon";
 import { MEASURE_DAYS } from "@/lib/measurements";
@@ -68,6 +68,9 @@ export default function App() {
   const [pet, setPet] = useState({ enabled: false, name: "", changes: 0 });
   const [todayCheckin, setTodayCheckin] = useState(null);
   const [checkinReady, setCheckinReady] = useState(false);
+  // Check-in opcional abierto a mano (tarjeta de Inicio) o al empezar la rutina de hoy
+  const [petCheckinOpen, setPetCheckinOpen] = useState(null); // null | "home" | "routine"
+  const pendingPetName = useRef("");
   const [showMeasure, setShowMeasure] = useState(false);
   const [showAnnouncements, setShowAnnouncements] = useState(false);
   const [hasNutritionProfile, setHasNutritionProfile] = useState(false);
@@ -257,8 +260,22 @@ export default function App() {
     return !!dayRoutine;
   };
 
-  // El check-in diario ahora se hace al abrir la app (con el camaleón), así que la rutina abre directo
-  const openRoutineWithCheckin = () => setShowRoutine(true);
+  // Al empezar la rutina de HOY se ofrece el check-in del camaleón (opcional), una sola vez por día
+  const openRoutineWithCheckin = (day = selectedDay) => {
+    if (!pet.enabled || todayCheckin || day !== todayDayLabel() || !userId) return setShowRoutine(true);
+    let skipped = false;
+    try { skipped = localStorage.getItem(dailyCheckinKey(userId, localDateString())) === "1"; } catch { }
+    if (skipped) return setShowRoutine(true);
+    setPetCheckinOpen("routine");
+  };
+  const closePetCheckin = (row) => {
+    if (row) setTodayCheckin(row);
+    else { try { localStorage.setItem(dailyCheckinKey(userId, localDateString()), "1"); } catch { } }
+    const goRoutine = petCheckinOpen === "routine";
+    setPetCheckinOpen(null);
+    setNotifKey((k) => k + 1);
+    if (goRoutine) setShowRoutine(true);
+  };
 
   // Camaleón: nombre + check-in de hoy. Si falta la columna pet_name (SQL sin correr), no se bloquea nada.
   const loadPet = async (uid) => {
@@ -539,6 +556,17 @@ export default function App() {
         onSaved={() => { setHasIntake(true); setEditingIntake(false); }}
       />
     );
+  } else if (petCheckinOpen) {
+    content = (
+      <PetCheckin
+        userId={userId}
+        petName={pet.name}
+        healthConsent={healthConsent}
+        optional
+        onDone={(row) => closePetCheckin(row)}
+        onSkip={() => closePetCheckin(null)}
+      />
+    );
   } else if (showRoutine && routine) {
     content = <RoutineScreen routine={routine} userId={userId} pet={pet.enabled ? { name: pet.name, mood: petMood(todayCheckin) } : null} onClose={() => setShowRoutine(false)} onToggle={handleToggleExercise} onProgressChange={() => { loadStreak(userId); loadRecentActivity(userId); }} />;
   } else if (tab === "nutrition") {
@@ -552,6 +580,7 @@ export default function App() {
         onOpenAnnouncements={() => setShowAnnouncements(true)}
         onAnnouncementRead={() => setNotifKey((k) => k + 1)}
         onOpenRoutine={() => openRoutineWithCheckin()}
+        onOpenPetCheckin={() => setPetCheckinOpen("home")}
         onOpenCalendar={() => setShowCalendar(true)}
         fullName={fullName}
         avatarUrl={avatarUrl}
@@ -603,8 +632,8 @@ export default function App() {
     );
   }
   const selectTab = (key) => { setEditingIntake(false); handleSelectTab(key); };
-  // Check-in diario obligatorio: al abrir la app cada día, hasta que lo responda
-  const needsPetCheckin = pet.enabled && checkinReady && !needsConsent && !todayCheckin;
+  // Check-in obligatorio SOLO la primera vez (cuando le pone nombre al camaleón); después es opcional
+  const needsPetCheckin = pet.enabled && checkinReady && !needsConsent && !pet.name;
   const hideNav = accessBlocked || needsConsent || needsPetCheckin;
 
   return (
@@ -639,8 +668,13 @@ export default function App() {
               userId={userId}
               petName={pet.name}
               healthConsent={healthConsent}
-              onPetNamed={(name) => setPet((p) => ({ ...p, name }))}
-              onDone={(row) => { setTodayCheckin(row); setNotifKey((k) => k + 1); }}
+              onPetNamed={(name) => { pendingPetName.current = name; }}
+              onDone={(row) => {
+                // El nombre se aplica al terminar, para que el primer check-in no se cierre a mitad de camino
+                setTodayCheckin(row);
+                setPet((p) => ({ ...p, name: pendingPetName.current || p.name }));
+                setNotifKey((k) => k + 1);
+              }}
             />
           ) : accessBlocked ? (
             <div className="flex-1 flex flex-col items-center justify-center text-center p-8">
