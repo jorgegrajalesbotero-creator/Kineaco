@@ -1,9 +1,12 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { AlertTriangle, ArrowLeftRight, Plus, RotateCcw, Trash2, Undo2, X } from "lucide-react";
+import { AlertTriangle, ArrowLeftRight, MessageSquarePlus, MessageSquareText, Pencil, Plus, RotateCcw, Trash2, Undo2, X } from "lucide-react";
 import { EPLEY_MAX_REPS, cellKey, fmtNum, loadFor, phaseType, rmOf } from "@/lib/loadCalc";
 import { applyPlanChanges } from "@/lib/planChanges";
+import { loadExerciseNotes, noteFor, noteKey, saveExerciseNote } from "@/lib/exerciseNotes";
+import { supabase } from "@/lib/supabaseClient";
+import { ExerciseNoteEditor } from "./ExerciseNoteEditor";
 import { blockTypeLabel } from "@/lib/blocks";
 import { cleanInt } from "@/lib/numbers";
 import { Select } from "@/components/ui/Select";
@@ -20,7 +23,8 @@ const newKey = () => (typeof crypto !== "undefined" && crypto.randomUUID ? crypt
 // routines = [{ id, title, blocks: [{ id, block_type, title }], items: [routine_exercises con exercises(name)] }]
 // changes = [{ routine_id, from_week, action: "remove" | "replace" | "add", item_key, exercise_id, after_item_key, new_item_key, sets, reps, exercises: { name } }]
 // extra = ejercicios con cargas guardadas que ya no están en las rutinas del plan [{ exercise_id, name }]
-export function PlanLoadsEditor({ weeks, routines, catalog, changes, onChanges, extra = [], loads, cells, weekOv, onLoads, onCells, onWeekOv }) {
+// userId = alumno: las observaciones por ejercicio se guardan al instante y aparte (no cambian el plan)
+export function PlanLoadsEditor({ userId, weeks, routines, catalog, changes, onChanges, extra = [], loads, cells, weekOv, onLoads, onCells, onWeekOv }) {
   const [routineId, setRoutineId] = useState(routines[0]?.id || null);
   const [form, setForm] = useState(null); // { kind, itemKey?, afterKey?, exerciseId, fromWeek, sets, reps }
   const [unit] = useWeightUnit();
@@ -30,6 +34,30 @@ export function PlanLoadsEditor({ weeks, routines, catalog, changes, onChanges, 
   useEffect(() => {
     if (!routines.some((r) => r.id === routineId)) setRoutineId(routines[0]?.id || null);
   }, [routines, routineId]);
+
+  // ---------- Observaciones del alumno (aparte del plan) ----------
+  const [notes, setNotes] = useState({});
+  const [noteTarget, setNoteTarget] = useState(null); // { itemKey, exId, name }
+  async function loadNotes() {
+    setNotes(await loadExerciseNotes(supabase, userId));
+  }
+  useEffect(() => { if (userId) loadNotes(); }, [userId]);
+  const saveNote = async (text) => {
+    const t = noteTarget;
+    const { error, row } = await saveExerciseNote(supabase, { userId, routineId, itemKey: t.itemKey, exerciseId: t.exId, note: text });
+    if (error) {
+      alert("No se pudo guardar la observación. Si es la primera vez, revisá que el SQL de observaciones esté aplicado en Supabase.");
+      return false;
+    }
+    const k = noteKey(routineId, t.itemKey, t.exId);
+    setNotes((n) => {
+      const copy = { ...n };
+      if (row) copy[k] = row;
+      else delete copy[k];
+      return copy;
+    });
+    return true;
+  };
 
   // ---------- Bases y casillas ----------
   const loadsOf = (exId) =>
@@ -138,13 +166,14 @@ export function PlanLoadsEditor({ weeks, routines, catalog, changes, onChanges, 
 
   // ---------- Una fila de progresión (por ejercicio) ----------
   // activeFrom / activeTo: semanas en que ese ejercicio está en la rutina (las demás se ven más tenues)
-  const progressRow = (exId, name, { label, activeFrom = 1, activeTo = total } = {}) => {
+  const progressRow = (exId, name, { label, activeFrom = 1, activeTo = total, noteItemKey = null } = {}) => {
     const exLoads = loadsOf(exId);
     const repsOnly = exLoads.some((l) => l.base_type === "reps");
     const kgLoads = exLoads.filter((l) => l.base_type !== "reps");
     const rounding = kgLoads[0]?.rounding ?? 2.5;
     const hasManual = Object.keys(cells).some((k) => k.startsWith(`${exId}:`));
     const others = otherRoutines(exId);
+    const note = userId && noteItemKey ? noteFor(notes, routineId, noteItemKey, exId) : null;
     return (
       <div key={`${exId}-${label || ""}`} className="mt-3 first:mt-0">
         <div className="flex flex-wrap items-center justify-between gap-2 mb-2">
@@ -152,8 +181,19 @@ export function PlanLoadsEditor({ weeks, routines, catalog, changes, onChanges, 
             {label && <p className="text-muted text-[11px]">{label}</p>}
             <p className="text-ink text-sm font-medium truncate">{name}</p>
             {others.length > 0 && <p className="text-muted text-[11px]">Misma progresión en: {others.join(", ")}</p>}
+            {note && (
+              <p className="text-accent text-[11px] flex items-start gap-1 mt-0.5 max-w-md">
+                <MessageSquareText size={12} className="shrink-0 mt-0.5" /> <span className="line-clamp-2 break-words">{note}</span>
+              </p>
+            )}
           </div>
           <div className="flex items-center gap-2 shrink-0">
+            {userId && noteItemKey && (
+              <button onClick={() => setNoteTarget({ itemKey: noteItemKey, exId, name })} title="Observación para el alumno (no cambia el plan)"
+                className={`text-xs rounded-lg px-2.5 py-1.5 flex items-center gap-1 ${note ? "bg-accent/15 text-accent" : "bg-field text-soft hover:text-ink"}`}>
+                {note ? <Pencil size={12} /> : <MessageSquarePlus size={12} />} {note ? "Observación" : "Agregar observación"}
+              </button>
+            )}
             {!repsOnly && (
               <Select size="sm" aria-label="Redondeo" value={String(rounding)} onChange={(e) => setRounding(exId, Number(e.target.value))} disabled={kgLoads.length === 0}>
                 <option value="2.5">Redondeo {fmtNum(roundingStep(2.5, unit))} {unit}</option>
@@ -313,7 +353,7 @@ export function PlanLoadsEditor({ weeks, routines, catalog, changes, onChanges, 
 
     return (
       <div key={key || s.exercise_id} className={`bg-card rounded-xl p-4 ${add ? "border border-accent/30" : ""}`}>
-        {rows.map((r) => progressRow(r.exId, r.name, { label: r.label, activeFrom: r.from, activeTo: removedFrom && Number(removedFrom.from_week) <= endOf(r.from) + 1 ? Math.min(endOf(r.from), Number(removedFrom.from_week) - 1) : endOf(r.from) }))}
+        {rows.map((r) => progressRow(r.exId, r.name, { label: r.label, noteItemKey: key || null, activeFrom: r.from, activeTo: removedFrom && Number(removedFrom.from_week) <= endOf(r.from) + 1 ? Math.min(endOf(r.from), Number(removedFrom.from_week) - 1) : endOf(r.from) }))}
 
         {(own.length > 0 || add) && (
           <div className="mt-3 space-y-1">
@@ -440,6 +480,16 @@ export function PlanLoadsEditor({ weeks, routines, catalog, changes, onChanges, 
             )}
           </div>
         </>
+      )}
+
+      {noteTarget && (
+        <ExerciseNoteEditor
+          exerciseName={noteTarget.name}
+          routineTitle={routine?.title}
+          initial={noteFor(notes, routineId, noteTarget.itemKey, noteTarget.exId) || ""}
+          onSave={saveNote}
+          onClose={() => setNoteTarget(null)}
+        />
       )}
 
       {extra.length > 0 && (

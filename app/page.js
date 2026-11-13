@@ -2,13 +2,9 @@
 
 import { useEffect, useRef, useState } from "react";
 import { computeBadges, loadBadgeData } from "@/lib/badges";
-import { blockUsesProgression } from "@/lib/blocks";
-import { WEEK_DAYS, currentWeekStartISO, localDateString, todayDayLabel } from "@/lib/dates";
-import { addDays, loadSchedule, mondayOf, planFor, planWeekOf, routinesForDate } from "@/lib/trainingPlan";
-import { loadMapForWeek } from "@/lib/loadCalc";
-import { applyPlanChanges } from "@/lib/planChanges";
-import { getWeightUnit } from "@/lib/weightUnits";
+import { localDateString, todayDayLabel } from "@/lib/dates";
 import { fetchAllRows } from "@/lib/fetchAll";
+import { buildDay as buildStudentDay } from "@/lib/studentRoutine";
 import { appLocale, dayLetters, detectLang, rememberLang, setLang, tr } from "@/lib/i18n";
 import { NotificationBell, addNotifications } from "@/lib/notifications";
 import { removePushOnLogout, syncPush, useOpenNotification } from "@/lib/push";
@@ -104,125 +100,6 @@ export default function App() {
     const { error } = await supabase.from("body_weight_logs").delete().eq("id", id);
     if (error) alert(tr("No se pudo borrar: "));
     loadBodyWeight(userId);
-  };
-
-  const resolveTargetWeight = (exerciseId, generalWeight, customWeight, progressionMap) => {
-    const p = progressionMap[exerciseId];
-    if (p && p.value != null) {
-      if (p.value_type === "percent") {
-        const base = customWeight ?? generalWeight;
-        if (base != null) return Math.round(base * (p.value / 100) * 100) / 100;
-      } else {
-        return p.value;
-      }
-    }
-    return customWeight ?? generalWeight;
-  };
-
-  // Cargas de la semana actual del plan (fases + RM → peso calculado, o casillas escritas por el coach)
-  // + los cambios de ejercicios del plan (quitar / sustituir / agregar desde una semana)
-  const loadPlanContext = async (uid) => {
-    const today = new Date();
-    const { data: plans } = await supabase.from("training_plans").select("id, start_date, weeks").eq("user_id", uid);
-    const plan = planFor(plans || [], today);
-    if (!plan) return { map: {}, changes: [], week: 0 };
-    const week = planWeekOf(plan, today);
-    const [{ data: phases }, { data: weekRows }, { data: loads }, { data: cellRows }, { data: changes }] = await Promise.all([
-      supabase.from("training_plan_phases").select("*").eq("plan_id", plan.id),
-      supabase.from("training_plan_weeks").select("*").eq("plan_id", plan.id),
-      supabase.from("training_plan_loads").select("*").eq("plan_id", plan.id),
-      supabase.from("training_plan_load_cells").select("*").eq("plan_id", plan.id),
-      supabase.from("training_plan_exercise_changes").select("*, exercises(name, video_url)").eq("plan_id", plan.id),
-    ]);
-    return {
-      map: loadMapForWeek({ phases: phases || [], totalWeeks: plan.weeks, weekRows, loads, cellRows, week, unit: getWeightUnit() }),
-      changes: changes || [],
-      week,
-    };
-  };
-
-  const buildRoutine = async (uid, assignment) => {
-    const routineId = assignment.routines.id;
-    const [{ data: routineExercises }, { data: blocks }, { data: customWeights }, planCtx, { data: progressRows }] = await Promise.all([
-      supabase
-        .from("routine_exercises")
-        .select("exercise_id, block_id, item_key, sets, reps, order_index, target_weight_kg, rest_minutes, exercises(name, video_url)")
-        .eq("routine_id", routineId)
-        .order("order_index"),
-      supabase
-        .from("routine_blocks")
-        .select("id, block_type, title, sets, notes, order_index")
-        .eq("routine_id", routineId)
-        .order("order_index"),
-      supabase.from("student_exercise_weights").select("exercise_id, target_weight_kg").eq("user_id", uid),
-      loadPlanContext(uid),
-      supabase
-        .from("progress")
-        .select("exercise_id, item_key")
-        .eq("user_id", uid)
-        .eq("routine_id", routineId)
-        .eq("day_label", assignment.day_label)
-        .gte("completed_at", currentWeekStartISO()),
-    ]);
-
-    const customWeightMap = {};
-    (customWeights || []).forEach((c) => { customWeightMap[c.exercise_id] = c.target_weight_kg; });
-    const blockList = blocks || [];
-    const blockMap = {};
-    blockList.forEach((b) => { blockMap[b.id] = b; });
-    const progressionMap = planCtx.map;
-    // Cambios de ejercicios de su plan (la rutina original no cambia)
-    const exercises = applyPlanChanges(routineExercises || [], planCtx.changes, routineId, planCtx.week);
-    // Si un ejercicio está también en el trabajo principal, la progresión va solo ahí
-    const mainIds = new Set(exercises.filter((x) => blockUsesProgression(x.block_id ? blockMap[x.block_id]?.block_type : null)).map((x) => String(x.exercise_id)));
-    const hasBlocks = blockList.length > 0;
-    const doneItemKeys = new Set((progressRows || []).filter((p) => p.item_key).map((p) => p.item_key));
-    const doneExerciseIds = new Set((progressRows || []).map((p) => p.exercise_id));
-
-    return {
-      ...assignment.routines,
-      day_label: assignment.day_label,
-      planChanges: planCtx.changes,
-      planWeek: planCtx.week,
-      blocks: hasBlocks ? blockList : [],
-      exercises: (exercises || []).map((e) => {
-        const block = e.block_id ? blockMap[e.block_id] : null;
-        const blockSets = block?.sets ?? e.sets;
-        const usesProgression = blockUsesProgression(block?.block_type);
-        // El plan aplica en el trabajo principal y también en los demás bloques cuando el coach le hizo progresión a ese ejercicio
-        const planApplies = !!progressionMap[e.exercise_id] && (usesProgression || !mainIds.has(String(e.exercise_id)));
-        const reps = (planApplies && progressionMap[e.exercise_id]?.reps) || e.reps;
-        // Series: las de la semana del plan (si las tiene) mandan sobre las de la rutina o el bloque
-        const planSets = planApplies ? progressionMap[e.exercise_id]?.sets || null : null;
-        const routineSets = block ? blockSets : e.sets;
-        const setsN = planSets || routineSets;
-        const setsDiffer = !!(block && planSets && Number(planSets) !== Number(blockSets));
-        return {
-          exerciseId: e.exercise_id,
-          itemKey: e.item_key,
-          blockId: block ? block.id : null,
-          name: e.exercises?.name || "Ejercicio",
-          get sets() {
-            return [setsN ? tr("{p0} series", { p0: setsN }) : "", reps ? tr("{p0} reps", { p0: reps }) : ""].filter(Boolean).join(" × ");
-          },
-          get rowLabel() {
-            if (!block) return null;
-            if (setsDiffer) return [tr("{p0} series", { p0: planSets }), reps ? tr("{p0} reps", { p0: reps }) : ""].filter(Boolean).join(" × ");
-            return reps ? tr("{p0} reps", { p0: reps }) : "";
-          },
-          videoUrl: e.exercises?.video_url || "",
-          completed: hasBlocks ? doneItemKeys.has(e.item_key) : doneExerciseIds.has(e.exercise_id),
-          targetWeight: usesProgression
-            ? resolveTargetWeight(e.exercise_id, e.target_weight_kg, customWeightMap[e.exercise_id], progressionMap)
-            : planApplies && progressionMap[e.exercise_id]?.value != null
-              ? progressionMap[e.exercise_id].value
-              : e.target_weight_kg,
-          restMinutes: e.rest_minutes,
-          setsCount: parseInt(setsN, 10) || 0,
-          targetReps: reps ? String(reps) : "",
-        };
-      }),
-    };
   };
 
   const createStudentNotices = async (uid, profile, todayRoutine, healthOk = true) => {
@@ -348,6 +225,9 @@ export default function App() {
       const days = Math.floor((Date.now() - new Date(part + "T00:00:00").getTime()) / 86400000);
       return { title: tr(n.title), body: tr("Su último registro fue hace {p0} días.", { p0: days }) };
     }
+    if (n.type === "exercise_note") {
+      return { title: tr(n.title), body: n.body ? tr("Ejercicio: {p0}. Ábralo en su rutina para leerla.", { p0: n.body }) : "" };
+    }
     return { title: tr(n.title), body: n.body ? tr(n.body) : n.body };
   };
 
@@ -365,36 +245,7 @@ export default function App() {
     handleSelectTab(target);
   };
 
-  // Rutina(s) de un día de esta semana: las del plan si hay un plan activo esa semana; si no, las de sus días fijos
-  const buildDay = async (uid, day) => {
-    const schedule = await loadSchedule(supabase, uid, "*");
-    const date = addDays(mondayOf(new Date()), Math.max(0, WEEK_DAYS.indexOf(day)));
-    const valid = routinesForDate(schedule.plans, schedule.fixed, date).items;
-    if (valid.length === 0) return null;
-
-    const parts = await Promise.all(valid.map((a) => buildRoutine(uid, a)));
-    parts.forEach((p, partIndex) => {
-      p.partIndex = partIndex;
-      p.exercises.forEach((e) => {
-        e.routineId = p.id;
-        e.partIndex = partIndex;
-        e.byItem = p.blocks.length > 0;
-      });
-    });
-
-    return {
-      id: parts[0].id,
-      title: parts.map((p) => p.title).join(" + "),
-      get goal() { return parts.length > 1 ? tr("{p0} rutinas", { p0: parts.length }) : parts[0].goal; },
-      duration_minutes: parts.reduce((sum, p) => sum + (Number(p.duration_minutes) || 0), 0),
-      day_label: day,
-      parts,
-      blocks: [],
-      exercises: parts.flatMap((p) => p.exercises),
-      planChanges: parts[0].planChanges || [],
-      planWeek: parts[0].planWeek || 0,
-    };
-  };
+  const buildDay = (uid, day) => buildStudentDay(supabase, uid, day);
 
   const refreshRoutine = async (uid, day) => {
     const dayRoutine = await buildDay(uid, day);

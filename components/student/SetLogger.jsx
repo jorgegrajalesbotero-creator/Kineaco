@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Check, Plus, Timer, X } from "lucide-react";
+import { Check, MessageSquareText, Plus, Timer, X } from "lucide-react";
 import { supabase } from "@/lib/supabaseClient";
 import { currentWeekStartISO } from "@/lib/dates";
 import { tr } from "@/lib/i18n";
@@ -149,6 +149,14 @@ export function SetLogger({ exercise, routine, userId, onClose, onComplete, onUn
             formatWeight(exercise.targetWeight, unit),
           ].filter(Boolean).join(" · ") || tr("Registre lo que hizo en cada serie.")}
         </p>
+        {exercise.note && (
+          <div className="bg-accent/10 border border-accent/30 rounded-xl px-3 py-2.5 mb-4">
+            <p className="text-accent text-[11px] font-semibold flex items-center gap-1.5 mb-0.5">
+              <MessageSquareText size={13} /> {tr("Observación de su coach")}
+            </p>
+            <p className="text-ink text-sm whitespace-pre-wrap break-words">{exercise.note}</p>
+          </div>
+        )}
 
         {loading ? (
           <div className="h-32 rounded-2xl bg-card animate-pulse" />
