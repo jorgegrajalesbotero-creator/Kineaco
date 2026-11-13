@@ -1,7 +1,7 @@
 "use client";
 
-import { useState } from "react";
-import { Check, ChevronLeft, ChevronRight, Download, MessageSquarePlus, MessageSquareText, Pencil, Play, X } from "lucide-react";
+import { useEffect, useState } from "react";
+import { Check, ChevronLeft, ChevronRight, Download, MessageSquarePlus, MessageSquareText, Pencil, Play, SquarePen, X } from "lucide-react";
 import { blockTypeLabel } from "@/lib/blocks";
 import { currentWeekStartISO } from "@/lib/dates";
 import { appLocale, tr } from "@/lib/i18n";
@@ -14,6 +14,12 @@ import { youtubeVideo } from "@/lib/youtube";
 import { Confetti } from "@/components/ui/Confetti";
 import { RestTimer } from "@/components/student/RestTimer";
 import { SetLogger } from "@/components/student/SetLogger";
+
+// Primer número de las reps sugeridas ("8-10" → 8)
+const firstNumber = (text) => {
+  const m = String(text || "").match(/\d+/);
+  return m ? Number(m[0]) : null;
+};
 
 // preview = el coach ve la rutina tal como la ve el alumno (sin marcar nada) y puede dejar observaciones (onEditNote)
 export function RoutineScreen({ routine, userId, onClose, onToggle, onProgressChange, preview = false, onEditNote = null }) {
@@ -37,12 +43,107 @@ export function RoutineScreen({ routine, userId, onClose, onToggle, onProgressCh
     }
     setPdfBusy(false);
   };
+  // ---------- Rutinas por bloques: se marca de a UNA serie por ejercicio ----------
+  // setsDone = { "rutina|item_key": [{ id, n, w }] } con las series ya hechas esta semana
+  const [setsDone, setSetsDone] = useState({});
+  const [savingSet, setSavingSet] = useState(false);
+  const setKey = (ex) => `${ex.routineId || routine.id}|${ex.itemKey}`;
+  const bySet = (ex) => !!(ex.byItem && ex.itemKey && ex.setsCount > 0);
+  async function loadSets() {
+    const ids = [...new Set(routine.exercises.filter((e) => e.byItem).map((e) => e.routineId || routine.id))];
+    if (!ids.length || !userId) return;
+    const { data } = await supabase
+      .from("progress_sets")
+      .select("id, routine_id, item_key, set_number, weight_kg")
+      .eq("user_id", userId)
+      .in("routine_id", ids)
+      .eq("day_label", routine.day_label)
+      .gte("completed_at", currentWeekStartISO());
+    const map = {};
+    (data || []).forEach((r) => {
+      if (!r.item_key) return;
+      const k = `${r.routine_id}|${r.item_key}`;
+      (map[k] = map[k] || []).push({ id: r.id, n: r.set_number, w: r.weight_kg });
+    });
+    setSetsDone(map);
+  }
+  useEffect(() => { loadSets(); }, [routine.day_label, routine.id, userId]);
+  const doneOf = (ex) => setsDone[setKey(ex)] || [];
+
+  // Marca la siguiente serie del ejercicio (con el peso y las reps sugeridas)
+  const markNextSet = async (i) => {
+    const ex = routine.exercises[i];
+    const done = doneOf(ex);
+    const nums = new Set(done.map((d) => d.n));
+    let n = 1;
+    while (nums.has(n)) n++;
+    if (n > ex.setsCount || savingSet) return;
+    setSavingSet(true);
+    const { data, error } = await supabase
+      .from("progress_sets")
+      .insert({
+        user_id: userId,
+        routine_id: ex.routineId || routine.id,
+        exercise_id: ex.exerciseId,
+        item_key: ex.itemKey,
+        day_label: routine.day_label,
+        set_number: n,
+        weight_kg: ex.targetWeight ?? null,
+        reps: firstNumber(ex.targetReps),
+      })
+      .select("id")
+      .single();
+    if (error) {
+      setSavingSet(false);
+      return alert(tr("No se pudo guardar la serie: "));
+    }
+    navigator.vibrate?.(12);
+    const next = [...done, { id: data.id, n, w: ex.targetWeight ?? null }];
+    setSetsDone((m) => ({ ...m, [setKey(ex)]: next }));
+    if (next.length >= ex.setsCount && !ex.completed) {
+      const ws = next.map((d) => d.w).filter((w) => w != null).map(Number);
+      await completeExercise(i, ws.length ? Math.max(...ws) : null);
+    }
+    setSavingSet(false);
+  };
+
+  // Desmarca la última serie hecha del ejercicio
+  const unmarkLastSet = async (i) => {
+    const ex = routine.exercises[i];
+    const done = doneOf(ex);
+    if (!done.length || savingSet) return;
+    const last = done.reduce((a, b) => (b.n > a.n ? b : a));
+    setSavingSet(true);
+    const { error } = await supabase.from("progress_sets").delete().eq("id", last.id);
+    if (error) {
+      setSavingSet(false);
+      return alert(tr("No se pudo actualizar la serie: "));
+    }
+    setSetsDone((m) => ({ ...m, [setKey(ex)]: done.filter((d) => d.id !== last.id) }));
+    if (ex.completed) await uncompleteExercise(i);
+    setSavingSet(false);
+  };
+
+  // Serie del bloque en la que va (la más atrasada de sus ejercicios)
+  const blockRound = (items) => {
+    const list = items.filter(({ ex }) => bySet(ex));
+    if (!list.length) return null;
+    const total = Math.max(...list.map(({ ex }) => ex.setsCount));
+    const minDone = Math.min(...list.map(({ ex }) => Math.min(doneOf(ex).length, ex.setsCount)));
+    return { current: Math.min(minDone + 1, total), total, finished: list.every(({ ex }) => doneOf(ex).length >= ex.setsCount) };
+  };
+
   const total = routine.exercises.length;
   const done = routine.exercises.filter((e) => e.completed).length;
   const pct = total ? Math.round((done / total) * 100) : 0;
 
   // Tocar el círculo abre la hoja de series del ejercicio
-  const toggle = (i) => (preview ? openDetail(i) : setLoggerIndex(i));
+  const toggle = (i) => {
+    if (preview) return openDetail(i);
+    const ex = routine.exercises[i];
+    if (bySet(ex) && doneOf(ex).length < ex.setsCount) return markNextSet(i);
+    setLoggerIndex(i);
+  };
 
   // Todas las series hechas → el ejercicio queda hecho (con el mejor peso del día)
   const completeExercise = async (i, bestWeight) => {
@@ -97,6 +198,41 @@ export function RoutineScreen({ routine, userId, onClose, onToggle, onProgressCh
   const videoLink = detail ? safeHttpUrl(detail.videoUrl) : null;
   const video = detail ? youtubeVideo(detail.videoUrl) : null;
 
+  // Puntos de series (rutinas por bloques): tocar el siguiente marca esa serie; tocar el último hecho lo desmarca
+  const setDots = (ex, i) => {
+    const done = doneOf(ex);
+    const nums = new Set(done.map((d) => d.n));
+    const lastDone = done.length ? Math.max(...done.map((d) => d.n)) : 0;
+    let nextN = 1;
+    while (nums.has(nextN)) nextN++;
+    return (
+      <div className="flex items-center gap-1.5 mt-1.5" onClick={(e) => e.stopPropagation()}>
+        {Array.from({ length: ex.setsCount }, (_, k) => {
+          const n = k + 1;
+          const isDone = nums.has(n);
+          const clickable = !preview && !savingSet && ((isDone && n === lastDone) || (!isDone && n === nextN));
+          return (
+            <button
+              key={n}
+              type="button"
+              disabled={!clickable}
+              onClick={() => (isDone ? unmarkLastSet(i) : markNextSet(i))}
+              aria-label={isDone ? tr("Desmarcar serie {p0}", { p0: n }) : tr("Marcar serie {p0}", { p0: n })}
+              className={`w-6 h-6 rounded-full text-[10px] font-semibold flex items-center justify-center transition-all active:scale-90 ${
+                isDone ? "bg-accent text-app" : n === nextN && !preview ? "border-2 border-accent/70 text-accent" : "border border-field-strong text-muted"
+              } disabled:cursor-default`}
+            >
+              {isDone ? <Check size={11} strokeWidth={3} /> : n}
+            </button>
+          );
+        })}
+        <span className="text-muted text-[11px] ml-1">
+          {done.length >= ex.setsCount ? tr("Series completas") : tr("Serie {p0} de {p1}", { p0: Math.min(done.length + 1, ex.setsCount), p1: ex.setsCount })}
+        </span>
+      </div>
+    );
+  };
+
   // Fila de un ejercicio. Si el coach le dejó una observación, se ve la marca antes de abrirlo.
   const exerciseRow = (ex, i, subtitle) => (
     <div key={i} onClick={() => openDetail(i)} className={`flex items-center justify-between gap-2 rounded-2xl px-4 py-3 group cursor-pointer transition duration-200 ease-out hover:scale-[1.02] hover:bg-card-hover active:scale-[0.99] ${ex.completed ? "bg-card/60" : "bg-card"}`}>
@@ -104,13 +240,19 @@ export function RoutineScreen({ routine, userId, onClose, onToggle, onProgressCh
         <button
           onClick={(e) => { e.stopPropagation(); toggle(i); }}
           aria-label={preview ? tr("Ver ejercicio") : undefined}
-          className={`w-7 h-7 rounded-full flex items-center justify-center shrink-0 transition-all active:scale-90 ${ex.completed ? "bg-accent" : "border-2 border-field-strong"} ${preview ? "cursor-default" : ""}`}
+          disabled={savingSet && bySet(ex)}
+          className={`w-7 h-7 rounded-full flex items-center justify-center shrink-0 transition-all active:scale-90 ${ex.completed ? "bg-accent" : bySet(ex) && doneOf(ex).length > 0 ? "border-2 border-accent" : "border-2 border-field-strong"} ${preview ? "cursor-default" : ""}`}
         >
-          {ex.completed && <Check size={14} strokeWidth={3} className="text-app animate-check-pop" />}
+          {ex.completed ? (
+            <Check size={14} strokeWidth={3} className="text-app animate-check-pop" />
+          ) : bySet(ex) && doneOf(ex).length > 0 ? (
+            <span className="text-accent text-[10px] font-semibold tabular-nums">{doneOf(ex).length}/{ex.setsCount}</span>
+          ) : null}
         </button>
         <div className="min-w-0">
           <p className={`text-sm ${ex.completed ? "text-muted line-through" : "text-ink"}`}>{ex.name}</p>
           {subtitle && <p className="text-muted text-xs">{subtitle}</p>}
+          {bySet(ex) && setDots(ex, i)}
           {ex.note && (
             <p className="inline-flex items-center gap-1 text-accent text-[11px] font-medium mt-0.5">
               <MessageSquareText size={12} /> {tr("Tiene observación de su coach")}
@@ -187,6 +329,7 @@ export function RoutineScreen({ routine, userId, onClose, onToggle, onProgressCh
                     {part.blocks.map((b) => {
                       const items = routine.exercises.map((ex, i) => ({ ex, i })).filter(({ ex }) => ex.partIndex === part.partIndex && ex.blockId === b.id);
                       const doneCount = items.filter(({ ex }) => ex.completed).length;
+                      const round = blockRound(items);
                       return (
                         <section key={b.id}>
                           <div className="flex items-end justify-between gap-3 mb-2">
@@ -197,7 +340,13 @@ export function RoutineScreen({ routine, userId, onClose, onToggle, onProgressCh
                               <h2 className="text-ink text-base font-semibold truncate">{b.title && b.title !== blockTypeLabel(b.block_type) ? b.title : tr(blockTypeLabel(b.block_type))}</h2>
                             </div>
                             <div className="text-right shrink-0">
-                              {b.sets && <p className="text-ink text-sm font-medium">{b.sets} {tr("series")}</p>}
+                              {round ? (
+                                <p className={`text-sm font-medium ${round.finished ? "text-accent" : "text-ink"}`}>
+                                  {round.finished ? tr("Bloque completo") : tr("Serie {p0} de {p1}", { p0: round.current, p1: round.total })}
+                                </p>
+                              ) : (
+                                b.sets && <p className="text-ink text-sm font-medium">{b.sets} {tr("series")}</p>
+                              )}
                               {items.length > 0 && <p className="text-muted text-[11px]">{doneCount}/{items.length} {tr("hechos")}</p>}
                             </div>
                           </div>
@@ -251,6 +400,11 @@ export function RoutineScreen({ routine, userId, onClose, onToggle, onProgressCh
               )
             )}
             {detail.sets && <p className="text-soft text-sm mb-4">{detail.sets}</p>}
+            {!preview && bySet(detail) && (
+              <button onClick={() => { const i = detailIndex; closeDetail(); setLoggerIndex(i); }} className="w-full mb-4 flex items-center justify-center gap-1.5 bg-field text-ink text-sm rounded-xl py-2.5 hover:bg-field-hover">
+                <SquarePen size={14} /> {tr("Anotar peso y reps de cada serie")}
+              </button>
+            )}
             {detail.targetWeight != null && (
               <p className="text-accent text-sm mb-4">{tr("Peso sugerido:")} {formatWeight(detail.targetWeight, unit)}</p>
             )}
@@ -296,7 +450,7 @@ export function RoutineScreen({ routine, userId, onClose, onToggle, onProgressCh
           exercise={routine.exercises[loggerIndex]}
           routine={routine}
           userId={userId}
-          onClose={() => setLoggerIndex(null)}
+          onClose={() => { setLoggerIndex(null); loadSets(); }}
           onComplete={(w) => completeExercise(loggerIndex, w)}
           onUncomplete={() => uncompleteExercise(loggerIndex)}
           onStartRest={startRest}
