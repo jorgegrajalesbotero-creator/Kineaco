@@ -6,12 +6,14 @@ import { tr } from "@/lib/i18n";
 import { shrinkAvatar } from "@/lib/images";
 import { supabase } from "@/lib/supabaseClient";
 import { signedAvatarUrl } from "@/lib/avatars";
+import { updateAccount } from "@/lib/account";
 import { PrivacySection } from "@/components/student/PrivacySection";
 import { ChangePassword } from "@/components/ui/ChangePassword";
 import { PushToggle } from "@/components/ui/PushNotifications";
 
-export function ProfileScreen({ fullName, email, avatarUrl, userId, onProfileUpdate, onOpenIntake, onOpenAnnouncements, isCoach, onLogout, lang, onChangeLang, healthConsent, onHealthChange }) {
+export function ProfileScreen({ fullName, email, avatarUrl, userId, onProfileUpdate, onEmailUpdate, onOpenIntake, onOpenAnnouncements, isCoach, onLogout, lang, onChangeLang, healthConsent, onHealthChange }) {
   const [nameDraft, setNameDraft] = useState(fullName);
+  const [emailDraft, setEmailDraft] = useState(email || "");
   const [uploading, setUploading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
@@ -57,11 +59,27 @@ export function ProfileScreen({ fullName, email, avatarUrl, userId, onProfileUpd
   const handleSave = async () => {
     setSaving(true);
     const { error } = await supabase.from("profiles").update({ full_name: nameDraft }).eq("id", userId);
-    setSaving(false);
     if (error) {
+      setSaving(false);
       alert(tr("No se pudo guardar: "));
       return;
     }
+    // Correo: se cambia en la cuenta (de una vez, sin correo de confirmación)
+    const newEmail = emailDraft.trim().toLowerCase();
+    if (newEmail && newEmail !== (email || "").toLowerCase()) {
+      if (!confirm(tr("Desde ahora va a iniciar sesión con {p0}. ¿Está bien escrito?", { p0: newEmail }))) {
+        setSaving(false);
+        return;
+      }
+      const { error: emailError } = await updateAccount(null, { email: newEmail });
+      if (emailError) {
+        setSaving(false);
+        alert(tr(emailError));
+        return;
+      }
+      if (onEmailUpdate) onEmailUpdate(newEmail);
+    }
+    setSaving(false);
     setSaved(true);
     setTimeout(() => setSaved(false), 2500);
     if (onProfileUpdate) onProfileUpdate(nameDraft, localAvatarUrl);
@@ -100,10 +118,13 @@ export function ProfileScreen({ fullName, email, avatarUrl, userId, onProfileUpd
         <div>
           <p className="text-muted text-xs mb-1">{tr("Email")}</p>
           <input
-            value={email}
-            disabled
-            className="block w-full bg-field text-muted text-sm rounded-lg px-3 py-2 outline-none cursor-not-allowed"
+            type="email"
+            autoComplete="email"
+            value={emailDraft}
+            onChange={(e) => setEmailDraft(e.target.value)}
+            className="block w-full bg-field text-ink text-sm rounded-lg px-3 py-2 outline-none focus:ring-1 focus:ring-accent"
           />
+          <p className="text-muted text-[11px] mt-1">{tr("Es el correo con el que inicia sesión.")}</p>
         </div>
       </div>
 
