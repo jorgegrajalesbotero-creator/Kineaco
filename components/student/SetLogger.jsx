@@ -19,7 +19,8 @@ const inputCls =
   "w-full min-w-0 bg-app/60 border border-white/[0.07] text-ink text-[15px] text-center rounded-xl px-2 py-2.5 outline-none focus:border-accent/50 disabled:opacity-70";
 
 // Hoja para registrar cada serie de un ejercicio (peso y reps)
-export function SetLogger({ exercise, routine, userId, onClose, onComplete, onUncomplete, onStartRest }) {
+// readOnly = el entrenamiento ya se finalizó: solo se ven las series, no se cambian
+export function SetLogger({ exercise, routine, userId, onClose, onComplete, onUncomplete, onStartRest, readOnly = false }) {
   const [rows, setRows] = useState([]);
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
@@ -77,7 +78,7 @@ export function SetLogger({ exercise, routine, userId, onClose, onComplete, onUn
   };
 
   const toggleRow = async (idx) => {
-    if (busy) return;
+    if (busy || readOnly) return;
     setBusy(true);
     const r = rows[idx];
     let next = rows;
@@ -178,7 +179,7 @@ export function SetLogger({ exercise, routine, userId, onClose, onComplete, onUn
                     placeholderKg={targetWeight}
                     placeholder="—"
                     toggle={false}
-                    disabled={r.done}
+                    disabled={r.done || readOnly}
                     className={inputCls}
                   />
                   <input
@@ -186,13 +187,13 @@ export function SetLogger({ exercise, routine, userId, onClose, onComplete, onUn
                     inputMode="numeric"
                     value={r.reps}
                     placeholder={exercise.targetReps || "—"}
-                    disabled={r.done}
+                    disabled={r.done || readOnly}
                     onChange={(e) => update(idx, "reps", cleanInt(e.target.value))}
                     className={inputCls}
                   />
                   <button
                     onClick={() => toggleRow(idx)}
-                    disabled={busy}
+                    disabled={busy || readOnly}
                     aria-label={r.done ? tr("Desmarcar serie") : tr("Marcar serie")}
                     className={`w-10 h-10 rounded-full flex items-center justify-center transition-all active:scale-90 ${r.done ? "bg-accent" : "border-2 border-field-strong"}`}
                   >
@@ -202,6 +203,13 @@ export function SetLogger({ exercise, routine, userId, onClose, onComplete, onUn
               ))}
             </div>
 
+            {readOnly ? (
+              <>
+                <p className="text-muted text-xs text-center mb-3">{tr("Entrenamiento finalizado: solo lectura.")}</p>
+                <button onClick={onClose} className="block w-full bg-accent text-app font-semibold text-sm rounded-xl py-3">{tr("Listo")}</button>
+              </>
+            ) : (
+            <>
             <div className="flex gap-2 mb-3">
               <button onClick={addRow} className="flex-1 flex items-center justify-center gap-1.5 bg-white/[0.04] border border-white/[0.06] text-soft text-sm rounded-xl py-2.5">
                 <Plus size={14} /> {tr("Agregar serie")}
@@ -222,6 +230,8 @@ export function SetLogger({ exercise, routine, userId, onClose, onComplete, onUn
               <button onClick={onClose} className="block w-full bg-accent text-app font-semibold text-sm rounded-xl py-3">
                 {tr("Listo")}
               </button>
+            )}
+            </>
             )}
             <p className="text-muted text-[11px] text-center mt-2">{tr("{p0} de {p1} series hechas", { p0: doneCount, p1: rows.length })}</p>
           </>

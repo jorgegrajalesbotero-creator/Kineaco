@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Check, ChevronLeft, ChevronRight, Download, MessageSquarePlus, MessageSquareText, Pencil, Play, SquarePen, X } from "lucide-react";
+import { Check, ChevronLeft, ChevronRight, Download, Lock, MessageSquarePlus, MessageSquareText, Pencil, Play, SquarePen, X } from "lucide-react";
 import { blockTypeLabel } from "@/lib/blocks";
 import { currentWeekStartISO } from "@/lib/dates";
 import { appLocale, tr } from "@/lib/i18n";
@@ -14,6 +14,7 @@ import { youtubeVideo } from "@/lib/youtube";
 import { Confetti } from "@/components/ui/Confetti";
 import { RestTimer } from "@/components/student/RestTimer";
 import { SetLogger } from "@/components/student/SetLogger";
+import { finishSession, fmtFinished, isLocked, loadSession, weekStartISO } from "@/lib/workoutSession";
 
 // Primer número de las reps sugeridas ("8-10" → 8)
 const firstNumber = (text) => {
@@ -22,7 +23,8 @@ const firstNumber = (text) => {
 };
 
 // preview = el coach ve la rutina tal como la ve el alumno (sin marcar nada) y puede dejar observaciones (onEditNote)
-export function RoutineScreen({ routine, userId, onClose, onToggle, onProgressChange, preview = false, onEditNote = null }) {
+// coachEdit = (solo con preview) el coach puede corregir peso y reps de cada serie del alumno (semana actual)
+export function RoutineScreen({ routine, userId, onClose, onToggle, onProgressChange, preview = false, onEditNote = null, coachEdit = false }) {
   const [unit] = useWeightUnit();
   const [detailIndex, setDetailIndex] = useState(null);
   const [playing, setPlaying] = useState(false); // el video solo se carga cuando el alumno toca "Ver video"
@@ -133,13 +135,23 @@ export function RoutineScreen({ routine, userId, onClose, onToggle, onProgressCh
     return { current: Math.min(minDone + 1, total), total, finished: list.every(({ ex }) => doneOf(ex).length >= ex.setsCount) };
   };
 
+  // ---------- Entrenamiento finalizado: el alumno ya no puede cambiar nada (salvo que el coach lo habilite) ----------
+  const [session, setSession] = useState(null);
+  const [finishing, setFinishing] = useState(false);
+  async function loadDaySession() {
+    if (preview) return;
+    setSession(await loadSession(supabase, userId, weekStartISO(), routine.day_label));
+  }
+  useEffect(() => { loadDaySession(); }, [routine.day_label, userId]);
+  const locked = !preview && isLocked(session);
+
   const total = routine.exercises.length;
   const done = routine.exercises.filter((e) => e.completed).length;
   const pct = total ? Math.round((done / total) * 100) : 0;
 
   // Tocar el círculo abre la hoja de series del ejercicio
   const toggle = (i) => {
-    if (preview) return openDetail(i);
+    if (preview || locked) return openDetail(i);
     const ex = routine.exercises[i];
     if (bySet(ex) && doneOf(ex).length < ex.setsCount) return markNextSet(i);
     setLoggerIndex(i);
@@ -151,7 +163,7 @@ export function RoutineScreen({ routine, userId, onClose, onToggle, onProgressCh
     onToggle(i, true);
     navigator.vibrate?.(15); // vibración suave en celulares que lo permiten
     const othersDone = routine.exercises.filter((e, j) => j !== i && e.completed).length;
-    if (othersDone + 1 === routine.exercises.length) {
+    if (!preview && othersDone + 1 === routine.exercises.length) {
       setCelebrate(true);
       setLoggerIndex(null);
       navigator.vibrate?.([20, 60, 30]);
@@ -198,6 +210,21 @@ export function RoutineScreen({ routine, userId, onClose, onToggle, onProgressCh
   const videoLink = detail ? safeHttpUrl(detail.videoUrl) : null;
   const video = detail ? youtubeVideo(detail.videoUrl) : null;
 
+  const finish = async () => {
+    const pending = total - done;
+    const msg = pending > 0
+      ? tr("Le faltan {p0} ejercicios por marcar. Después de finalizar ya no podrá cambiar sus series ni sus pesos. ¿Finalizar?", { p0: pending })
+      : tr("Después de finalizar ya no podrá cambiar sus series ni sus pesos. ¿Finalizar?");
+    if (!confirm(msg)) return;
+    setFinishing(true);
+    const { data, error } = await finishSession(supabase, { userId, weekStart: weekStartISO(), dayLabel: routine.day_label });
+    setFinishing(false);
+    if (error) return alert(tr("No se pudo finalizar: "));
+    setSession(data);
+    setRest(null);
+    navigator.vibrate?.([20, 60, 30]);
+  };
+
   // Puntos de series (rutinas por bloques): tocar el siguiente marca esa serie; tocar el último hecho lo desmarca
   const setDots = (ex, i) => {
     const done = doneOf(ex);
@@ -210,7 +237,7 @@ export function RoutineScreen({ routine, userId, onClose, onToggle, onProgressCh
         {Array.from({ length: ex.setsCount }, (_, k) => {
           const n = k + 1;
           const isDone = nums.has(n);
-          const clickable = !preview && !savingSet && ((isDone && n === lastDone) || (!isDone && n === nextN));
+          const clickable = !preview && !locked && !savingSet && ((isDone && n === lastDone) || (!isDone && n === nextN));
           return (
             <button
               key={n}
@@ -308,6 +335,16 @@ export function RoutineScreen({ routine, userId, onClose, onToggle, onProgressCh
       </div>
 
       <div className="px-5 pt-5">
+        {locked && (
+          <p className="flex items-center gap-2 bg-card border border-white/[0.06] text-soft text-xs rounded-xl px-3 py-2.5 mb-4">
+            <Lock size={14} className="text-accent shrink-0" /> {tr("Entrenamiento finalizado: solo lectura.")}
+          </p>
+        )}
+        {!preview && session?.finished_at && session.unlocked_at && (
+          <p className="bg-accent/10 border border-accent/30 text-ink text-xs rounded-xl px-3 py-2.5 mb-4">
+            {tr("Su coach habilitó la edición. Cuando termine de corregir, toque «Finalizar entrenamiento».")}
+          </p>
+        )}
 
         <div className="space-y-8">
           {(routine.parts || [routine]).map((part, partIdx, allParts) => {
@@ -368,11 +405,21 @@ export function RoutineScreen({ routine, userId, onClose, onToggle, onProgressCh
           })}
         </div>
 
-        {!preview && (
-          <button onClick={onClose} className="block w-full bg-accent text-app font-semibold py-3.5 rounded-2xl mt-6 active:scale-[0.98] transition-transform">
-            {tr("Continuar rutina")}
-          </button>
-        )}
+        {!preview && (locked ? (
+          <div className="bg-card border border-accent/30 rounded-2xl p-4 mt-6 text-center">
+            <p className="text-accent text-sm font-semibold flex items-center justify-center gap-1.5"><Check size={16} strokeWidth={3} /> {tr("Entrenamiento finalizado")}</p>
+            <p className="text-muted text-xs mt-1">{fmtFinished(session.finished_at, appLocale())}</p>
+            <p className="text-soft text-xs mt-2">{tr("Ya no se pueden cambiar las series ni los pesos. Si necesita corregir algo, pídale a su coach que habilite la edición.")}</p>
+            <button onClick={onClose} className="block w-full bg-field text-ink font-medium text-sm py-3 rounded-xl mt-3">{tr("Volver al inicio")}</button>
+          </div>
+        ) : (
+          <>
+            <button onClick={finish} disabled={finishing} className="block w-full bg-accent text-app font-semibold py-3.5 rounded-2xl mt-6 active:scale-[0.98] transition-transform disabled:opacity-60">
+              {finishing ? tr("Guardando...") : tr("Finalizar entrenamiento")}
+            </button>
+            <p className="text-muted text-[11px] text-center mt-2">{tr("Al finalizar, el entrenamiento de hoy queda cerrado y ya no se puede modificar.")}</p>
+          </>
+        ))}
       </div>
 
       {detail && (
@@ -400,9 +447,9 @@ export function RoutineScreen({ routine, userId, onClose, onToggle, onProgressCh
               )
             )}
             {detail.sets && <p className="text-soft text-sm mb-4">{detail.sets}</p>}
-            {!preview && bySet(detail) && (
+            {((!preview && (bySet(detail) || locked)) || (preview && coachEdit)) && (
               <button onClick={() => { const i = detailIndex; closeDetail(); setLoggerIndex(i); }} className="w-full mb-4 flex items-center justify-center gap-1.5 bg-field text-ink text-sm rounded-xl py-2.5 hover:bg-field-hover">
-                <SquarePen size={14} /> {tr("Anotar peso y reps de cada serie")}
+                <SquarePen size={14} /> {preview ? "Corregir peso y reps de cada serie" : locked ? tr("Ver peso y reps de cada serie") : tr("Anotar peso y reps de cada serie")}
               </button>
             )}
             {detail.targetWeight != null && (
@@ -444,9 +491,10 @@ export function RoutineScreen({ routine, userId, onClose, onToggle, onProgressCh
         </div>
       )}
 
-      {!preview && loggerIndex !== null && (
+      {(!preview || coachEdit) && loggerIndex !== null && (
         <SetLogger
           key={loggerIndex}
+          readOnly={locked}
           exercise={routine.exercises[loggerIndex]}
           routine={routine}
           userId={userId}
