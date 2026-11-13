@@ -5,6 +5,7 @@ import { Camera, Check, User } from "lucide-react";
 import { shrinkAvatar } from "@/lib/images";
 import { supabase } from "@/lib/supabaseClient";
 import { signedAvatarUrl } from "@/lib/avatars";
+import { updateAccount } from "@/lib/account";
 import { Skeleton } from "@/components/ui/Skeleton";
 import { ChangePassword } from "@/components/ui/ChangePassword";
 import { PushToggle } from "@/components/ui/PushNotifications";
@@ -15,6 +16,7 @@ export function ProfileView({ onProfileUpdate }) {
   const [loading, setLoading] = useState(true);
   const [saved, setSaved] = useState(false);
   const [uploading, setUploading] = useState(false);
+  const [savedEmail, setSavedEmail] = useState("");
 
   async function loadProfile() {
     setLoading(true);
@@ -33,6 +35,7 @@ export function ProfileView({ onProfileUpdate }) {
       bio: profile?.bio || "",
       avatarUrl: await signedAvatarUrl(profile?.avatar_url),
     });
+    setSavedEmail(user?.email || "");
     setLoading(false);
   }
 
@@ -77,6 +80,13 @@ export function ProfileView({ onProfileUpdate }) {
   };
 
   const handleSave = async () => {
+    const newEmail = form.email.trim().toLowerCase();
+    if (newEmail && newEmail !== savedEmail.toLowerCase()) {
+      if (!confirm(`Desde ahora vas a iniciar sesión con ${newEmail}. ¿Está bien escrito?`)) return;
+      const { error } = await updateAccount(null, { email: newEmail });
+      if (error) return alert(error);
+      setSavedEmail(newEmail);
+    }
     const { data: { user } } = await supabase.auth.getUser();
     await supabase
       .from("profiles")
@@ -120,7 +130,7 @@ export function ProfileView({ onProfileUpdate }) {
       </div>
       <div className="bg-card rounded-xl p-5 space-y-4 mb-6">
         <div><p className="text-muted text-xs mb-1">Nombre completo</p><input value={form.fullName} onChange={update("fullName")} className="w-full bg-field text-ink text-sm rounded-lg px-3 py-2 outline-none focus:ring-1 focus:ring-accent" /></div>
-        <div><p className="text-muted text-xs mb-1">Email</p><input type="email" value={form.email} disabled className="w-full bg-field text-muted text-sm rounded-lg px-3 py-2 outline-none cursor-not-allowed" /></div>
+        <div><p className="text-muted text-xs mb-1">Email</p><input type="email" autoComplete="email" value={form.email} onChange={update("email")} className="w-full bg-field text-ink text-sm rounded-lg px-3 py-2 outline-none focus:ring-1 focus:ring-accent" /><p className="text-muted text-[11px] mt-1">Es el correo con el que iniciás sesión.</p></div>
         <div><p className="text-muted text-xs mb-1">Especialidad</p><input value={form.specialty} onChange={update("specialty")} placeholder="Ej: Fuerza, cardio..." className="w-full bg-field text-ink text-sm rounded-lg px-3 py-2 outline-none focus:ring-1 focus:ring-accent" /></div>
         <div><p className="text-muted text-xs mb-1">Bio</p><textarea value={form.bio} onChange={update("bio")} rows={3} className="w-full bg-field text-ink text-sm rounded-lg px-3 py-2 outline-none focus:ring-1 focus:ring-accent resize-none" /></div>
       </div>

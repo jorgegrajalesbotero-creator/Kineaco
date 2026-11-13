@@ -585,6 +585,7 @@ export default function App() {
           setFullName(name);
           setAvatarUrl(avatar);
         }}
+        onEmailUpdate={setUserEmail}
       />
     ) : (
       <div className="flex-1 flex items-center justify-center">

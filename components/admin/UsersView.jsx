@@ -1,13 +1,14 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Shield } from "lucide-react";
+import { Shield, Trash2 } from "lucide-react";
 import { supabase } from "@/lib/supabaseClient";
 import { matchesSearch } from "@/lib/search";
 import { accessBucket, filterItems, sortItems } from "@/lib/filters";
 import { useFilterState } from "@/lib/useFilterState";
 import { FilterBar } from "@/components/ui/FilterBar";
 import { Select } from "@/components/ui/Select";
+import { deleteStudent } from "@/components/coach/students/AccountPanel";
 
 const ROLE_LABELS = { alumno: "Alumno", coach: "Coach", admin: "Admin" };
 const ROLE_ORDER = { admin: 0, coach: 1, alumno: 2 };
@@ -72,6 +73,13 @@ export function UsersView() {
     const { error } = await supabase.from("profiles").update({ coach_id: coach_id || null }).eq("id", id);
     if (error) setError(error.message);
     await load();
+    setSavingId(null);
+  };
+
+  const removeUser = async (r) => {
+    setSavingId(r.id);
+    setError("");
+    if (await deleteStudent({ id: r.id, name: r.full_name })) await load();
     setSavingId(null);
   };
 
@@ -180,6 +188,17 @@ export function UsersView() {
                     </option>
                   ))}
                 </Select>
+              )}
+              {r.role === "alumno" && (
+                <button
+                  onClick={() => removeUser(r)}
+                  disabled={savingId === r.id}
+                  aria-label={`Eliminar a ${r.full_name || "este alumno"}`}
+                  title="Eliminar cuenta (alumnos de prueba o bajas)"
+                  className="w-8 h-8 rounded-lg bg-field text-soft flex items-center justify-center hover:text-danger disabled:opacity-50"
+                >
+                  <Trash2 size={14} />
+                </button>
               )}
             </div>
           </div>

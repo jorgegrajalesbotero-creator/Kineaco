@@ -2,12 +2,13 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { Activity, ArrowLeft, Calendar, Camera, ClipboardCheck, Download, Dumbbell, Eye, TrendingUp, Lock, MessageCircle, Ruler, Utensils } from "lucide-react";
+import { Activity, ArrowLeft, Calendar, Camera, ClipboardCheck, Download, Dumbbell, Eye, TrendingUp, Lock, MessageCircle, Ruler, UserCog, Utensils } from "lucide-react";
 import { supabase } from "@/lib/supabaseClient";
 import { buildReportPdf } from "@/lib/planPdf";
 import { usePdfPreview } from "@/components/ui/PdfPreview";
 import { currentOrNextPlan, loadSchedule } from "@/lib/trainingPlan";
 import { AccessPanel } from "./AccessPanel";
+import { AccountPanel } from "./AccountPanel";
 import { CheckinPanel } from "./CheckinPanel";
 import { ComparePanel } from "./ComparePanel";
 import { DaysPanel } from "./DaysPanel";
@@ -28,6 +29,7 @@ const PANELS = {
   routine: RoutinePreviewPanel,
   photos: PhotosPanel,
   access: AccessPanel,
+  account: AccountPanel,
   nutrition: NutritionPanel,
   measurements: MeasurementsPanel,
   exercises: ExerciseHistoryPanel,
@@ -38,7 +40,7 @@ const GROUPS = [
   { title: "Entrenamiento", items: [["Ver su rutina como la ve el alumno (y observaciones)", "routine", Eye], ["Planeación (fases, rutinas y cargas)", "plan", Calendar], ["Semana base (días fijos)", "days", Activity]] },
   { title: "Seguimiento", items: [["Progreso por ejercicio (gráficos e historial)", "exercises", Dumbbell], ["Progreso", "compare", TrendingUp], ["Medidas", "measurements", Ruler], ["Fotos", "photos", Camera], ["Check-in", "checkin", ClipboardCheck]] },
   { title: "Nutrición", items: [["Nutrición", "nutrition", Utensils]] },
-  { title: "Cuenta", items: [["Acceso y ficha", "access", Lock]] },
+  { title: "Cuenta", items: [["Acceso y ficha", "access", Lock], ["Nombre, correo y eliminar cuenta", "account", UserCog]] },
 ];
 
 // Ficha de un alumno: 4 accesos principales arriba y el resto agrupado por tema
@@ -60,7 +62,7 @@ export function StudentDetail({ student, onClose, onChanged, initialPanel = null
 
   if (panel) {
     const Panel = PANELS[panel];
-    return <Panel student={student} onClose={() => setPanel(null)} onChanged={onChanged} onOpenPanel={setPanel} />;
+    return <Panel student={student} onClose={() => setPanel(null)} onChanged={onChanged} onOpenPanel={setPanel} onDeleted={() => { onChanged?.(); onClose(); }} />;
   }
 
   const tile = "bg-card rounded-xl p-3.5 flex flex-col items-start gap-2 text-left active:scale-[0.98] transition-transform";
