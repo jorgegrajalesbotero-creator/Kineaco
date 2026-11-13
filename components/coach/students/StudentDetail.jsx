@@ -1,12 +1,15 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { Activity, ArrowLeft, Calendar, Camera, ClipboardCheck, Download, Dumbbell, Eye, TrendingUp, Lock, MessageCircle, Ruler, UserCog, Utensils } from "lucide-react";
 import { supabase } from "@/lib/supabaseClient";
 import { buildReportPdf } from "@/lib/planPdf";
 import { usePdfPreview } from "@/components/ui/PdfPreview";
 import { currentOrNextPlan, loadSchedule } from "@/lib/trainingPlan";
+import { localDateString } from "@/lib/dates";
+import { PET_STATES, petMood } from "@/lib/chameleon";
+import { Chameleon } from "@/components/ui/Chameleon";
 import { AccessPanel } from "./AccessPanel";
 import { AccountPanel } from "./AccountPanel";
 import { CheckinPanel } from "./CheckinPanel";
@@ -48,6 +51,16 @@ export function StudentDetail({ student, onClose, onChanged, initialPanel = null
   const [panel, setPanel] = useState(initialPanel);
   const [pdfBusy, setPdfBusy] = useState(false);
   const [showPdf, pdfPreview] = usePdfPreview();
+  // Camaleón del alumno: su estado de hoy sale del check-in diario
+  const [petToday, setPetToday] = useState(null);
+  async function loadPetToday() {
+    const [{ data: p, error }, { data: ck }] = await Promise.all([
+      supabase.from("profiles").select("pet_name").eq("id", student.id).maybeSingle(),
+      supabase.from("daily_checkins").select("*").eq("user_id", student.id).eq("check_date", localDateString()).maybeSingle(),
+    ]);
+    if (!error) setPetToday({ name: p?.pet_name || "", row: ck || null });
+  }
+  useEffect(() => { loadPetToday(); }, [student.id]);
 
   const downloadReport = async () => {
     setPdfBusy(true);
@@ -88,6 +101,18 @@ export function StudentDetail({ student, onClose, onChanged, initialPanel = null
           {student.intakeAlert && <span className="text-xs text-danger bg-danger/10 rounded-lg px-2.5 py-1.5">⚠ Revisar su ficha (lesión o restricción)</span>}
           {student.checkinAlert && <span className="text-xs text-danger bg-danger/10 rounded-lg px-2.5 py-1.5">⚠ Check-in con dolor</span>}
         </div>
+      )}
+
+      {petToday && (
+        <button onClick={() => setPanel("checkin")} className="w-full bg-card rounded-xl pl-2 pr-4 py-2 mb-4 flex items-center gap-3 text-left active:scale-[0.99] transition-transform">
+          <div className="w-24 shrink-0 bg-app rounded-lg p-0.5">
+            <Chameleon mood={petToday.row ? petMood(petToday.row) : 3} sleeping={!petToday.row} size="100%" />
+          </div>
+          <div className="min-w-0">
+            <p className="text-ink text-sm font-medium truncate">{petToday.name || "Camaleón"} · check-in de hoy</p>
+            <p className="text-soft text-xs">{petToday.row ? `Llegó «${PET_STATES[petMood(petToday.row)].name}» · ver respuestas` : "Todavía no lo ha hecho hoy"}</p>
+          </div>
+        </button>
       )}
 
       {/* Lo más usado */}

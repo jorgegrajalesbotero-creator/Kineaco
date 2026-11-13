@@ -14,6 +14,7 @@ import { youtubeVideo } from "@/lib/youtube";
 import { Confetti } from "@/components/ui/Confetti";
 import { RestTimer } from "@/components/student/RestTimer";
 import { SetLogger } from "@/components/student/SetLogger";
+import { Chameleon } from "@/components/ui/Chameleon";
 import { finishSession, fmtFinished, isLocked, loadSession, weekStartISO } from "@/lib/workoutSession";
 
 // Primer número de las reps sugeridas ("8-10" → 8)
@@ -24,7 +25,7 @@ const firstNumber = (text) => {
 
 // preview = el coach ve la rutina tal como la ve el alumno (sin marcar nada) y puede dejar observaciones (onEditNote)
 // coachEdit = (solo con preview) el coach puede corregir peso y reps de cada serie del alumno (semana actual)
-export function RoutineScreen({ routine, userId, onClose, onToggle, onProgressChange, preview = false, onEditNote = null, coachEdit = false }) {
+export function RoutineScreen({ routine, userId, pet = null, onClose, onToggle, onProgressChange, preview = false, onEditNote = null, coachEdit = false }) {
   const [unit] = useWeightUnit();
   const [detailIndex, setDetailIndex] = useState(null);
   const [playing, setPlaying] = useState(false); // el video solo se carga cuando el alumno toca "Ver video"
@@ -407,6 +408,13 @@ export function RoutineScreen({ routine, userId, onClose, onToggle, onProgressCh
 
         {!preview && (locked ? (
           <div className="bg-card border border-accent/30 rounded-2xl p-4 mt-6 text-center">
+            {pet && (
+              <>
+                <Chameleon mood={5} size={170} className="mx-auto" />
+                <p className="text-ink text-base font-semibold mt-1">{tr("¡Lo logramos!")}</p>
+                <p className="text-soft text-xs mb-2">{tr("{p0} está orgulloso de usted.", { p0: pet.name || tr("Su camaleón") })}</p>
+              </>
+            )}
             <p className="text-accent text-sm font-semibold flex items-center justify-center gap-1.5"><Check size={16} strokeWidth={3} /> {tr("Entrenamiento finalizado")}</p>
             <p className="text-muted text-xs mt-1">{fmtFinished(session.finished_at, appLocale())}</p>
             <p className="text-soft text-xs mt-2">{tr("Ya no se pueden cambiar las series ni los pesos. Si necesita corregir algo, pídale a su coach que habilite la edición.")}</p>
@@ -495,6 +503,7 @@ export function RoutineScreen({ routine, userId, onClose, onToggle, onProgressCh
         <SetLogger
           key={loggerIndex}
           readOnly={locked}
+          pet={preview ? null : pet}
           exercise={routine.exercises[loggerIndex]}
           routine={routine}
           userId={userId}

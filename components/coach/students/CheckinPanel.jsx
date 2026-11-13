@@ -4,6 +4,8 @@ import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabaseClient";
 import { DAILY_FIELDS, WELLBEING_FIELDS, formatWeek } from "@/lib/checkin";
 import { Skeleton } from "@/components/ui/Skeleton";
+import { Chameleon } from "@/components/ui/Chameleon";
+import { PET_STATES, petMood } from "@/lib/chameleon";
 import { PanelLayout } from "./PanelLayout";
 import { useWeightUnit, weightLabel } from "@/lib/weightUnits";
 
@@ -27,6 +29,7 @@ const dailyAlert = (c) => (c.pain && c.pain_level >= 7) || c.energy === 1 || c.s
 // Check-ins diarios (antes de entrenar) del alumno
 function DailyList({ student }) {
   const [items, setItems] = useState(null);
+  const [petName, setPetName] = useState("");
   useEffect(() => {
     supabase
       .from("daily_checkins")
@@ -35,13 +38,14 @@ function DailyList({ student }) {
       .order("check_date", { ascending: false })
       .limit(30)
       .then(({ data }) => setItems(data || []));
+    supabase.from("profiles").select("pet_name").eq("id", student.id).maybeSingle().then(({ data, error }) => { if (!error) setPetName(data?.pet_name || ""); });
   }, [student.id]);
 
   if (!items) return <Skeleton rows={3} height="h-24" />;
   if (items.length === 0)
     return (
       <div className="bg-card rounded-xl p-5">
-        <p className="text-muted text-sm">Todavía no respondió ningún check-in diario. Se le pregunta (opcional) al empezar la rutina de cada día.</p>
+        <p className="text-muted text-sm">Todavía no respondió ningún check-in diario. Se le pide (con su camaleón) cada día al abrir la app.</p>
       </div>
     );
 
@@ -52,8 +56,35 @@ function DailyList({ student }) {
     return v.length ? Math.round((v.reduce((a, b) => a + b, 0) / v.length) * 10) / 10 : null;
   };
 
+  // Últimos 7 días (hoy al final), con el camaleón de cada día
+  const days = Array.from({ length: 7 }, (_, i) => {
+    const d = new Date();
+    d.setDate(d.getDate() - (6 - i));
+    const iso = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+    return { iso, letter: ["D", "L", "M", "X", "J", "V", "S"][d.getDay()], row: items.find((c) => c.check_date === iso) };
+  });
+  const todayRow = days[6].row;
+
   return (
     <div className="space-y-3">
+      <div className="bg-card rounded-2xl p-4">
+        <div className="flex items-center gap-3 mb-3">
+          <div className="w-28 shrink-0 bg-app rounded-xl p-1"><Chameleon mood={todayRow ? petMood(todayRow) : 3} sleeping={!todayRow} size="100%" /></div>
+          <div className="min-w-0">
+            <p className="text-ink text-sm font-medium">{petName ? `${petName} · hoy` : "Camaleón · hoy"}</p>
+            <p className="text-soft text-xs">{todayRow ? `Está «${PET_STATES[petMood(todayRow)].name}»` : "Todavía no hizo el check-in de hoy"}</p>
+            {todayRow && dailyAlert(todayRow) && <p className="text-danger text-xs mt-1">⚠ Llegó mal hoy: revisalo antes de entrenar</p>}
+          </div>
+        </div>
+        <div className="grid grid-cols-7 gap-1">
+          {days.map((d) => (
+            <div key={d.iso} className="text-center">
+              <div className="bg-app rounded-md p-0.5"><Chameleon mood={d.row ? petMood(d.row) : 3} sleeping={!d.row} animate={false} size="100%" /></div>
+              <span className="text-muted text-[10px]">{d.letter}</span>
+            </div>
+          ))}
+        </div>
+      </div>
       <div className="bg-card rounded-2xl p-4">
         <p className="text-muted text-xs mb-2">Promedio de los últimos {last.length} días con respuesta</p>
         <div className="grid grid-cols-5 gap-2">
@@ -71,7 +102,10 @@ function DailyList({ student }) {
       {items.map((c) => (
         <div key={c.id} className={`bg-card rounded-2xl p-4 ${dailyAlert(c) ? "border border-danger/30" : ""}`}>
           <div className="flex items-center justify-between gap-3 mb-3">
-            <p className="text-ink text-sm font-medium">{dayTitle(c.check_date)}</p>
+            <p className="text-ink text-sm font-medium flex items-center gap-2">
+              <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ background: PET_STATES[petMood(c)].color }} />
+              {dayTitle(c.check_date)} · <span className="text-soft font-normal">{PET_STATES[petMood(c)].name}</span>
+            </p>
             {dailyAlert(c) && <span className="text-[11px] text-danger bg-danger/10 rounded px-1.5 py-0.5">⚠ Llegó mal</span>}
           </div>
           <div className="grid grid-cols-5 gap-2">
