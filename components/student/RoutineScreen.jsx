@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Check, ChevronLeft, ChevronRight, Download, Play, X } from "lucide-react";
+import { Check, ChevronLeft, ChevronRight, Download, MessageSquarePlus, MessageSquareText, Pencil, Play, X } from "lucide-react";
 import { blockTypeLabel } from "@/lib/blocks";
 import { currentWeekStartISO } from "@/lib/dates";
 import { appLocale, tr } from "@/lib/i18n";
@@ -15,7 +15,8 @@ import { Confetti } from "@/components/ui/Confetti";
 import { RestTimer } from "@/components/student/RestTimer";
 import { SetLogger } from "@/components/student/SetLogger";
 
-export function RoutineScreen({ routine, userId, onClose, onToggle, onProgressChange }) {
+// preview = el coach ve la rutina tal como la ve el alumno (sin marcar nada) y puede dejar observaciones (onEditNote)
+export function RoutineScreen({ routine, userId, onClose, onToggle, onProgressChange, preview = false, onEditNote = null }) {
   const [unit] = useWeightUnit();
   const [detailIndex, setDetailIndex] = useState(null);
   const [playing, setPlaying] = useState(false); // el video solo se carga cuando el alumno toca "Ver video"
@@ -41,7 +42,7 @@ export function RoutineScreen({ routine, userId, onClose, onToggle, onProgressCh
   const pct = total ? Math.round((done / total) * 100) : 0;
 
   // Tocar el círculo abre la hoja de series del ejercicio
-  const toggle = (i) => setLoggerIndex(i);
+  const toggle = (i) => (preview ? openDetail(i) : setLoggerIndex(i));
 
   // Todas las series hechas → el ejercicio queda hecho (con el mejor peso del día)
   const completeExercise = async (i, bestWeight) => {
@@ -95,6 +96,42 @@ export function RoutineScreen({ routine, userId, onClose, onToggle, onProgressCh
   const detail = detailIndex !== null ? routine.exercises[detailIndex] : null;
   const videoLink = detail ? safeHttpUrl(detail.videoUrl) : null;
   const video = detail ? youtubeVideo(detail.videoUrl) : null;
+
+  // Fila de un ejercicio. Si el coach le dejó una observación, se ve la marca antes de abrirlo.
+  const exerciseRow = (ex, i, subtitle) => (
+    <div key={i} onClick={() => openDetail(i)} className={`flex items-center justify-between gap-2 rounded-2xl px-4 py-3 group cursor-pointer transition duration-200 ease-out hover:scale-[1.02] hover:bg-card-hover active:scale-[0.99] ${ex.completed ? "bg-card/60" : "bg-card"}`}>
+      <div className="flex items-center gap-3 min-w-0">
+        <button
+          onClick={(e) => { e.stopPropagation(); toggle(i); }}
+          aria-label={preview ? tr("Ver ejercicio") : undefined}
+          className={`w-7 h-7 rounded-full flex items-center justify-center shrink-0 transition-all active:scale-90 ${ex.completed ? "bg-accent" : "border-2 border-field-strong"} ${preview ? "cursor-default" : ""}`}
+        >
+          {ex.completed && <Check size={14} strokeWidth={3} className="text-app animate-check-pop" />}
+        </button>
+        <div className="min-w-0">
+          <p className={`text-sm ${ex.completed ? "text-muted line-through" : "text-ink"}`}>{ex.name}</p>
+          {subtitle && <p className="text-muted text-xs">{subtitle}</p>}
+          {ex.note && (
+            <p className="inline-flex items-center gap-1 text-accent text-[11px] font-medium mt-0.5">
+              <MessageSquareText size={12} /> {tr("Tiene observación de su coach")}
+            </p>
+          )}
+        </div>
+      </div>
+      {preview && onEditNote && ex.itemKey ? (
+        <button
+          onClick={(e) => { e.stopPropagation(); onEditNote(ex); }}
+          className={`shrink-0 flex items-center gap-1 text-xs rounded-lg px-2.5 py-1.5 ${ex.note ? "bg-accent/15 text-accent" : "bg-field text-soft hover:text-ink"}`}
+        >
+          {ex.note ? <Pencil size={12} /> : <MessageSquarePlus size={12} />} {ex.note ? "Editar" : "Observación"}
+        </button>
+      ) : (
+        <button onClick={(e) => { e.stopPropagation(); openDetail(i); }} aria-label={tr("Ver ejercicio")} className="text-muted transition-colors group-hover:text-ink shrink-0">
+          <ChevronRight size={16} />
+        </button>
+      )}
+    </div>
+  );
 
   return (
     <div className="flex-1 overflow-y-auto pb-4">
@@ -166,24 +203,7 @@ export function RoutineScreen({ routine, userId, onClose, onToggle, onProgressCh
                           </div>
                           {b.notes && <p className="text-soft text-xs bg-card rounded-lg px-3 py-2 mb-2">{b.notes}</p>}
                           <div className="space-y-2">
-                            {items.map(({ ex, i }) => (
-                              <div key={i} onClick={() => openDetail(i)} className={`flex items-center justify-between rounded-2xl px-4 py-3 group cursor-pointer transition duration-200 ease-out hover:scale-[1.02] hover:bg-card-hover active:scale-[0.99] ${ex.completed ? "bg-card/60" : "bg-card"}`}>
-                                <div className="flex items-center gap-3">
-                                  <button onClick={(e) => { e.stopPropagation(); toggle(i); }} className={`w-7 h-7 rounded-full flex items-center justify-center shrink-0 transition-all active:scale-90 ${ex.completed ? "bg-accent" : "border-2 border-field-strong"}`}>
-                                    {ex.completed && <Check size={14} strokeWidth={3} className="text-app animate-check-pop" />}
-                                  </button>
-                                  <div>
-                                    <p className={`text-sm ${ex.completed ? "text-muted line-through" : "text-ink"}`}>{ex.name}</p>
-                                    {(ex.rowLabel || ex.targetWeight != null) && (
-                                      <p className="text-muted text-xs">{[ex.rowLabel, formatWeight(ex.targetWeight, unit)].filter(Boolean).join(" · ")}</p>
-                                    )}
-                                  </div>
-                                </div>
-                                <button onClick={(e) => { e.stopPropagation(); openDetail(i); }} aria-label={tr("Ver ejercicio")} className="text-muted transition-colors group-hover:text-ink">
-                                  <ChevronRight size={16} />
-                                </button>
-                              </div>
-                            ))}
+                            {items.map(({ ex, i }) => exerciseRow(ex, i, [ex.rowLabel, formatWeight(ex.targetWeight, unit)].filter(Boolean).join(" · ")))}
                           </div>
                         </section>
                       );
@@ -191,22 +211,7 @@ export function RoutineScreen({ routine, userId, onClose, onToggle, onProgressCh
                   </div>
                 ) : (
                   <div className="space-y-2">
-                    {routine.exercises.map((ex, i) => ({ ex, i })).filter(({ ex }) => ex.partIndex === part.partIndex).map(({ ex, i }) => (
-                      <div key={i} onClick={() => openDetail(i)} className={`flex items-center justify-between rounded-2xl px-4 py-3 group cursor-pointer transition duration-200 ease-out hover:scale-[1.02] hover:bg-card-hover active:scale-[0.99] ${ex.completed ? "bg-card/60" : "bg-card"}`}>
-                        <div className="flex items-center gap-3">
-                          <button onClick={(e) => { e.stopPropagation(); toggle(i); }} className={`w-7 h-7 rounded-full flex items-center justify-center shrink-0 transition-all active:scale-90 ${ex.completed ? "bg-accent" : "border-2 border-field-strong"}`}>
-                            {ex.completed && <Check size={14} strokeWidth={3} className="text-app animate-check-pop" />}
-                          </button>
-                          <div>
-                            <p className={`text-sm ${ex.completed ? "text-muted line-through" : "text-ink"}`}>{ex.name}</p>
-                            {ex.sets && <p className="text-muted text-xs">{ex.sets}</p>}
-                          </div>
-                        </div>
-                        <button onClick={(e) => { e.stopPropagation(); openDetail(i); }} aria-label={tr("Ver ejercicio")} className="text-muted transition-colors group-hover:text-ink">
-                          <ChevronRight size={16} />
-                        </button>
-                      </div>
-                    ))}
+                    {routine.exercises.map((ex, i) => ({ ex, i })).filter(({ ex }) => ex.partIndex === part.partIndex).map(({ ex, i }) => exerciseRow(ex, i, ex.sets))}
                   </div>
                 )}
               </div>
@@ -214,9 +219,11 @@ export function RoutineScreen({ routine, userId, onClose, onToggle, onProgressCh
           })}
         </div>
 
-        <button onClick={onClose} className="block w-full bg-accent text-app font-semibold py-3.5 rounded-2xl mt-6 active:scale-[0.98] transition-transform">
-          {tr("Continuar rutina")}
-        </button>
+        {!preview && (
+          <button onClick={onClose} className="block w-full bg-accent text-app font-semibold py-3.5 rounded-2xl mt-6 active:scale-[0.98] transition-transform">
+            {tr("Continuar rutina")}
+          </button>
+        )}
       </div>
 
       {detail && (
@@ -226,6 +233,23 @@ export function RoutineScreen({ routine, userId, onClose, onToggle, onProgressCh
               <h2 className="text-ink text-lg font-semibold">{detail.name}</h2>
               <button onClick={closeDetail} aria-label={tr("Cerrar")} className="text-muted"><X size={20} /></button>
             </div>
+            {detail.note && (
+              <div className="bg-accent/10 border border-accent/30 rounded-xl px-3.5 py-3 mb-4">
+                <p className="text-accent text-xs font-semibold flex items-center gap-1.5 mb-1">
+                  <MessageSquareText size={14} /> {tr("Observación de su coach")}
+                </p>
+                <p className="text-ink text-sm whitespace-pre-wrap break-words">{detail.note}</p>
+              </div>
+            )}
+            {preview && onEditNote && (
+              detail.itemKey ? (
+                <button onClick={() => onEditNote(detail)} className="w-full mb-4 flex items-center justify-center gap-1.5 bg-field text-ink text-sm rounded-xl py-2.5 hover:bg-field-hover">
+                  {detail.note ? <Pencil size={14} /> : <MessageSquarePlus size={14} />} {detail.note ? "Editar observación" : "Agregar observación"}
+                </button>
+              ) : (
+                <p className="text-muted text-xs mb-4">Este ejercicio no tiene clave fija: guardá la rutina una vez (Rutinas → editar → guardar) para poder dejarle observaciones.</p>
+              )
+            )}
             {detail.sets && <p className="text-soft text-sm mb-4">{detail.sets}</p>}
             {detail.targetWeight != null && (
               <p className="text-accent text-sm mb-4">{tr("Peso sugerido:")} {formatWeight(detail.targetWeight, unit)}</p>
@@ -266,7 +290,7 @@ export function RoutineScreen({ routine, userId, onClose, onToggle, onProgressCh
         </div>
       )}
 
-      {loggerIndex !== null && (
+      {!preview && loggerIndex !== null && (
         <SetLogger
           key={loggerIndex}
           exercise={routine.exercises[loggerIndex]}

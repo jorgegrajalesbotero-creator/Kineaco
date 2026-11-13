@@ -437,6 +437,7 @@ export function PlanPanel({ student, onClose }) {
         {tab === "cargas" ? (
           <div className="mb-6">
             <PlanLoadsEditor
+              userId={student.id}
               weeks={weeksInfo}
               routines={planRoutines}
               extra={extraLoads}

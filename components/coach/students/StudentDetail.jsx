@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { Activity, ArrowLeft, Calendar, Camera, ClipboardCheck, Download, Dumbbell, TrendingUp, Lock, MessageCircle, Ruler, Utensils } from "lucide-react";
+import { Activity, ArrowLeft, Calendar, Camera, ClipboardCheck, Download, Dumbbell, Eye, TrendingUp, Lock, MessageCircle, Ruler, Utensils } from "lucide-react";
 import { supabase } from "@/lib/supabaseClient";
 import { buildReportPdf } from "@/lib/planPdf";
 import { usePdfPreview } from "@/components/ui/PdfPreview";
@@ -17,6 +17,7 @@ import { MessagesPanel } from "./MessagesPanel";
 import { NutritionPanel } from "./NutritionPanel";
 import { PhotosPanel } from "./PhotosPanel";
 import { PlanPanel } from "./PlanPanel";
+import { RoutinePreviewPanel } from "./RoutinePreviewPanel";
 
 const PANELS = {
   messages: MessagesPanel,
@@ -24,6 +25,7 @@ const PANELS = {
   compare: ComparePanel,
   days: DaysPanel,
   plan: PlanPanel,
+  routine: RoutinePreviewPanel,
   photos: PhotosPanel,
   access: AccessPanel,
   nutrition: NutritionPanel,
@@ -33,7 +35,7 @@ const PANELS = {
 
 // Grupos de opciones de la ficha (lo más usado va arriba, aparte)
 const GROUPS = [
-  { title: "Entrenamiento", items: [["Planeación (fases, rutinas y cargas)", "plan", Calendar], ["Semana base (días fijos)", "days", Activity]] },
+  { title: "Entrenamiento", items: [["Ver su rutina como la ve el alumno (y observaciones)", "routine", Eye], ["Planeación (fases, rutinas y cargas)", "plan", Calendar], ["Semana base (días fijos)", "days", Activity]] },
   { title: "Seguimiento", items: [["Progreso por ejercicio (gráficos e historial)", "exercises", Dumbbell], ["Progreso", "compare", TrendingUp], ["Medidas", "measurements", Ruler], ["Fotos", "photos", Camera], ["Check-in", "checkin", ClipboardCheck]] },
   { title: "Nutrición", items: [["Nutrición", "nutrition", Utensils]] },
   { title: "Cuenta", items: [["Acceso y ficha", "access", Lock]] },
@@ -58,7 +60,7 @@ export function StudentDetail({ student, onClose, onChanged, initialPanel = null
 
   if (panel) {
     const Panel = PANELS[panel];
-    return <Panel student={student} onClose={() => setPanel(null)} onChanged={onChanged} />;
+    return <Panel student={student} onClose={() => setPanel(null)} onChanged={onChanged} onOpenPanel={setPanel} />;
   }
 
   const tile = "bg-card rounded-xl p-3.5 flex flex-col items-start gap-2 text-left active:scale-[0.98] transition-transform";
@@ -113,6 +115,13 @@ export function StudentDetail({ student, onClose, onChanged, initialPanel = null
         <button onClick={downloadReport} disabled={pdfBusy} className={`${tile} disabled:opacity-60`}>
           <span className="w-9 h-9 rounded-xl bg-accent/15 flex items-center justify-center"><Download size={17} className="text-accent" /></span>
           <span className="text-ink text-sm font-medium">{pdfBusy ? "Generando..." : "Descargar PDF"}</span>
+        </button>
+        <button onClick={() => setPanel("routine")} className={`${tile} col-span-2 flex-row! items-center!`}>
+          <span className="w-9 h-9 rounded-xl bg-accent/15 flex items-center justify-center shrink-0"><Eye size={17} className="text-accent" /></span>
+          <span className="min-w-0">
+            <span className="block text-ink text-sm font-medium">Ver su rutina (como la ve el alumno)</span>
+            <span className="block text-muted text-xs">Revisar ejercicios y dejar observaciones, sin cambiar la planeación</span>
+          </span>
         </button>
       </div>
 
