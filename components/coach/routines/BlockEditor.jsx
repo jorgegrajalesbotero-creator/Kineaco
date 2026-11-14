@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Pencil, Plus, Trash2 } from "lucide-react";
+import { ChevronDown, Pencil, Plus, Timer, Trash2 } from "lucide-react";
 import { BLOCK_TYPES, blockTypeLabel } from "@/lib/blocks";
 import { catalogOptions, defaultBlockTitle, tmpKey } from "@/components/coach/routines/routineHelpers";
 import { SearchSelect } from "@/components/ui/Search";
@@ -9,11 +9,14 @@ import { Select } from "@/components/ui/Select";
 import { ExerciseItemEditor } from "@/components/coach/routines/ExerciseItemEditor";
 import { WeightInput } from "@/components/ui/WeightInput";
 import { formatWeight, useWeightUnit } from "@/lib/weightUnits";
+import { timerLabel } from "@/lib/clock";
+import { TimerSettings } from "@/components/coach/TimerSettings";
 
 export function BlockEditor({ blocks, setBlocks, catalog, onCreateExercise }) {
   const [newType, setNewType] = useState("principal");
   const [forms, setForms] = useState({});
   const [editing, setEditing] = useState(null); // { block: key, index }
+  const [timerOpen, setTimerOpen] = useState(null); // bloque con el reloj desplegado
   const [unit] = useWeightUnit();
 
   const updateBlock = (key, patch) => setBlocks((bs) => bs.map((b) => (b.key === key ? { ...b, ...patch } : b)));
@@ -122,6 +125,21 @@ export function BlockEditor({ blocks, setBlocks, catalog, onCreateExercise }) {
                 <span className="absolute right-3 top-1/2 -translate-y-1/2 text-muted text-xs pointer-events-none">series</span>
               </div>
               <input placeholder="Nota para el alumno (opcional)" value={b.notes} onChange={(e) => updateBlock(b.key, { notes: e.target.value })} className={inputCls} />
+            </div>
+
+            {/* Reloj programado para este bloque (el alumno lo abre con un toque y lo puede ajustar) */}
+            <div className="mb-3">
+              <button type="button" onClick={() => setTimerOpen(timerOpen === b.key ? null : b.key)} aria-expanded={timerOpen === b.key}
+                className={`w-full flex items-center gap-2 rounded-lg px-3 py-2 text-xs text-left ${b.timer ? "bg-accent/15 text-accent" : "bg-field/60 text-soft hover:text-ink"}`}>
+                <Timer size={14} />
+                <span className="flex-1">{b.timer ? `Reloj: ${timerLabel(b.timer)}` : "Programar reloj (opcional): Tabata, intervalos, AMRAP..."}</span>
+                <ChevronDown size={14} className={`transition-transform ${timerOpen === b.key ? "rotate-180" : ""}`} />
+              </button>
+              {timerOpen === b.key && (
+                <div className="mt-2">
+                  <TimerSettings value={b.timer || null} onChange={(t) => updateBlock(b.key, { timer: t })} />
+                </div>
+              )}
             </div>
 
             <div className="space-y-1.5 mb-3">

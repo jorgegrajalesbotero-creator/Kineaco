@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Check, ChevronLeft, ChevronRight, Download, Lock, MessageSquarePlus, MessageSquareText, Pencil, Play, SquarePen, Timer, X } from "lucide-react";
+import { Check, ChevronLeft, ChevronRight, Download, Lock, MessageSquarePlus, MessageSquareText, Pencil, Play, Plus, SquarePen, Timer, X } from "lucide-react";
 import { blockTypeLabel } from "@/lib/blocks";
 import { currentWeekStartISO } from "@/lib/dates";
 import { appLocale, tr } from "@/lib/i18n";
@@ -14,6 +14,8 @@ import { youtubeVideo } from "@/lib/youtube";
 import { Confetti } from "@/components/ui/Confetti";
 import { RestTimer } from "@/components/student/RestTimer";
 import { WorkoutClock } from "@/components/student/WorkoutClock";
+import { getAudio } from "@/lib/alarm";
+import { timerLabel } from "@/lib/clock";
 import { SetLogger } from "@/components/student/SetLogger";
 import { Chameleon } from "@/components/ui/Chameleon";
 import { finishSession, fmtFinished, isLocked, loadSession, weekStartISO } from "@/lib/workoutSession";
@@ -26,7 +28,7 @@ const firstNumber = (text) => {
 
 // preview = el coach ve la rutina tal como la ve el alumno (sin marcar nada) y puede dejar observaciones (onEditNote)
 // coachEdit = (solo con preview) el coach puede corregir peso y reps de cada serie del alumno (semana actual)
-export function RoutineScreen({ routine, userId, pet = null, onClose, onToggle, onProgressChange, preview = false, onEditNote = null, coachEdit = false }) {
+export function RoutineScreen({ routine, userId, pet = null, onClose, onToggle, onProgressChange, preview = false, onEditNote = null, onEditTimer = null, coachEdit = false }) {
   const [unit] = useWeightUnit();
   const [detailIndex, setDetailIndex] = useState(null);
   const [playing, setPlaying] = useState(false); // el video solo se carga cuando el alumno toca "Ver video"
@@ -34,15 +36,17 @@ export function RoutineScreen({ routine, userId, pet = null, onClose, onToggle, 
   const closeDetail = () => { setPlaying(false); setDetailIndex(null); };
   const [loggerIndex, setLoggerIndex] = useState(null);
   const [rest, setRest] = useState(null); // { endsAt, total }
-  const [clockOpen, setClockOpen] = useState(false);
+  const [clock, setClock] = useState(null); // { preset } cuando el reloj está abierto
   const [celebrate, setCelebrate] = useState(false);
   const [pdfBusy, setPdfBusy] = useState(false);
   const [showPdf, pdfPreview] = usePdfPreview(tr);
   const downloadPdf = async () => {
     setPdfBusy(true);
     try {
-      const ids = (routine.parts || [routine]).map((p) => p.id);
-      showPdf(await buildRoutinePdf({ supabase, routineIds: ids, dayTitle: tr(routine.day_label), t: tr, locale: appLocale(), changes: routine.planChanges || [], week: routine.planWeek || 0 }));
+      const parts = routine.parts || [routine];
+      const ids = parts.map((p) => p.id);
+      const extraIds = parts.filter((p) => p.isExtra).map((p) => p.id);
+      showPdf(await buildRoutinePdf({ supabase, routineIds: ids, dayTitle: tr(routine.day_label), t: tr, locale: appLocale(), changes: routine.planChanges || [], week: routine.planWeek || 0, extraIds, userId }));
     } catch {
       alert(tr("No se pudo generar el PDF: "));
     }
@@ -208,7 +212,10 @@ export function RoutineScreen({ routine, userId, pet = null, onClose, onToggle, 
     }
   };
 
-  const startRest = (seconds) => setRest({ endsAt: Date.now() + seconds * 1000, total: seconds });
+  const startRest = (seconds) => {
+    getAudio(); // se activa el sonido con el toque (iPhone lo exige)
+    setRest({ endsAt: Date.now() + seconds * 1000, total: seconds });
+  };
   const detail = detailIndex !== null ? routine.exercises[detailIndex] : null;
   const videoLink = detail ? safeHttpUrl(detail.videoUrl) : null;
   const video = detail ? youtubeVideo(detail.videoUrl) : null;
@@ -305,6 +312,30 @@ export function RoutineScreen({ routine, userId, pet = null, onClose, onToggle, 
     </div>
   );
 
+  // Reloj programado por el coach (de un bloque, o de toda la rutina en "lista simple")
+  const timerChip = (part, b) => {
+    if (preview && onEditTimer) {
+      return (
+        <button onClick={() => onEditTimer(part, b)} className={`w-full flex items-center gap-2 rounded-lg px-3 py-2 mb-2 text-xs text-left ${b.timer ? "bg-accent/15 text-accent" : "bg-field text-soft hover:text-ink"}`}>
+          {b.timer ? <Timer size={14} /> : <Plus size={14} />}
+          <span className="flex-1">{b.timer ? `Reloj: ${timerLabel(b.timer)}${b.timerCustom ? " (solo para este alumno)" : " (de la rutina)"}` : "Programar reloj para este alumno"}</span>
+          {b.timer && <Pencil size={12} />}
+        </button>
+      );
+    }
+    if (!b.timer) return null;
+    return (
+      <button onClick={() => setClock({ preset: b.timer })} className="w-full flex items-center gap-2.5 rounded-xl px-3 py-2.5 mb-2 bg-accent/15 border border-accent/30 text-left active:scale-[0.99] transition-transform">
+        <span className="w-8 h-8 rounded-lg bg-accent text-app flex items-center justify-center shrink-0"><Timer size={16} /></span>
+        <span className="flex-1 min-w-0">
+          <span className="block text-ink text-sm font-medium">{timerLabel(b.timer, tr)}</span>
+          <span className="block text-muted text-[11px]">{tr("Reloj programado por su coach · tocar para abrir")}</span>
+        </span>
+        <ChevronRight size={16} className="text-accent shrink-0" />
+      </button>
+    );
+  };
+
   return (
     <div className="flex-1 overflow-y-auto pb-4">
       {celebrate && <Confetti onDone={() => setTimeout(() => setCelebrate(false), 1200)} />}
@@ -325,7 +356,7 @@ export function RoutineScreen({ routine, userId, pet = null, onClose, onToggle, 
           </button>
           <div className="flex items-center gap-2">
             {!preview && (
-              <button onClick={() => setClockOpen(true)} className="flex items-center gap-1.5 h-9 rounded-full bg-accent text-app px-3.5 text-xs font-semibold active:scale-95 transition-transform">
+              <button onClick={() => setClock({ preset: null })} className="flex items-center gap-1.5 h-9 rounded-full bg-accent text-app px-3.5 text-xs font-semibold active:scale-95 transition-transform">
                 <Timer size={14} /> {tr("Reloj")}
               </button>
             )}
@@ -362,10 +393,11 @@ export function RoutineScreen({ routine, userId, pet = null, onClose, onToggle, 
             const partDone = partItems.filter((ex) => ex.completed).length;
             return (
               <div key={`${part.id}-${partIdx}`}>
-                {allParts.length > 1 && (
+                {(allParts.length > 1 || part.isExtra) && (
                   <div className="flex items-center gap-3 mb-3 pb-2 border-b border-field">
                     <span className="w-7 h-7 rounded-full bg-accent text-app text-xs font-semibold flex items-center justify-center shrink-0">{partIdx + 1}</span>
                     <div className="flex-1 min-w-0">
+                      {part.isExtra && <p className="text-accent text-[10px] font-semibold uppercase tracking-wider">{tr("Extra")}</p>}
                       <h2 className="text-ink text-lg font-semibold truncate">{part.title}</h2>
                       <p className="text-muted text-xs">{[part.duration_minutes ? `${part.duration_minutes} ${tr("min")}` : "", `${partDone}/${partItems.length} ${tr("hechos")}`].filter(Boolean).join(" · ")}</p>
                     </div>
@@ -398,6 +430,7 @@ export function RoutineScreen({ routine, userId, pet = null, onClose, onToggle, 
                             </div>
                           </div>
                           {b.notes && <p className="text-soft text-xs bg-card rounded-lg px-3 py-2 mb-2">{b.notes}</p>}
+                          {timerChip(part, b)}
                           <div className="space-y-2">
                             {items.map(({ ex, i }) => exerciseRow(ex, i, [ex.rowLabel, formatWeight(ex.targetWeight, unit)].filter(Boolean).join(" · ")))}
                           </div>
@@ -406,9 +439,12 @@ export function RoutineScreen({ routine, userId, pet = null, onClose, onToggle, 
                     })}
                   </div>
                 ) : (
-                  <div className="space-y-2">
-                    {routine.exercises.map((ex, i) => ({ ex, i })).filter(({ ex }) => ex.partIndex === part.partIndex).map(({ ex, i }) => exerciseRow(ex, i, ex.sets))}
-                  </div>
+                  <>
+                    {timerChip(part, part)}
+                    <div className="space-y-2">
+                      {routine.exercises.map((ex, i) => ({ ex, i })).filter(({ ex }) => ex.partIndex === part.partIndex).map(({ ex, i }) => exerciseRow(ex, i, ex.sets))}
+                    </div>
+                  </>
                 )}
               </div>
             );
@@ -530,9 +566,10 @@ export function RoutineScreen({ routine, userId, pet = null, onClose, onToggle, 
           onClose={() => setRest(null)}
         />
       )}
-      {clockOpen && (
+      {clock && (
         <WorkoutClock
-          onClose={() => setClockOpen(false)}
+          onClose={() => setClock(null)}
+          preset={clock.preset}
           initialMode={(routine.parts || [routine]).some((p) => p.blocks?.some((b) => b.block_type === "intermitentes")) ? "intervals" : undefined}
         />
       )}

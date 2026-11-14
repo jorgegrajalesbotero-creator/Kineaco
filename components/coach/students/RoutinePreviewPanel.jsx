@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Activity, Calendar, ChevronLeft, ChevronRight, Eye, Lock, LockOpen } from "lucide-react";
+import { Activity, Calendar, ChevronLeft, ChevronRight, Eye, Lock, LockOpen, PlusCircle } from "lucide-react";
 import { supabase } from "@/lib/supabaseClient";
 import { WEEK_DAYS, todayDayLabel } from "@/lib/dates";
 import { addDays, loadSchedule, mondayOf, routinesForDate } from "@/lib/trainingPlan";
@@ -12,6 +12,9 @@ import { RoutineScreen } from "@/components/student/RoutineScreen";
 import { Skeleton } from "@/components/ui/Skeleton";
 import { PanelLayout } from "./PanelLayout";
 import { ExerciseNoteEditor } from "./ExerciseNoteEditor";
+import { TimerOverrideEditor } from "./TimerOverrideEditor";
+import { saveStudentTimer } from "@/lib/routineTimers";
+import { blockTypeLabel } from "@/lib/blocks";
 
 const DAY_SHORT = ["L", "M", "X", "J", "V", "S", "D"];
 const fmtDay = (d) => d.toLocaleDateString("es-CO", { day: "numeric", month: "short" });
@@ -28,6 +31,7 @@ export function RoutinePreviewPanel({ student, onClose, onOpenPanel }) {
   const [routine, setRoutine] = useState(null);
   const [loading, setLoading] = useState(true);
   const [editing, setEditing] = useState(null); // ejercicio al que se le escribe la observación
+  const [editingTimer, setEditingTimer] = useState(null); // { part, block } reloj solo para este alumno
   const [session, setSession] = useState(null); // ¿el alumno ya finalizó este día?
   const [sessionBusy, setSessionBusy] = useState(false);
 
@@ -70,7 +74,7 @@ export function RoutinePreviewPanel({ student, onClose, onOpenPanel }) {
   const weekDays = schedule
     ? WEEK_DAYS.map((label, i) => {
         const date = addDays(monday, i);
-        const info = routinesForDate(schedule.plans, schedule.fixed, date);
+        const info = routinesForDate(schedule.plans, schedule.fixed, date, schedule.extras);
         return { label, date, count: info.items.length, plan: info.plan, planWeek: info.week };
       })
     : [];
@@ -97,6 +101,17 @@ export function RoutinePreviewPanel({ student, onClose, onOpenPanel }) {
     return true;
   };
 
+  const saveTimer = async (timer) => {
+    const { part, block } = editingTimer;
+    const error = await saveStudentTimer(supabase, student.id, part.id, block.blockIndex, timer);
+    if (error) {
+      alert("No se pudo guardar el reloj. Si es la primera vez, revisá que el SQL del reloj programado esté aplicado en Supabase.");
+      return false;
+    }
+    loadRoutine(schedule, day, weekOffset);
+    return true;
+  };
+
   return (
     <PanelLayout title="Rutina como la ve el alumno" subtitle={student.isSelf ? "Mi entrenamiento" : student.name} onClose={onClose} width="max-w-2xl">
       <p className="text-muted text-xs mb-4 flex items-start gap-2">
@@ -110,6 +125,9 @@ export function RoutinePreviewPanel({ student, onClose, onOpenPanel }) {
         </button>
         <button onClick={() => onOpenPanel?.("days")} className="bg-card text-soft text-xs rounded-lg px-3 py-2 flex items-center gap-1.5 hover:text-ink">
           <Activity size={13} /> Semana base (días fijos)
+        </button>
+        <button onClick={() => onOpenPanel?.("extras")} className="bg-card text-soft text-xs rounded-lg px-3 py-2 flex items-center gap-1.5 hover:text-ink">
+          <PlusCircle size={13} /> Extras (remates, intermitentes, entrenos)
         </button>
       </div>
 
@@ -172,6 +190,7 @@ export function RoutinePreviewPanel({ student, onClose, onOpenPanel }) {
               userId={student.id}
               preview
               onEditNote={setEditing}
+              onEditTimer={(part, block) => setEditingTimer({ part, block })}
               coachEdit={weekOffset === 0}
               onClose={onClose}
               onToggle={onToggle}
@@ -181,6 +200,17 @@ export function RoutinePreviewPanel({ student, onClose, onOpenPanel }) {
         </>
       )}
 
+      {editingTimer && (
+        <TimerOverrideEditor
+          blockTitle={editingTimer.block.title || blockTypeLabel(editingTimer.block.block_type)}
+          routineTitle={editingTimer.part.title}
+          initial={editingTimer.block.timer}
+          base={editingTimer.block.timerBase}
+          isCustom={editingTimer.block.timerCustom}
+          onSave={saveTimer}
+          onClose={() => setEditingTimer(null)}
+        />
+      )}
       {editing && (
         <ExerciseNoteEditor
           exerciseName={editing.name}

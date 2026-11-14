@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { CalendarDays, Copy, CopyPlus, Download, Layers, Minus, Pencil, Plus, Trash2 } from "lucide-react";
 import { WEEK_DAYS, localDateString } from "@/lib/dates";
 import { supabase } from "@/lib/supabaseClient";
+import { libraryRoutines } from "@/lib/libraryRoutines";
 import { addDays, loadSchedule, mondayOf, parseDate, planLastDay, planStart, planWeekOf, plansOverlap, suggestedStart } from "@/lib/trainingPlan";
 import { downloadPlanPdf } from "@/lib/planPdf";
 import { DayRoutinesEditor } from "@/components/coach/programs/DayRoutinesEditor";
@@ -127,7 +128,7 @@ export function PlanPanel({ student, onClose }) {
     setLoading(true);
     const [schedule, { data: lib }, { data: tpls }, { data: cat }] = await Promise.all([
       loadSchedule(supabase, student.id, "id, title"),
-      supabase.from("routines").select("id, title, level, goal").order("title"),
+      libraryRoutines(supabase, "id, title, level, goal", (q) => q.order("title")),
       supabase.from("plan_templates").select("id, name, plan_template_phases(*), plan_template_days(*)").order("name"),
       supabase.from("exercises").select("id, name").order("name"),
     ]);

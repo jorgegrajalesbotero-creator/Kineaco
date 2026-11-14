@@ -47,6 +47,7 @@ export function CalendarScreen({ userId, studentName, healthConsent, onClose, on
 
   const plans = schedule?.plans || [];
   const fixed = schedule?.fixed || [];
+  const extras = schedule?.extras || [];
   const plan = currentOrNextPlan(plans);
   const today = new Date();
   const todayKey = localDateString(today);
@@ -59,7 +60,7 @@ export function CalendarScreen({ userId, studentName, healthConsent, onClose, on
   }, [month]);
 
   const selDate = new Date(`${selected}T00:00:00`);
-  const selInfo = schedule ? routinesForDate(plans, fixed, selDate) : { items: [] };
+  const selInfo = schedule ? routinesForDate(plans, fixed, selDate, extras) : { items: [] };
   const selIds = selInfo.items.map((a) => a.routines?.id).filter(Boolean);
   const inThisWeek = selDate >= weekStart && selDate < addDays(weekStart, 7);
 
@@ -75,7 +76,7 @@ export function CalendarScreen({ userId, studentName, healthConsent, onClose, on
   useEffect(() => {
     const missing = selIds.filter((id) => !details[detailKey(id)]);
     if (missing.length === 0) return;
-    loadRoutineDetails(supabase, missing, { changes: selChanges, week: selInfo.week || 0 }).then((d) =>
+    loadRoutineDetails(supabase, missing, { changes: selChanges, week: selInfo.week || 0, extraIds: selInfo.items.filter((x) => x.isExtra).map((x) => x.routines?.id), userId }).then((d) =>
       setDetails((prev) => ({ ...prev, ...Object.fromEntries(Object.entries(d).map(([id, v]) => [detailKey(id), v])) })));
   }, [selected, schedule, planChanges]);
 
@@ -98,7 +99,7 @@ export function CalendarScreen({ userId, studentName, healthConsent, onClose, on
     setBusy("day");
     try {
       const raw = fmt(selDate, { weekday: "long", day: "numeric", month: "long" });
-      showPdf(await buildRoutinePdf({ supabase, routineIds: selIds, dayTitle: raw.charAt(0).toUpperCase() + raw.slice(1), t: tr, locale, changes: selChanges, week: selInfo.week || 0 }));
+      showPdf(await buildRoutinePdf({ supabase, routineIds: selIds, dayTitle: raw.charAt(0).toUpperCase() + raw.slice(1), t: tr, locale, changes: selChanges, week: selInfo.week || 0, extraIds: selInfo.items.filter((a) => a.isExtra).map((a) => a.routines?.id), userId }));
     } catch {
       alert(tr("No se pudo generar el PDF: "));
     }
@@ -160,7 +161,7 @@ export function CalendarScreen({ userId, studentName, healthConsent, onClose, on
           {cells.map((d) => {
             const key = localDateString(d);
             const inMonth = d.getMonth() === month.getMonth();
-            const info = schedule ? routinesForDate(plans, fixed, d) : { items: [] };
+            const info = schedule ? routinesForDate(plans, fixed, d, extras) : { items: [] };
             const has = info.items.length > 0;
             const done = trained.has(key);
             const isSel = key === selected;
