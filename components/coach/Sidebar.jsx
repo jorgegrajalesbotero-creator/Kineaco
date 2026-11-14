@@ -5,17 +5,36 @@ import { BrandMark } from "@/components/ui/BrandMark";
 import { Calendar, ClipboardList, Dumbbell, LayoutDashboard, Megaphone, MessageCircle, User, UserCog, Users } from "lucide-react";
 
 export function Sidebar({ active, onSelect, email, fullName, onLogout, bell, isAdmin, unreadMessages = 0 }) {
-  const items = [
-    { key: "rutinas", label: "Rutinas", icon: LayoutDashboard },
-    { key: "ejercicios", label: "Ejercicios", icon: Dumbbell },
-    { key: "mensajes", label: "Mensajes", icon: MessageCircle, badge: unreadMessages },
-    { key: "alumnos", label: "Alumnos", icon: Users },
-    { key: "reporte", label: "Reporte semanal", icon: ClipboardList },
-    { key: "anuncios", label: "Anuncios", icon: Megaphone },
-    { key: "programas", label: "Programas", icon: Calendar },
-    // Solo el administrador gestiona usuarios y roles.
-    ...(isAdmin ? [{ key: "usuarios", label: "Usuarios", icon: UserCog }] : []),
-    { key: "perfil", label: "Mi perfil", icon: User },
+  // Menú agrupado por niveles: primero el día a día con los alumnos, luego la biblioteca
+  const groups = [
+    {
+      title: "Alumnos",
+      items: [
+        { key: "alumnos", label: "Alumnos", icon: Users },
+        { key: "mensajes", label: "Mensajes", icon: MessageCircle, badge: unreadMessages },
+        { key: "reporte", label: "Reporte semanal", icon: ClipboardList },
+      ],
+    },
+    {
+      title: "Biblioteca",
+      items: [
+        { key: "rutinas", label: "Rutinas", icon: LayoutDashboard },
+        { key: "ejercicios", label: "Ejercicios", icon: Dumbbell },
+        { key: "programas", label: "Programas", icon: Calendar },
+      ],
+    },
+    {
+      title: "Comunicación",
+      items: [{ key: "anuncios", label: "Anuncios", icon: Megaphone }],
+    },
+    {
+      title: "Cuenta",
+      items: [
+        // Solo el administrador gestiona usuarios y roles.
+        ...(isAdmin ? [{ key: "usuarios", label: "Usuarios", icon: UserCog }] : []),
+        { key: "perfil", label: "Mi perfil", icon: User },
+      ],
+    },
   ];
   return (
     <div className="w-64 md:w-56 h-full bg-panel border-r border-field flex flex-col shrink-0">
@@ -29,8 +48,12 @@ export function Sidebar({ active, onSelect, email, fullName, onLogout, bell, isA
         </div>
         {bell}
       </div>
-      <nav className="flex-1 px-3 py-4 space-y-1">
-        {items.map(({ key, label, icon: Icon, badge }) => (
+      <nav className="flex-1 min-h-0 overflow-y-auto overscroll-contain px-3 py-3">
+        {groups.map((g) => (
+          <div key={g.title} className="mb-3 last:mb-0">
+            <p className="px-3 pt-2 pb-1.5 text-[10px] font-semibold uppercase tracking-[0.14em] text-muted">{g.title}</p>
+            <div className="space-y-0.5">
+        {g.items.map(({ key, label, icon: Icon, badge }) => (
           <button key={key} onClick={() => onSelect(key)} className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm transition-colors ${active === key ? "bg-accent/[0.10] text-accent" : "text-soft hover:bg-card/60 hover:text-ink"}`}>
             <Icon size={17} />
             <span className="flex-1 text-left">{label}</span>
@@ -38,6 +61,9 @@ export function Sidebar({ active, onSelect, email, fullName, onLogout, bell, isA
               <span className="bg-accent text-app text-[10px] font-bold rounded-full min-w-5 h-5 px-1.5 flex items-center justify-center">{badge > 99 ? "99+" : badge}</span>
             )}
           </button>
+        ))}
+            </div>
+          </div>
         ))}
       </nav>
       <div className="px-3 pb-[max(1rem,env(safe-area-inset-bottom))] space-y-1">
