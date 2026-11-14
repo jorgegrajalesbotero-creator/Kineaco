@@ -1,5 +1,6 @@
 import { blockTypeLabel } from "@/lib/blocks";
 import { supabase } from "@/lib/supabaseClient";
+import { loadTimers, saveRoutineTimers, timersFor } from "@/lib/routineTimers";
 
 export const catalogOptions = (catalog) => catalog.map((c) => ({ value: c.id, label: c.name, sub: c.muscle_group || "" }));
 
@@ -53,7 +54,11 @@ export async function writeRoutineContent(routineId, mode, list, blocks) {
     p_blocks: payloadBlocks,
     p_list: payloadList,
   });
-  return error || null;
+  if (error) return error;
+  // Relojes programados de cada bloque (si falla, el contenido igual quedó guardado)
+  const timerError = await saveRoutineTimers(supabase, routineId, mode === "bloques" ? blocks : []);
+  if (timerError) console.warn("No se pudo guardar el reloj de la rutina", timerError);
+  return null;
 }
 
 export function autoRoutineTitle() {
@@ -96,7 +101,7 @@ export function listToBlocks(list, startNumber = 1) {
 
 // Lee los ejercicios y bloques de una rutina guardada
 export async function loadRoutineContent(routineId) {
-  const [{ data: exData }, { data: blockData }] = await Promise.all([
+  const [{ data: exData }, { data: blockData }, timerRows] = await Promise.all([
     supabase
       .from("routine_exercises")
       .select("exercise_id, block_id, item_key, sets, reps, order_index, target_weight_kg, rest_minutes, exercises(name, video_url)")
@@ -107,7 +112,9 @@ export async function loadRoutineContent(routineId) {
       .select("id, block_type, title, sets, notes, order_index")
       .eq("routine_id", routineId)
       .order("order_index"),
+    loadTimers(supabase, [routineId]),
   ]);
+  const timers = timersFor(timerRows, routineId);
   const toItem = (e) => ({
     itemKey: e.item_key || null,
     exerciseId: e.exercise_id,
@@ -121,8 +128,10 @@ export async function loadRoutineContent(routineId) {
     return {
       mode: "bloques",
       list: [],
-      blocks: blockData.map((b) => ({
+      blocks: blockData.map((b, i) => ({
         key: b.id,
+        origIndex: b.order_index ?? i,
+        timer: timers[b.order_index ?? i]?.timer || null,
         block_type: b.block_type,
         title: b.title || "",
         sets: b.sets != null ? String(b.sets) : "",
@@ -144,7 +153,7 @@ export function mergeRoutineContent(current, other) {
   const base = current.mode === "bloques" ? current.blocks : listToBlocks(current.list);
   let extra =
     other.mode === "bloques"
-      ? other.blocks.map((b) => ({ ...b, key: tmpKey(), exercises: b.exercises.map(fresh) }))
+      ? other.blocks.map((b) => ({ ...b, key: tmpKey(), origIndex: undefined, exercises: b.exercises.map(fresh) }))
       : listToBlocks(other.list.map(fresh));
   // Un solo estiramiento al final: se quitan los estiramientos vacíos de la otra rutina
   // y lo nuevo entra antes del estiramiento de esta rutina

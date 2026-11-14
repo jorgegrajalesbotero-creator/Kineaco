@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { BellOff, Flag, Minus, Pause, Play, Plus, RotateCcw, SkipForward, X } from "lucide-react";
 import { tr } from "@/lib/i18n";
 import { beep, getAudio, startAlarm, vibrate } from "@/lib/alarm";
-import { CLOCK_FIELDS, CLOCK_MODES, buildPhases, formatClock, formatStopwatch, normalizeConfig, stateAt } from "@/lib/clock";
+import { CLOCK_FIELDS, CLOCK_MODES, buildPhases, formatClock, formatStopwatch, normalizeConfig, normalizeTimer, stateAt } from "@/lib/clock";
 
 const MODE_LABELS = { rest: "Descanso", tabata: "Tabata", intervals: "Intervalos", amrap: "AMRAP", stopwatch: "Cronómetro" };
 const MODE_HINTS = {
@@ -25,10 +25,12 @@ function loadSaved() {
 }
 
 // Reloj de entrenamiento a pantalla completa
-export function WorkoutClock({ onClose, initialMode }) {
+// preset = reloj programado por el coach ({ mode, ...valores }); el alumno igual lo puede ajustar.
+export function WorkoutClock({ onClose, initialMode, preset = null }) {
   const [saved] = useState(loadSaved);
-  const [mode, setMode] = useState(() => (CLOCK_MODES.includes(initialMode) ? initialMode : CLOCK_MODES.includes(saved.mode) ? saved.mode : "tabata"));
-  const [configs, setConfigs] = useState(() => Object.fromEntries(CLOCK_MODES.map((m) => [m, normalizeConfig(m, saved.configs?.[m])])));
+  const [programmed] = useState(() => normalizeTimer(preset));
+  const [mode, setMode] = useState(() => programmed?.mode || (CLOCK_MODES.includes(initialMode) ? initialMode : CLOCK_MODES.includes(saved.mode) ? saved.mode : "tabata"));
+  const [configs, setConfigs] = useState(() => Object.fromEntries(CLOCK_MODES.map((m) => [m, normalizeConfig(m, programmed?.mode === m ? programmed : saved.configs?.[m])])));
   // run = { startedAt, pausedAt (o null), pausedTotal, extra (s, solo descanso) }
   const [run, setRun] = useState(null);
   const [now, setNow] = useState(() => Date.now());
@@ -47,10 +49,17 @@ export function WorkoutClock({ onClose, initialMode }) {
   const st = mode === "stopwatch" ? null : stateAt(phases, elapsedMs);
   const finished = !!st?.done && !!run;
 
-  // Guardar el modo y la configuración en este dispositivo
+  // Guardar el modo y la configuración en este dispositivo (no si viene programado por el coach)
   useEffect(() => {
+    if (programmed) return;
     try { localStorage.setItem(STORE_KEY, JSON.stringify({ mode, configs })); } catch { }
-  }, [mode, configs]);
+  }, [mode, configs, programmed]);
+  const isProgrammed = !!programmed && mode === programmed.mode && CLOCK_FIELDS[mode].every((f) => configs[mode][f.key] === programmed[f.key]);
+  const backToProgrammed = () => {
+    reset();
+    setMode(programmed.mode);
+    setConfigs((c) => ({ ...c, [programmed.mode]: normalizeConfig(programmed.mode, programmed) }));
+  };
 
   // Reloj interno: refresca la pantalla mientras corre
   useEffect(() => {
@@ -220,6 +229,15 @@ export function WorkoutClock({ onClose, initialMode }) {
             ))}
           </div>
           <p className="text-muted text-xs mb-4">{tr(MODE_HINTS[mode])}</p>
+
+          {programmed && (
+            <div className={`flex items-center gap-2 rounded-xl px-3 py-2 mb-4 text-xs ${isProgrammed ? "bg-accent/15 text-accent" : "bg-card text-soft"}`}>
+              <span className="flex-1">{isProgrammed ? tr("Programado por su coach. Puede ajustarlo si lo necesita.") : tr("Usted cambió lo que programó su coach.")}</span>
+              {!isProgrammed && !run && (
+                <button onClick={backToProgrammed} className="text-accent font-semibold shrink-0">{tr("Volver a lo programado")}</button>
+              )}
+            </div>
+          )}
 
           {/* Configuración (solo antes de iniciar) */}
           {!run && CLOCK_FIELDS[mode].length > 0 && (

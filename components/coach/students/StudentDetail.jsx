@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { Activity, ArrowLeft, Calendar, Camera, ChevronDown, ChevronRight, ClipboardCheck, Download, Dumbbell, Eye, TrendingUp, Lock, MessageCircle, Ruler, UserCog, Utensils } from "lucide-react";
+import { Activity, ArrowLeft, Calendar, Camera, ChevronDown, ChevronRight, ClipboardCheck, Download, Dumbbell, Eye, TrendingUp, Lock, MessageCircle, PlusCircle, Ruler, UserCog, Utensils } from "lucide-react";
 import { supabase } from "@/lib/supabaseClient";
 import { buildReportPdf } from "@/lib/planPdf";
 import { usePdfPreview } from "@/components/ui/PdfPreview";
@@ -15,6 +15,7 @@ import { AccountPanel } from "./AccountPanel";
 import { CheckinPanel } from "./CheckinPanel";
 import { ComparePanel } from "./ComparePanel";
 import { DaysPanel } from "./DaysPanel";
+import { ExtrasPanel } from "./ExtrasPanel";
 import { ExerciseHistoryPanel } from "./ExerciseHistoryPanel";
 import { MeasurementsPanel } from "./MeasurementsPanel";
 import { MessagesPanel } from "./MessagesPanel";
@@ -28,6 +29,7 @@ const PANELS = {
   checkin: CheckinPanel,
   compare: ComparePanel,
   days: DaysPanel,
+  extras: ExtrasPanel,
   plan: PlanPanel,
   routine: RoutinePreviewPanel,
   photos: PhotosPanel,
@@ -41,7 +43,7 @@ const PANELS = {
 // Grupos de la ficha, por niveles (se despliega solo el que se necesita).
 // "Ver su rutina", Mensajes, PDF y el check-in (camaleón) van arriba, así que no se repiten aquí.
 const GROUPS = [
-  { title: "Entrenamiento", icon: Calendar, items: [["Planeación (fases, rutinas y cargas)", "plan", Calendar], ["Semana base (días fijos)", "days", Activity]] },
+  { title: "Entrenamiento", icon: Calendar, items: [["Planeación (fases, rutinas y cargas)", "plan", Calendar], ["Extras: remates, intermitentes y entrenos adicionales", "extras", PlusCircle], ["Semana base (días fijos)", "days", Activity]] },
   { title: "Progreso", icon: TrendingUp, items: [["Progreso por ejercicio (gráficos e historial)", "exercises", Dumbbell], ["Peso sugerido vs. real y logros", "compare", TrendingUp], ["Medidas", "measurements", Ruler], ["Fotos", "photos", Camera]] },
   { title: "Nutrición", icon: Utensils, items: [["Nutrición y comidas registradas", "nutrition", Utensils]] },
   { title: "Cuenta", icon: Lock, items: [["Acceso y ficha de ingreso", "access", Lock], ["Nombre, correo y eliminar cuenta", "account", UserCog]] },

@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabaseClient";
+import { libraryRoutines } from "@/lib/libraryRoutines";
 import { matchesSearch } from "@/lib/search";
 import { SearchInput } from "@/components/ui/Search";
 import { DayRoutinesEditor } from "@/components/coach/programs/DayRoutinesEditor";
@@ -24,7 +25,7 @@ export function DaysPanel({ student, onClose, onChanged }) {
 
   async function load() {
     const [{ data: routinesData }, { data }, { data: customData }] = await Promise.all([
-      supabase.from("routines").select("id, title, level, goal"),
+      libraryRoutines(supabase, "id, title, level, goal"),
       supabase.from("routine_assignments").select("day_label, routine_id, order_index").eq("user_id", student.id).order("order_index"),
       supabase.from("student_exercise_weights").select("exercise_id, target_weight_kg").eq("user_id", student.id),
       supabase.from("training_plans").select("start_date, weeks").eq("user_id", student.id).then((r) => {

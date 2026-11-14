@@ -37,12 +37,12 @@ export function useHomeExtras(userId) {
       // Días de esta semana con algún ejercicio hecho (0 = lunes)
       const trainedDays = new Set((progressRes.data || []).map((p) => (new Date(p.completed_at).getDay() + 6) % 7));
       // Días con rutina esta semana (del plan si hay plan activo, si no de sus días fijos) y lo de mañana
-      const { plans, fixed } = assignRes;
+      const { plans, fixed, extras } = assignRes;
       const monday = mondayOf(new Date());
-      const assignedCount = WEEK_DAYS.filter((_, i) => routinesForDate(plans, fixed, addDays(monday, i)).items.length > 0).length;
+      const assignedCount = WEEK_DAYS.filter((_, i) => routinesForDate(plans, fixed, addDays(monday, i), extras).items.length > 0).length;
       const todayIndex = (new Date().getDay() + 6) % 7;
       const tomorrowLabel = WEEK_DAYS[(todayIndex + 1) % 7];
-      const tomorrow = routinesForDate(plans, fixed, addDays(new Date(), 1)).items.map((a) => a.routines);
+      const tomorrow = routinesForDate(plans, fixed, addDays(new Date(), 1), extras).items.map((a) => a.routines);
       const plan = currentOrNextPlan(plans);
 
       const meals = mealsRes.data || [];

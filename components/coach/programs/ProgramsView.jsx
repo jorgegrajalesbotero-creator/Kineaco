@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { Dumbbell, Home, X } from "lucide-react";
 import { WEEK_DAYS } from "@/lib/dates";
 import { supabase } from "@/lib/supabaseClient";
+import { libraryRoutines } from "@/lib/libraryRoutines";
 import { DayRoutinesEditor } from "@/components/coach/programs/DayRoutinesEditor";
 import { Skeleton } from "@/components/ui/Skeleton";
 
@@ -29,7 +30,7 @@ export function ProgramsView() {
 
   async function loadAll() {
     setLoading(true);
-    const { data: routinesData } = await supabase.from("routines").select("id, title").order("title");
+    const { data: routinesData } = await libraryRoutines(supabase, "id, title", (q) => q.order("title"));
     setRoutines(routinesData || []);
 
     const { data: programsData } = await supabase

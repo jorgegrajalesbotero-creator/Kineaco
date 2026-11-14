@@ -7,6 +7,7 @@ import { filterItems, sortItems } from "@/lib/filters";
 import { useFilterState } from "@/lib/useFilterState";
 import { fetchAllRows } from "@/lib/fetchAll";
 import { supabase } from "@/lib/supabaseClient";
+import { libraryRoutines } from "@/lib/libraryRoutines";
 import { buildRoutinePdf } from "@/lib/planPdf";
 import { usePdfPreview } from "@/components/ui/PdfPreview";
 import { BlockEditor } from "@/components/coach/routines/BlockEditor";
@@ -124,10 +125,8 @@ export function RoutinesView() {
 
   async function loadRoutines() {
     setLoading(true);
-    const { data: routinesData } = await supabase
-      .from("routines")
-      .select("*, routine_exercises(id, exercises(name)), routine_blocks(id)")
-      .order("created_at", { ascending: false });
+    const { data: routinesData } = await libraryRoutines(supabase, "*, routine_exercises(id, exercises(name)), routine_blocks(id)", (q) =>
+      q.order("created_at", { ascending: false }));
     setRoutines(routinesData || []);
     setLoading(false);
   }

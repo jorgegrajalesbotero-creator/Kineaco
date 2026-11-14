@@ -26,7 +26,7 @@ async function noticesFor(db, student, today) {
   const rows = [];
 
   const schedule = await loadSchedule(db, uid, "id, title");
-  const items = routinesForDate(schedule.plans, schedule.fixed, today).items || [];
+  const items = routinesForDate(schedule.plans, schedule.fixed, today, schedule.extras).items || [];
   const titles = items.map((a) => a.routines?.title).filter(Boolean);
   if (titles.length > 0) {
     rows.push({ recipient_id: uid, type: "day", link: "home", dedupe_key: `day:${todayIso}`, title: "Hoy le toca entrenar", body: titles.join(" + ") });

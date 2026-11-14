@@ -47,6 +47,7 @@ export function CalendarScreen({ userId, studentName, healthConsent, onClose, on
 
   const plans = schedule?.plans || [];
   const fixed = schedule?.fixed || [];
+  const extras = schedule?.extras || [];
   const plan = currentOrNextPlan(plans);
   const today = new Date();
   const todayKey = localDateString(today);
@@ -59,7 +60,7 @@ export function CalendarScreen({ userId, studentName, healthConsent, onClose, on
   }, [month]);
 
   const selDate = new Date(`${selected}T00:00:00`);
-  const selInfo = schedule ? routinesForDate(plans, fixed, selDate) : { items: [] };
+  const selInfo = schedule ? routinesForDate(plans, fixed, selDate, extras) : { items: [] };
   const selIds = selInfo.items.map((a) => a.routines?.id).filter(Boolean);
   const inThisWeek = selDate >= weekStart && selDate < addDays(weekStart, 7);
 
@@ -160,7 +161,7 @@ export function CalendarScreen({ userId, studentName, healthConsent, onClose, on
           {cells.map((d) => {
             const key = localDateString(d);
             const inMonth = d.getMonth() === month.getMonth();
-            const info = schedule ? routinesForDate(plans, fixed, d) : { items: [] };
+            const info = schedule ? routinesForDate(plans, fixed, d, extras) : { items: [] };
             const has = info.items.length > 0;
             const done = trained.has(key);
             const isSel = key === selected;
