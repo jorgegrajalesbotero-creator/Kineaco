@@ -1,6 +1,6 @@
 import { blockTypeLabel } from "@/lib/blocks";
 import { supabase } from "@/lib/supabaseClient";
-import { loadTimers, saveRoutineTimers, timersFor } from "@/lib/routineTimers";
+import { LIST_TIMER_INDEX, loadTimers, saveRoutineTimers, timersFor } from "@/lib/routineTimers";
 
 export const catalogOptions = (catalog) => catalog.map((c) => ({ value: c.id, label: c.name, sub: c.muscle_group || "" }));
 
@@ -23,7 +23,7 @@ export function defaultBlockTitle(type, blocks) {
 // insertaba fila por fila sin transacción: si una inserción fallaba, la
 // rutina quedaba vacía o a medias (BUG-M1). Ahora, si algo falla, se
 // revierte todo y la rutina conserva su contenido anterior.
-export async function writeRoutineContent(routineId, mode, list, blocks) {
+export async function writeRoutineContent(routineId, mode, list, blocks, { timer = null } = {}) {
   const mapExercise = (ex) => ({
     exercise_id: ex.exerciseId,
     reps: ex.reps ?? "",
@@ -56,7 +56,7 @@ export async function writeRoutineContent(routineId, mode, list, blocks) {
   });
   if (error) return error;
   // Relojes programados de cada bloque (si falla, el contenido igual quedó guardado)
-  const timerError = await saveRoutineTimers(supabase, routineId, mode === "bloques" ? blocks : []);
+  const timerError = await saveRoutineTimers(supabase, routineId, { mode: mode === "bloques" ? "bloques" : "lista", blocks, listTimer: timer });
   if (timerError) console.warn("No se pudo guardar el reloj de la rutina", timerError);
   return null;
 }
@@ -140,7 +140,7 @@ export async function loadRoutineContent(routineId) {
       })),
     };
   }
-  return { mode: "lista", list: (exData || []).map(toItem), blocks: [] };
+  return { mode: "lista", list: (exData || []).map(toItem), blocks: [], timer: timers[LIST_TIMER_INDEX]?.timer || null };
 }
 
 // Fusiona el contenido de otra rutina al final de la que se está editando.

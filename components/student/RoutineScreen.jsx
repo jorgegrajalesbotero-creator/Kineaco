@@ -43,8 +43,10 @@ export function RoutineScreen({ routine, userId, pet = null, onClose, onToggle, 
   const downloadPdf = async () => {
     setPdfBusy(true);
     try {
-      const ids = (routine.parts || [routine]).map((p) => p.id);
-      showPdf(await buildRoutinePdf({ supabase, routineIds: ids, dayTitle: tr(routine.day_label), t: tr, locale: appLocale(), changes: routine.planChanges || [], week: routine.planWeek || 0 }));
+      const parts = routine.parts || [routine];
+      const ids = parts.map((p) => p.id);
+      const extraIds = parts.filter((p) => p.isExtra).map((p) => p.id);
+      showPdf(await buildRoutinePdf({ supabase, routineIds: ids, dayTitle: tr(routine.day_label), t: tr, locale: appLocale(), changes: routine.planChanges || [], week: routine.planWeek || 0, extraIds, userId }));
     } catch {
       alert(tr("No se pudo generar el PDF: "));
     }
@@ -310,6 +312,30 @@ export function RoutineScreen({ routine, userId, pet = null, onClose, onToggle, 
     </div>
   );
 
+  // Reloj programado por el coach (de un bloque, o de toda la rutina en "lista simple")
+  const timerChip = (part, b) => {
+    if (preview && onEditTimer) {
+      return (
+        <button onClick={() => onEditTimer(part, b)} className={`w-full flex items-center gap-2 rounded-lg px-3 py-2 mb-2 text-xs text-left ${b.timer ? "bg-accent/15 text-accent" : "bg-field text-soft hover:text-ink"}`}>
+          {b.timer ? <Timer size={14} /> : <Plus size={14} />}
+          <span className="flex-1">{b.timer ? `Reloj: ${timerLabel(b.timer)}${b.timerCustom ? " (solo para este alumno)" : " (de la rutina)"}` : "Programar reloj para este alumno"}</span>
+          {b.timer && <Pencil size={12} />}
+        </button>
+      );
+    }
+    if (!b.timer) return null;
+    return (
+      <button onClick={() => setClock({ preset: b.timer })} className="w-full flex items-center gap-2.5 rounded-xl px-3 py-2.5 mb-2 bg-accent/15 border border-accent/30 text-left active:scale-[0.99] transition-transform">
+        <span className="w-8 h-8 rounded-lg bg-accent text-app flex items-center justify-center shrink-0"><Timer size={16} /></span>
+        <span className="flex-1 min-w-0">
+          <span className="block text-ink text-sm font-medium">{timerLabel(b.timer, tr)}</span>
+          <span className="block text-muted text-[11px]">{tr("Reloj programado por su coach · tocar para abrir")}</span>
+        </span>
+        <ChevronRight size={16} className="text-accent shrink-0" />
+      </button>
+    );
+  };
+
   return (
     <div className="flex-1 overflow-y-auto pb-4">
       {celebrate && <Confetti onDone={() => setTimeout(() => setCelebrate(false), 1200)} />}
@@ -404,22 +430,7 @@ export function RoutineScreen({ routine, userId, pet = null, onClose, onToggle, 
                             </div>
                           </div>
                           {b.notes && <p className="text-soft text-xs bg-card rounded-lg px-3 py-2 mb-2">{b.notes}</p>}
-                          {preview && onEditTimer ? (
-                            <button onClick={() => onEditTimer(part, b)} className={`w-full flex items-center gap-2 rounded-lg px-3 py-2 mb-2 text-xs text-left ${b.timer ? "bg-accent/15 text-accent" : "bg-field text-soft hover:text-ink"}`}>
-                              {b.timer ? <Timer size={14} /> : <Plus size={14} />}
-                              <span className="flex-1">{b.timer ? `Reloj: ${timerLabel(b.timer)}${b.timerCustom ? " (solo para este alumno)" : " (de la rutina)"}` : "Programar reloj para este alumno"}</span>
-                              {b.timer && <Pencil size={12} />}
-                            </button>
-                          ) : b.timer ? (
-                            <button onClick={() => setClock({ preset: b.timer })} className="w-full flex items-center gap-2.5 rounded-xl px-3 py-2.5 mb-2 bg-accent/15 border border-accent/30 text-left active:scale-[0.99] transition-transform">
-                              <span className="w-8 h-8 rounded-lg bg-accent text-app flex items-center justify-center shrink-0"><Timer size={16} /></span>
-                              <span className="flex-1 min-w-0">
-                                <span className="block text-ink text-sm font-medium">{timerLabel(b.timer, tr)}</span>
-                                <span className="block text-muted text-[11px]">{tr("Reloj programado por su coach · tocar para abrir")}</span>
-                              </span>
-                              <ChevronRight size={16} className="text-accent shrink-0" />
-                            </button>
-                          ) : null}
+                          {timerChip(part, b)}
                           <div className="space-y-2">
                             {items.map(({ ex, i }) => exerciseRow(ex, i, [ex.rowLabel, formatWeight(ex.targetWeight, unit)].filter(Boolean).join(" · ")))}
                           </div>
@@ -428,9 +439,12 @@ export function RoutineScreen({ routine, userId, pet = null, onClose, onToggle, 
                     })}
                   </div>
                 ) : (
-                  <div className="space-y-2">
-                    {routine.exercises.map((ex, i) => ({ ex, i })).filter(({ ex }) => ex.partIndex === part.partIndex).map(({ ex, i }) => exerciseRow(ex, i, ex.sets))}
-                  </div>
+                  <>
+                    {timerChip(part, part)}
+                    <div className="space-y-2">
+                      {routine.exercises.map((ex, i) => ({ ex, i })).filter(({ ex }) => ex.partIndex === part.partIndex).map(({ ex, i }) => exerciseRow(ex, i, ex.sets))}
+                    </div>
+                  </>
                 )}
               </div>
             );

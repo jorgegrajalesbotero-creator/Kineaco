@@ -76,7 +76,7 @@ export function CalendarScreen({ userId, studentName, healthConsent, onClose, on
   useEffect(() => {
     const missing = selIds.filter((id) => !details[detailKey(id)]);
     if (missing.length === 0) return;
-    loadRoutineDetails(supabase, missing, { changes: selChanges, week: selInfo.week || 0 }).then((d) =>
+    loadRoutineDetails(supabase, missing, { changes: selChanges, week: selInfo.week || 0, extraIds: selInfo.items.filter((x) => x.isExtra).map((x) => x.routines?.id), userId }).then((d) =>
       setDetails((prev) => ({ ...prev, ...Object.fromEntries(Object.entries(d).map(([id, v]) => [detailKey(id), v])) })));
   }, [selected, schedule, planChanges]);
 
@@ -99,7 +99,7 @@ export function CalendarScreen({ userId, studentName, healthConsent, onClose, on
     setBusy("day");
     try {
       const raw = fmt(selDate, { weekday: "long", day: "numeric", month: "long" });
-      showPdf(await buildRoutinePdf({ supabase, routineIds: selIds, dayTitle: raw.charAt(0).toUpperCase() + raw.slice(1), t: tr, locale, changes: selChanges, week: selInfo.week || 0 }));
+      showPdf(await buildRoutinePdf({ supabase, routineIds: selIds, dayTitle: raw.charAt(0).toUpperCase() + raw.slice(1), t: tr, locale, changes: selChanges, week: selInfo.week || 0, extraIds: selInfo.items.filter((a) => a.isExtra).map((a) => a.routines?.id), userId }));
     } catch {
       alert(tr("No se pudo generar el PDF: "));
     }

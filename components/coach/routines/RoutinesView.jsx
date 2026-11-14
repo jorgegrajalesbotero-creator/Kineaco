@@ -15,6 +15,7 @@ import { autoRoutineTitle, catalogOptions, loadRoutineContent, mergeRoutineConte
 import { ExerciseItemEditor } from "@/components/coach/routines/ExerciseItemEditor";
 import { AssignRoutineModal } from "@/components/coach/routines/AssignRoutineModal";
 import { RoutineModeToggle } from "@/components/coach/routines/RoutineModeToggle";
+import { RoutineTimerField } from "@/components/coach/routines/RoutineTimerField";
 import { SearchSelect } from "@/components/ui/Search";
 import { FilterBar } from "@/components/ui/FilterBar";
 import { Select } from "@/components/ui/Select";
@@ -108,6 +109,8 @@ export function RoutinesView() {
 
   const [viewingId, setViewingId] = useState(null);
   const [editDraft, setEditDraft] = useState({ title: "", level: "Principiante", goal: "", duration: "" });
+  const [draftTimer, setDraftTimer] = useState(null); // reloj de la rutina en "lista simple"
+  const [editTimer, setEditTimer] = useState(null);
   const [editExercises, setEditExercises] = useState([]);
   const [editExForm, setEditExForm] = useState({ exerciseId: "", sets: "", reps: "", targetWeight: "", restMinutes: "" });
   const [savingEdit, setSavingEdit] = useState(false);
@@ -210,12 +213,13 @@ export function RoutinesView() {
       return;
     }
 
-    const contentError = await writeRoutineContent(newRoutine.id, draftMode, draftExercises, draftBlocks);
+    const contentError = await writeRoutineContent(newRoutine.id, draftMode, draftExercises, draftBlocks, { timer: draftTimer });
     if (contentError) {
       alert("La rutina se creó, pero hubo un error al guardar sus ejercicios: " + (contentError.message || ""));
     }
 
     setDraft({ title: "", level: "Principiante", goal: "", duration: "" });
+    setDraftTimer(null);
     setDraftExercises([]);
     setDraftBlocks([]);
     setDraftMode("lista");
@@ -239,6 +243,7 @@ export function RoutinesView() {
     setEditMode(content.mode);
     setEditBlocks(content.blocks);
     setEditExercises(content.list);
+    setEditTimer(content.timer || null);
   };
 
   const closeDetail = () => {
@@ -246,6 +251,7 @@ export function RoutinesView() {
     setEditExercises([]);
     setEditBlocks([]);
     setEditMode("lista");
+    setEditTimer(null);
     setEditExForm({ exerciseId: "", sets: "", reps: "", targetWeight: "", restMinutes: "" });
     setMergeOpen(false);
     setMergeId("");
@@ -313,7 +319,7 @@ export function RoutinesView() {
       return;
     }
 
-    const contentError = await writeRoutineContent(viewingId, editMode, editExercises, editBlocks);
+    const contentError = await writeRoutineContent(viewingId, editMode, editExercises, editBlocks, { timer: editTimer });
     if (contentError) {
       alert("Error al guardar los ejercicios de la rutina: " + (contentError.message || ""));
       setSavingEdit(false);
@@ -388,7 +394,7 @@ export function RoutinesView() {
     const strip = (arr) => arr.map((e) => ({ ...e, itemKey: null }));
     const list = strip(content.list);
     const blocks = content.blocks.map((b) => ({ ...b, exercises: strip(b.exercises) }));
-    const cErr = await writeRoutineContent(nr.id, content.mode, list, blocks);
+    const cErr = await writeRoutineContent(nr.id, content.mode, list, blocks, { timer: content.timer });
     setBusyId(null);
     if (cErr) alert("La copia se creó, pero hubo un error al copiar sus ejercicios: " + (cErr.message || ""));
     loadRoutines();
@@ -470,6 +476,7 @@ export function RoutinesView() {
         ) : (
           <>
             <ListItems items={draftExercises} setItems={setDraftExercises} catalog={catalog} />
+            <RoutineTimerField value={draftTimer} onChange={setDraftTimer} />
 
             <div className="bg-card rounded-xl p-4 mb-6">
               <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
@@ -547,6 +554,7 @@ export function RoutinesView() {
         ) : (
           <>
             <ListItems items={editExercises} setItems={setEditExercises} catalog={catalog} />
+            <RoutineTimerField value={editTimer} onChange={setEditTimer} />
             {editExercises.length === 0 && <p className="text-muted text-xs italic mb-3">Todavía no hay ejercicios en esta rutina.</p>}
 
             <div className="bg-card rounded-xl p-4 mb-6">
