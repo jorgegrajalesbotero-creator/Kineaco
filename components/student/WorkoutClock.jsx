@@ -25,6 +25,9 @@ function loadSaved() {
 }
 
 // Reloj de entrenamiento a pantalla completa
+// Hora actual (fuera del componente: solo se usa en botones y efectos, nunca al dibujar)
+const nowMs = () => Date.now();
+
 // preset = reloj programado por el coach ({ mode, ...valores }); el alumno igual lo puede ajustar.
 export function WorkoutClock({ onClose, initialMode, preset = null }) {
   const [saved] = useState(loadSaved);
@@ -33,7 +36,7 @@ export function WorkoutClock({ onClose, initialMode, preset = null }) {
   const [configs, setConfigs] = useState(() => Object.fromEntries(CLOCK_MODES.map((m) => [m, normalizeConfig(m, programmed?.mode === m ? programmed : saved.configs?.[m])])));
   // run = { startedAt, pausedAt (o null), pausedTotal, extra (s, solo descanso) }
   const [run, setRun] = useState(null);
-  const [now, setNow] = useState(() => Date.now());
+  const [now, setNow] = useState(() => nowMs());
   const [rounds, setRounds] = useState(0); // AMRAP
   const [laps, setLaps] = useState([]); // Cronómetro (ms acumulados)
   const alarmStop = useRef(null); // apaga la alarma final
@@ -55,16 +58,12 @@ export function WorkoutClock({ onClose, initialMode, preset = null }) {
     try { localStorage.setItem(STORE_KEY, JSON.stringify({ mode, configs })); } catch { }
   }, [mode, configs, programmed]);
   const isProgrammed = !!programmed && mode === programmed.mode && CLOCK_FIELDS[mode].every((f) => configs[mode][f.key] === programmed[f.key]);
-  const backToProgrammed = () => {
-    reset();
-    setMode(programmed.mode);
-    setConfigs((c) => ({ ...c, [programmed.mode]: normalizeConfig(programmed.mode, programmed) }));
-  };
+
 
   // Reloj interno: refresca la pantalla mientras corre
   useEffect(() => {
     if (!running) return;
-    const id = setInterval(() => setNow(Date.now()), mode === "stopwatch" ? 100 : 200);
+    const id = setInterval(() => setNow(nowMs()), mode === "stopwatch" ? 100 : 200);
     return () => clearInterval(id);
   }, [running, mode]);
 
@@ -94,7 +93,7 @@ export function WorkoutClock({ onClose, initialMode, preset = null }) {
         alarmStop.current?.();
         alarmStop.current = startAlarm();
         setRinging(true);
-        setRun((r) => (r && !r.pausedAt ? { ...r, pausedAt: Date.now() } : r));
+        setRun((r) => (r && !r.pausedAt ? { ...r, pausedAt: nowMs() } : r));
       }
       return;
     }
@@ -130,7 +129,7 @@ export function WorkoutClock({ onClose, initialMode, preset = null }) {
   const start = () => {
     stopAlarm();
     ensureAudio();
-    const t = Date.now();
+    const t = nowMs();
     setNow(t);
     lastIndex.current = -1;
     lastTick.current = null;
@@ -140,10 +139,10 @@ export function WorkoutClock({ onClose, initialMode, preset = null }) {
     // El cronómetro no tiene fases: sonido de arranque
     if (mode === "stopwatch") beep({ freq: 1175, dur: 0.25 });
   };
-  const pause = () => setRun((r) => (r ? { ...r, pausedAt: Date.now() } : r));
+  const pause = () => setRun((r) => (r ? { ...r, pausedAt: nowMs() } : r));
   const resume = () => {
     ensureAudio();
-    const t = Date.now();
+    const t = nowMs();
     setNow(t);
     setRun((r) => (r ? { ...r, pausedTotal: r.pausedTotal + (t - r.pausedAt), pausedAt: null } : r));
   };
@@ -157,10 +156,16 @@ export function WorkoutClock({ onClose, initialMode, preset = null }) {
   // Pasar a la siguiente fase (corre el inicio hacia atrás lo que falta de la fase actual)
   const skip = () => {
     if (!run || !st || st.done) return;
-    const ref = run.pausedAt ?? Date.now();
+    const ref = run.pausedAt ?? nowMs();
     const endMs = phases.slice(0, st.index + 1).reduce((t, p) => t + p.dur, 0) * 1000;
-    setNow(Date.now());
+    setNow(nowMs());
     setRun((r) => ({ ...r, startedAt: ref - r.pausedTotal - endMs }));
+  };
+  // Volver a lo que programó el coach
+  const backToProgrammed = () => {
+    reset();
+    setMode(programmed.mode);
+    setConfigs((c) => ({ ...c, [programmed.mode]: normalizeConfig(programmed.mode, programmed) }));
   };
   const addRest = (sec) => setRun((r) => (r ? { ...r, extra: r.extra + sec } : r));
 
