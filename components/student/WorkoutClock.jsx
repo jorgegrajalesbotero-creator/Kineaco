@@ -1,8 +1,9 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { Flag, Minus, Pause, Play, Plus, RotateCcw, SkipForward, X } from "lucide-react";
+import { BellOff, Flag, Minus, Pause, Play, Plus, RotateCcw, SkipForward, X } from "lucide-react";
 import { tr } from "@/lib/i18n";
+import { beep, getAudio, startAlarm, vibrate } from "@/lib/alarm";
 import { CLOCK_FIELDS, CLOCK_MODES, buildPhases, formatClock, formatStopwatch, normalizeConfig, stateAt } from "@/lib/clock";
 
 const MODE_LABELS = { rest: "Descanso", tabata: "Tabata", intervals: "Intervalos", amrap: "AMRAP", stopwatch: "Cronómetro" };
@@ -23,27 +24,6 @@ function loadSaved() {
   }
 }
 
-// Sonidos generados (sin archivos). El contexto de audio se crea al tocar "Iniciar" (iPhone lo exige).
-function tone(ctx, { freq = 880, at = 0, dur = 0.15, vol = 0.25 } = {}) {
-  if (!ctx) return;
-  try {
-    const osc = ctx.createOscillator();
-    const gain = ctx.createGain();
-    osc.frequency.value = freq;
-    gain.gain.setValueAtTime(vol, ctx.currentTime + at);
-    gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + at + dur);
-    osc.connect(gain).connect(ctx.destination);
-    osc.start(ctx.currentTime + at);
-    osc.stop(ctx.currentTime + at + dur + 0.02);
-  } catch {
-    // sin sonido no pasa nada
-  }
-}
-
-const vibrate = (pattern) => {
-  try { navigator.vibrate?.(pattern); } catch { }
-};
-
 // Reloj de entrenamiento a pantalla completa
 export function WorkoutClock({ onClose, initialMode }) {
   const [saved] = useState(loadSaved);
@@ -54,7 +34,8 @@ export function WorkoutClock({ onClose, initialMode }) {
   const [now, setNow] = useState(() => Date.now());
   const [rounds, setRounds] = useState(0); // AMRAP
   const [laps, setLaps] = useState([]); // Cronómetro (ms acumulados)
-  const audio = useRef(null);
+  const alarmStop = useRef(null); // apaga la alarma final
+  const [ringing, setRinging] = useState(false);
   const lastIndex = useRef(-1);
   const lastTick = useRef(null);
   const wakeLock = useRef(null);
@@ -100,8 +81,10 @@ export function WorkoutClock({ onClose, initialMode }) {
     if (st.done) {
       if (lastIndex.current !== phases.length) {
         lastIndex.current = phases.length;
-        [0, 0.22, 0.44].forEach((at) => tone(audio.current, { freq: 1046, at, dur: 0.18 }));
-        vibrate([300, 120, 300, 120, 300]);
+        // Alarma que sigue sonando hasta que la apaguen
+        alarmStop.current?.();
+        alarmStop.current = startAlarm();
+        setRinging(true);
         setRun((r) => (r && !r.pausedAt ? { ...r, pausedAt: Date.now() } : r));
       }
       return;
@@ -109,12 +92,12 @@ export function WorkoutClock({ onClose, initialMode }) {
     if (st.index !== lastIndex.current) {
       if (lastIndex.current !== -1 || st.phase.type !== "prep") {
         if (st.phase.type === "work") {
-          tone(audio.current, { freq: 1046, dur: 0.45, vol: 0.3 });
-          vibrate([250]);
+          beep({ freq: 1175, dur: 0.6 });
+          vibrate([350]);
         } else {
-          tone(audio.current, { freq: 660, dur: 0.18 });
-          tone(audio.current, { freq: 660, at: 0.25, dur: 0.18 });
-          vibrate([120, 80, 120]);
+          beep({ freq: 740, dur: 0.22 });
+          beep({ freq: 740, at: 0.3, dur: 0.22 });
+          vibrate([150, 100, 150]);
         }
       }
       lastIndex.current = st.index;
@@ -122,18 +105,21 @@ export function WorkoutClock({ onClose, initialMode }) {
     }
     if (running && st.remaining <= 3 && st.remaining >= 1 && lastTick.current !== `${st.index}:${st.remaining}`) {
       lastTick.current = `${st.index}:${st.remaining}`;
-      tone(audio.current, { freq: 880, dur: 0.08, vol: 0.18 });
+      beep({ freq: 988, dur: 0.12, vol: 0.7 });
     }
   });
 
-  const ensureAudio = () => {
-    try {
-      if (!audio.current) audio.current = new (window.AudioContext || window.webkitAudioContext)();
-      audio.current.resume?.();
-    } catch { }
+  const ensureAudio = () => getAudio();
+  const stopAlarm = () => {
+    alarmStop.current?.();
+    alarmStop.current = null;
+    setRinging(false);
   };
+  // Al cerrar el reloj se apaga la alarma
+  useEffect(() => () => alarmStop.current?.(), []);
 
   const start = () => {
+    stopAlarm();
     ensureAudio();
     const t = Date.now();
     setNow(t);
@@ -143,7 +129,7 @@ export function WorkoutClock({ onClose, initialMode }) {
     setLaps([]);
     setRun({ startedAt: t, pausedAt: null, pausedTotal: 0, extra: 0 });
     // El cronómetro no tiene fases: sonido de arranque
-    if (mode === "stopwatch") tone(audio.current, { freq: 1046, dur: 0.2 });
+    if (mode === "stopwatch") beep({ freq: 1175, dur: 0.25 });
   };
   const pause = () => setRun((r) => (r ? { ...r, pausedAt: Date.now() } : r));
   const resume = () => {
@@ -153,6 +139,7 @@ export function WorkoutClock({ onClose, initialMode }) {
     setRun((r) => (r ? { ...r, pausedTotal: r.pausedTotal + (t - r.pausedAt), pausedAt: null } : r));
   };
   const reset = () => {
+    stopAlarm();
     setRun(null);
     setRounds(0);
     setLaps([]);
@@ -216,7 +203,7 @@ export function WorkoutClock({ onClose, initialMode }) {
     <div className="fixed inset-0 z-[70] bg-app flex flex-col animate-fade-in" role="dialog" aria-modal="true" aria-label={tr("Reloj")}>
       <div className="flex items-center justify-between px-4 pt-[calc(0.75rem+env(safe-area-inset-top))] pb-2">
         <h2 className="text-ink text-lg font-semibold">{tr("Reloj")}</h2>
-        <button onClick={onClose} aria-label={tr("Cerrar")} className="w-10 h-10 rounded-full bg-card flex items-center justify-center text-soft">
+        <button onClick={() => { stopAlarm(); onClose(); }} aria-label={tr("Cerrar")} className="w-10 h-10 rounded-full bg-card flex items-center justify-center text-soft">
           <X size={18} />
         </button>
       </div>
@@ -251,11 +238,17 @@ export function WorkoutClock({ onClose, initialMode }) {
           )}
 
           {/* Carátula */}
-          <div className={`rounded-3xl px-4 py-8 text-center transition-colors duration-300 ${face}`} aria-live="polite">
+          <div className={`rounded-3xl px-4 py-8 text-center transition-colors duration-300 ${face} ${ringing ? "animate-pulse ring-4 ring-danger" : ""}`} aria-live="polite">
             <p className="text-sm font-semibold uppercase tracking-[0.14em] opacity-80">{phaseLabel}</p>
             <p className="text-[4.5rem] sm:text-[5.5rem] leading-none font-semibold tabular-nums my-3">{big}</p>
             <p className="text-sm opacity-80 min-h-5">{sub}</p>
           </div>
+
+          {ringing && (
+            <button onClick={stopAlarm} className="w-full h-16 mt-3 rounded-2xl bg-danger text-app text-lg font-bold flex items-center justify-center gap-2 active:scale-[0.98] transition-transform">
+              <BellOff size={22} /> {tr("Apagar alarma")}
+            </button>
+          )}
 
           {/* AMRAP: contador de rondas */}
           {mode === "amrap" && run && (
@@ -323,7 +316,7 @@ export function WorkoutClock({ onClose, initialMode }) {
             </div>
           )}
 
-          <p className="text-muted text-[11px] text-center mt-5">{tr("Suena y vibra en cada cambio. Deje la pantalla encendida mientras entrena.")}</p>
+          <p className="text-muted text-[11px] text-center mt-5">{tr("Suena y vibra en cada cambio; al final la alarma sigue hasta que la apague. Suba el volumen del celular.")}</p>
         </div>
       </div>
     </div>

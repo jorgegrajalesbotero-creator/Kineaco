@@ -1,27 +1,9 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { Timer, X } from "lucide-react";
+import { BellOff, Timer, X } from "lucide-react";
+import { getAudio, startAlarm } from "@/lib/alarm";
 import { tr } from "@/lib/i18n";
-
-// Pitido corto al terminar el descanso (sin archivos de audio)
-function beep() {
-  try {
-    const ctx = new (window.AudioContext || window.webkitAudioContext)();
-    [0, 0.25, 0.5].forEach((t) => {
-      const osc = ctx.createOscillator();
-      const gain = ctx.createGain();
-      osc.frequency.value = 880;
-      gain.gain.setValueAtTime(0.25, ctx.currentTime + t);
-      gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + t + 0.18);
-      osc.connect(gain).connect(ctx.destination);
-      osc.start(ctx.currentTime + t);
-      osc.stop(ctx.currentTime + t + 0.2);
-    });
-  } catch {
-    // algunos navegadores no permiten sonido; no pasa nada
-  }
-}
 
 const fmt = (s) => `${Math.floor(s / 60)}:${String(Math.max(0, s) % 60).padStart(2, "0")}`;
 
@@ -29,26 +11,33 @@ const fmt = (s) => `${Math.floor(s / 60)}:${String(Math.max(0, s) % 60).padStart
 export function RestTimer({ endsAt, total, onChange, onClose }) {
   const [now, setNow] = useState(() => Date.now());
   const finished = useRef(false);
+  const alarmStop = useRef(null);
   const left = Math.ceil((endsAt - now) / 1000);
   const done = left <= 0;
 
   useEffect(() => {
+    getAudio();
+    alarmStop.current?.();
+    alarmStop.current = null;
     finished.current = false;
     const id = setInterval(() => setNow(Date.now()), 250);
     return () => clearInterval(id);
   }, [endsAt]);
 
-  // Dependemos de `done` (booleano estable) y no de `left`: así el setTimeout no se
-  // cancela en cada tick y el temporizador se cierra solo a los 2,5 s.
+  // Al terminar suena una alarma que sigue hasta que el alumno la apague
   useEffect(() => {
     if (done && !finished.current) {
       finished.current = true;
-      navigator.vibrate?.([200, 100, 200]);
-      beep();
-      const t = setTimeout(onClose, 2500);
-      return () => clearTimeout(t);
+      alarmStop.current?.();
+      alarmStop.current = startAlarm();
     }
   }, [done]);
+  useEffect(() => () => alarmStop.current?.(), []);
+  const close = () => {
+    alarmStop.current?.();
+    alarmStop.current = null;
+    onClose();
+  };
 
   const pct = total ? Math.max(0, Math.min(100, (left / total) * 100)) : 0;
 
@@ -69,9 +58,15 @@ export function RestTimer({ endsAt, total, onChange, onClose }) {
               <button onClick={() => onChange(15)} className="w-10 h-10 rounded-xl bg-white/[0.05] text-soft text-xs font-semibold">+15</button>
             </>
           )}
-          <button onClick={onClose} aria-label={tr("Saltar descanso")} className="w-10 h-10 rounded-xl bg-white/[0.05] text-soft flex items-center justify-center">
-            <X size={16} />
-          </button>
+          {done ? (
+            <button onClick={close} className="h-10 rounded-xl bg-danger text-app px-3 text-sm font-semibold flex items-center gap-1.5">
+              <BellOff size={16} /> {tr("Apagar alarma")}
+            </button>
+          ) : (
+            <button onClick={close} aria-label={tr("Saltar descanso")} className="w-10 h-10 rounded-xl bg-white/[0.05] text-soft flex items-center justify-center">
+              <X size={16} />
+            </button>
+          )}
         </div>
         <div className="h-1 rounded-full bg-white/[0.07] overflow-hidden mt-3">
           <div className="h-full bg-accent rounded-full transition-[width] duration-300 ease-linear" style={{ width: `${pct}%` }} />

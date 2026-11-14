@@ -14,6 +14,7 @@ import { youtubeVideo } from "@/lib/youtube";
 import { Confetti } from "@/components/ui/Confetti";
 import { RestTimer } from "@/components/student/RestTimer";
 import { WorkoutClock } from "@/components/student/WorkoutClock";
+import { getAudio } from "@/lib/alarm";
 import { SetLogger } from "@/components/student/SetLogger";
 import { Chameleon } from "@/components/ui/Chameleon";
 import { finishSession, fmtFinished, isLocked, loadSession, weekStartISO } from "@/lib/workoutSession";
@@ -208,7 +209,10 @@ export function RoutineScreen({ routine, userId, pet = null, onClose, onToggle, 
     }
   };
 
-  const startRest = (seconds) => setRest({ endsAt: Date.now() + seconds * 1000, total: seconds });
+  const startRest = (seconds) => {
+    getAudio(); // se activa el sonido con el toque (iPhone lo exige)
+    setRest({ endsAt: Date.now() + seconds * 1000, total: seconds });
+  };
   const detail = detailIndex !== null ? routine.exercises[detailIndex] : null;
   const videoLink = detail ? safeHttpUrl(detail.videoUrl) : null;
   const video = detail ? youtubeVideo(detail.videoUrl) : null;
