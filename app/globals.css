@@ -26,6 +26,7 @@
   --color-danger: #ff6b4a;       /* errores, borrar, alertas */
   --color-danger-strong: #ff4a4a;
   --color-warning: #ffb547;
+  --color-calm: #5b9bff;          /* fase de descanso del reloj */
 
   --animate-fade-up: fade-up 0.5s cubic-bezier(0.2, 0.8, 0.2, 1) both;
   --animate-shimmer: shimmer 1.6s linear infinite;
@@ -170,3 +171,19 @@ body {
 @media (prefers-reduced-motion: reduce) {
   .cham-breathe, .cham-tail, .cham-tail-fast, .cham-bob, .cham-shake, .cham-tongue, .cham-float { animation: none; }
 }
+
+/* Barras de desplazamiento con el estilo de la app: oscuras, delgadas y dentro de la pantalla
+   (aplica a login, panel del coach y app del alumno) */
+html { color-scheme: dark; }
+* { scrollbar-width: thin; scrollbar-color: var(--color-field-strong) transparent; }
+*::-webkit-scrollbar { width: 8px; height: 8px; }
+*::-webkit-scrollbar-track { background: transparent; }
+*::-webkit-scrollbar-thumb {
+  background: var(--color-field);
+  border-radius: 999px;
+  border: 2px solid transparent;
+  background-clip: padding-box;
+}
+*::-webkit-scrollbar-thumb:hover { background: var(--color-field-strong); border: 2px solid transparent; background-clip: padding-box; }
+*::-webkit-scrollbar-corner { background: transparent; }
+*::-webkit-scrollbar-button { display: none; width: 0; height: 0; }

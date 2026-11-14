@@ -18,7 +18,7 @@ import { UsersView } from "@/components/admin/UsersView";
 import { BrandMark } from "@/components/ui/BrandMark";
 
 export default function AdminPanel() {
-  const [tab, setTab] = useState("rutinas");
+  const [tab, setTab] = useState("alumnos");
   const [pendingStudentAction, setPendingStudentAction] = useState(null);
   const [menuOpen, setMenuOpen] = useState(false);
   const [coachId, setCoachId] = useState(null);
@@ -147,8 +147,8 @@ export default function AdminPanel() {
   };
 
   return (
-    <div className="fixed inset-0 md:static md:min-h-screen bg-app md:bg-night flex">
-      <div className="flex flex-col md:flex-row w-full max-w-6xl mx-auto md:my-6 md:rounded-2xl md:overflow-hidden md:border md:border-field">
+    <div className="fixed inset-0 bg-app md:bg-night flex md:p-6">
+      <div className="flex flex-col md:flex-row w-full max-w-6xl mx-auto min-h-0 md:rounded-2xl md:overflow-hidden md:border md:border-field">
         <div className="md:hidden flex items-center gap-3 px-4 pb-3 pt-[calc(0.75rem+env(safe-area-inset-top))] bg-panel border-b border-field">
           <button onClick={() => setMenuOpen(true)} aria-label="Abrir menú" className="relative w-10 h-10 -ml-2 flex items-center justify-center text-ink">
             <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M4 6h16M4 12h16M4 18h16" /></svg>
@@ -175,7 +175,7 @@ export default function AdminPanel() {
           </div>
         )}
 
-        <div className="flex-1 min-h-0 bg-app overflow-y-auto pb-[env(safe-area-inset-bottom)]">
+        <div id="coach-scroll" className="flex-1 min-h-0 bg-app overflow-y-auto overscroll-contain pb-[env(safe-area-inset-bottom)]">
           <div className="px-4 pt-4 md:px-8 md:pt-6 empty:hidden">
             {coachId && <PushPromptCard userId={coachId} className="mb-0!" />}
           </div>

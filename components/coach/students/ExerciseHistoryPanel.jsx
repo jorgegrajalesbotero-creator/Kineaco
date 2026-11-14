@@ -92,7 +92,7 @@ export function ExerciseHistoryPanel({ student, onClose }) {
       sets: r.sets != null ? String(r.sets) : "",
       note: r.note || "",
     });
-    window.scrollTo?.({ top: 0, behavior: "smooth" });
+    (document.getElementById("coach-scroll") || window).scrollTo?.({ top: 0, behavior: "smooth" });
   };
 
   const save = async (addAnother) => {

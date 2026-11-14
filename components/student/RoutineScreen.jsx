@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Check, ChevronLeft, ChevronRight, Download, Lock, MessageSquarePlus, MessageSquareText, Pencil, Play, SquarePen, X } from "lucide-react";
+import { Check, ChevronLeft, ChevronRight, Download, Lock, MessageSquarePlus, MessageSquareText, Pencil, Play, SquarePen, Timer, X } from "lucide-react";
 import { blockTypeLabel } from "@/lib/blocks";
 import { currentWeekStartISO } from "@/lib/dates";
 import { appLocale, tr } from "@/lib/i18n";
@@ -13,6 +13,7 @@ import { formatWeight, useWeightUnit } from "@/lib/weightUnits";
 import { youtubeVideo } from "@/lib/youtube";
 import { Confetti } from "@/components/ui/Confetti";
 import { RestTimer } from "@/components/student/RestTimer";
+import { WorkoutClock } from "@/components/student/WorkoutClock";
 import { SetLogger } from "@/components/student/SetLogger";
 import { Chameleon } from "@/components/ui/Chameleon";
 import { finishSession, fmtFinished, isLocked, loadSession, weekStartISO } from "@/lib/workoutSession";
@@ -33,6 +34,7 @@ export function RoutineScreen({ routine, userId, pet = null, onClose, onToggle, 
   const closeDetail = () => { setPlaying(false); setDetailIndex(null); };
   const [loggerIndex, setLoggerIndex] = useState(null);
   const [rest, setRest] = useState(null); // { endsAt, total }
+  const [clockOpen, setClockOpen] = useState(false);
   const [celebrate, setCelebrate] = useState(false);
   const [pdfBusy, setPdfBusy] = useState(false);
   const [showPdf, pdfPreview] = usePdfPreview(tr);
@@ -321,9 +323,16 @@ export function RoutineScreen({ routine, userId, pet = null, onClose, onToggle, 
           <button onClick={onClose} aria-label={tr("Volver")} className="w-9 h-9 rounded-full bg-app/50 border border-white/[0.06] flex items-center justify-center active:scale-90 transition-transform">
             <ChevronLeft size={18} className="text-ink" />
           </button>
-          <button onClick={downloadPdf} disabled={pdfBusy} className="flex items-center gap-1.5 h-9 rounded-full bg-app/50 border border-white/[0.06] px-3 text-soft text-xs disabled:opacity-60">
-            <Download size={14} /> {pdfBusy ? tr("Generando...") : "PDF"}
-          </button>
+          <div className="flex items-center gap-2">
+            {!preview && (
+              <button onClick={() => setClockOpen(true)} className="flex items-center gap-1.5 h-9 rounded-full bg-accent text-app px-3.5 text-xs font-semibold active:scale-95 transition-transform">
+                <Timer size={14} /> {tr("Reloj")}
+              </button>
+            )}
+            <button onClick={downloadPdf} disabled={pdfBusy} className="flex items-center gap-1.5 h-9 rounded-full bg-app/50 border border-white/[0.06] px-3 text-soft text-xs disabled:opacity-60">
+              <Download size={14} /> {pdfBusy ? tr("Generando...") : "PDF"}
+            </button>
+          </div>
         </div>
         <p className="relative text-accent text-xs font-medium mb-1">{tr(routine.day_label)}</p>
         <h1 className="relative text-ink text-2xl font-semibold tracking-tight mb-4">{routine.parts?.length > 1 ? tr("Su entrenamiento") : routine.title}</h1>
@@ -519,6 +528,12 @@ export function RoutineScreen({ routine, userId, pet = null, onClose, onToggle, 
           total={rest.total}
           onChange={(d) => setRest((r) => ({ endsAt: Math.max(Date.now(), r.endsAt + d * 1000), total: Math.max(15, r.total + d) }))}
           onClose={() => setRest(null)}
+        />
+      )}
+      {clockOpen && (
+        <WorkoutClock
+          onClose={() => setClockOpen(false)}
+          initialMode={(routine.parts || [routine]).some((p) => p.blocks?.some((b) => b.block_type === "intermitentes")) ? "intervals" : undefined}
         />
       )}
       {pdfPreview}
