@@ -1,10 +1,11 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { BellOff, Flag, Minus, Pause, Play, Plus, RotateCcw, SkipForward, X } from "lucide-react";
+import { BellOff, Flag, Minus, Pause, Play, RotateCcw, SkipForward, X } from "lucide-react";
 import { tr } from "@/lib/i18n";
 import { beep, getAudio, startAlarm, vibrate } from "@/lib/alarm";
 import { CLOCK_FIELDS, CLOCK_MODES, buildPhases, formatClock, formatStopwatch, normalizeConfig, normalizeTimer, stateAt } from "@/lib/clock";
+import { ClockField } from "@/components/ui/ClockField";
 
 const MODE_LABELS = { rest: "Descanso", tabata: "Tabata", intervals: "Intervalos", amrap: "AMRAP", stopwatch: "Cronómetro" };
 const MODE_HINTS = {
@@ -248,15 +249,11 @@ export function WorkoutClock({ onClose, initialMode, preset = null }) {
           {!run && CLOCK_FIELDS[mode].length > 0 && (
             <div className="grid grid-cols-1 gap-2 mb-4">
               {CLOCK_FIELDS[mode].map((f) => (
-                <div key={f.key} className="bg-card rounded-xl px-3 py-2 flex items-center gap-3">
-                  <span className="text-soft text-sm flex-1">{tr(f.label)}</span>
-                  <button onClick={() => setField(f, cfg[f.key] - f.step)} disabled={cfg[f.key] <= f.min} aria-label={tr("Menos")} className="w-9 h-9 rounded-lg bg-field text-ink flex items-center justify-center disabled:opacity-40"><Minus size={16} /></button>
-                  <span className="text-ink text-base font-semibold tabular-nums w-16 text-center">
-                    {f.unit === "time" ? formatClock(cfg[f.key]) : f.unit === "minutes" ? `${cfg[f.key]} min` : cfg[f.key]}
-                  </span>
-                  <button onClick={() => setField(f, cfg[f.key] + f.step)} disabled={cfg[f.key] >= f.max} aria-label={tr("Más")} className="w-9 h-9 rounded-lg bg-field text-ink flex items-center justify-center disabled:opacity-40"><Plus size={16} /></button>
-                </div>
+                <ClockField key={`${mode}-${f.key}`} field={f} value={cfg[f.key]} onChange={(v) => setField(f, v)} t={tr} />
               ))}
+              {CLOCK_FIELDS[mode].some((f) => f.unit === "time") && (
+                <p className="text-muted text-[11px] px-1">{tr("Toque el tiempo para escribirlo exacto (por ejemplo 7 o 1:30). Mantenga − o + para ir más rápido.")}</p>
+              )}
             </div>
           )}
 

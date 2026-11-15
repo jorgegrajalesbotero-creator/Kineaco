@@ -63,6 +63,14 @@ lib/                      Lógica sin pantallas
 - En iPhone solo funciona con la app instalada en la pantalla de inicio (iOS 16.4+).
 - Variables (Vercel, Production): `NEXT_PUBLIC_VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY`, `VAPID_SUBJECT`, `PUSH_WEBHOOK_SECRET`, `CRON_SECRET`, `SUPABASE_SECRET_KEY`.
 
+### Avisos de entrenamiento y vista en vivo
+
+- Disparadores en Supabase (SQL "en vivo y avisos", no se guarda en la carpeta): `notify_access_granted` (al alumno, solo la primera vez que recibe acceso, `dedupe_key = access_granted`), `notify_workout_start` (al coach con la primera serie/ejercicio del día, solo si lo marca el alumno) y `notify_workout_done` (al coach al finalizar). Destinatarios: `kin_staff_for_student()` (su coach + admins).
+- `RoutinePreviewPanel` escucha `progress_sets`, `progress` y `workout_sessions` con Supabase Realtime (las tablas están en la publicación `supabase_realtime`) y revisa cada 20 s como respaldo.
+- El coach no marca series: `SetLogger` con `coachMode` solo corrige peso y reps de series ya hechas (políticas UPDATE "personal corrige series" y "personal corrige mejor peso").
+- Reloj: `components/ui/ClockField.jsx` (escribir el tiempo exacto, mantener − / +); pasos en `stepFor` y lectura en `parseClockInput` (`lib/clock.js`).
+- Fechas de nacimiento: `components/ui/DateSelect.jsx` (día · mes · año). No usar `<input type="date">` en formularios del alumno.
+
 ## Colores
 
 Definidos una sola vez en `app/globals.css` y usados como clases:

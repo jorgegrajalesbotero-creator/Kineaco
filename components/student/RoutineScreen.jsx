@@ -27,8 +27,10 @@ const firstNumber = (text) => {
 };
 
 // preview = el coach ve la rutina tal como la ve el alumno (sin marcar nada) y puede dejar observaciones (onEditNote)
-// coachEdit = (solo con preview) el coach puede corregir peso y reps de cada serie del alumno (semana actual)
-export function RoutineScreen({ routine, userId, pet = null, onClose, onToggle, onProgressChange, preview = false, onEditNote = null, onEditTimer = null, coachEdit = false }) {
+// coachEdit = (solo con preview) el coach puede corregir peso y reps de las series que el alumno ya hizo (semana actual).
+//             El coach nunca marca ni desmarca series ni ejercicios.
+// liveTick = (solo con preview) cambia cada vez que el alumno marca algo: se recargan las series al instante
+export function RoutineScreen({ routine, userId, pet = null, onClose, onToggle, onProgressChange, preview = false, onEditNote = null, onEditTimer = null, coachEdit = false, liveTick = 0 }) {
   const [unit] = useWeightUnit();
   const [detailIndex, setDetailIndex] = useState(null);
   const [playing, setPlaying] = useState(false); // el video solo se carga cuando el alumno toca "Ver video"
@@ -76,7 +78,7 @@ export function RoutineScreen({ routine, userId, pet = null, onClose, onToggle, 
     });
     setSetsDone(map);
   }
-  useEffect(() => { loadSets(); }, [routine.day_label, routine.id, userId]);
+  useEffect(() => { loadSets(); }, [routine.day_label, routine.id, userId, liveTick]);
   const doneOf = (ex) => setsDone[setKey(ex)] || [];
 
   // Marca la siguiente serie del ejercicio (con el peso y las reps sugeridas)
@@ -548,6 +550,8 @@ export function RoutineScreen({ routine, userId, pet = null, onClose, onToggle, 
         <SetLogger
           key={loggerIndex}
           readOnly={locked}
+          coachMode={preview}
+          onCorrected={preview ? loadSets : null}
           pet={preview ? null : pet}
           exercise={routine.exercises[loggerIndex]}
           routine={routine}

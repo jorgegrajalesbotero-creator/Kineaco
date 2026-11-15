@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { buildPhases, stateAt, totalSeconds, formatClock, formatStopwatch, normalizeConfig } from "@/lib/clock";
+import { buildPhases, stateAt, totalSeconds, formatClock, formatStopwatch, normalizeConfig, parseClockInput, stepFor, CLOCK_FIELDS } from "@/lib/clock";
 
 describe("buildPhases", () => {
   it("tabata por defecto: preparación + 8 de trabajo y 7 descansos", () => {
@@ -21,7 +21,8 @@ describe("buildPhases", () => {
     expect(totalSeconds(buildPhases("amrap", { minutes: 12 }))).toBe(10 + 720);
   });
   it("respeta los límites", () => {
-    expect(normalizeConfig("tabata", { rounds: 500, work: 1 })).toMatchObject({ rounds: 99, work: 5 });
+    expect(normalizeConfig("tabata", { rounds: 500, work: 0 })).toMatchObject({ rounds: 99, work: 1 });
+    expect(normalizeConfig("intervals", { work: 7, rest: 8 })).toMatchObject({ work: 7, rest: 8 });
   });
 });
 
@@ -48,5 +49,29 @@ describe("formatos", () => {
   });
   it("formatStopwatch", () => {
     expect(formatStopwatch(65400)).toBe("1:05.4");
+  });
+});
+
+describe("tiempos exactos", () => {
+  const work = CLOCK_FIELDS.tabata[0];
+  it("lee lo que se escribe", () => {
+    expect(parseClockInput("8")).toBe(8);
+    expect(parseClockInput("0:07")).toBe(7);
+    expect(parseClockInput("1:30")).toBe(90);
+    expect(parseClockInput("1,30")).toBe(90);
+    expect(parseClockInput("45s")).toBe(45);
+    expect(parseClockInput("2m")).toBe(120);
+    expect(parseClockInput("abc")).toBe(null);
+    expect(parseClockInput("")).toBe(null);
+  });
+  it("los botones van de a 1 s bajo el minuto y luego más rápido", () => {
+    expect(stepFor(work, 7, 1)).toBe(8);
+    expect(stepFor(work, 8, -1)).toBe(7);
+    expect(stepFor(work, 59, 1)).toBe(60);
+    expect(stepFor(work, 60, 1)).toBe(65);
+    expect(stepFor(work, 60, -1)).toBe(59);
+    expect(stepFor(work, 62, 1)).toBe(65);
+    expect(stepFor(work, 300, 1)).toBe(315);
+    expect(stepFor(work, 1, -1)).toBe(1);
   });
 });

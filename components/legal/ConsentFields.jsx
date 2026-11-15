@@ -2,8 +2,9 @@
 
 import { Check } from "lucide-react";
 import { GUARDIAN_DOC_TYPES, GUARDIAN_RELATIONSHIPS, ageFrom } from "@/lib/legal";
-import { tr } from "@/lib/i18n";
+import { appLocale, tr } from "@/lib/i18n";
 import { Select } from "@/components/ui/Select";
+import { DateSelect } from "@/components/ui/DateSelect";
 
 const inputCls =
   "w-full bg-app/60 border border-white/[0.07] text-ink text-[15px] rounded-xl px-4 py-3 outline-none placeholder:text-muted focus:border-accent/50 transition";
@@ -37,14 +38,13 @@ export function ConsentFields({ value, onChange }) {
   const set = (k, v) => onChange({ ...value, [k]: v });
   const age = ageFrom(value.birthDate);
   const minor = age !== null && age < 18;
-  const today = new Date().toISOString().slice(0, 10);
 
   return (
     <div className="space-y-4">
-      <label className="block">
-        <span className="text-muted text-xs px-1">{tr("Fecha de nacimiento")}</span>
-        <input type="date" value={value.birthDate} max={today} onChange={(e) => set("birthDate", e.target.value)} required className={`${inputCls} mt-1`} />
-      </label>
+      <div role="group" aria-label={tr("Fecha de nacimiento")}>
+        <span className="block text-muted text-xs px-1 mb-1">{tr("Fecha de nacimiento")}</span>
+        <DateSelect value={value.birthDate} onChange={(v) => set("birthDate", v)} locale={appLocale()} t={tr} />
+      </div>
 
       {minor && (
         <div className="rounded-2xl border border-warning/30 bg-warning/[0.06] p-4 space-y-3">

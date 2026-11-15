@@ -86,7 +86,7 @@ export default function AdminPanel() {
       setTab("mensajes");
       return;
     }
-    if (n.student_id && ["messages", "nutrition", "access", "photos", "progress", "checkin", "measurements"].includes(n.link)) {
+    if (n.student_id && ["messages", "nutrition", "access", "photos", "progress", "checkin", "measurements", "routine"].includes(n.link)) {
       setPendingStudentAction({ id: n.student_id, action: n.link });
     }
     setTab("alumnos");

@@ -685,6 +685,11 @@ export default function App() {
                   : tr("Contacte a su coach para renovar su acceso y seguir entrenando.")}
               </p>
               {accessNeverGranted && (
+                <div className="w-full max-w-sm text-left">
+                  <PushPromptCard userId={userId} t={tr} body={tr("Active las notificaciones y le avisamos apenas su coach habilite su acceso.")} />
+                </div>
+              )}
+              {accessNeverGranted && (
                 <button onClick={() => setEditingIntake(true)} className="text-accent text-sm mb-4">
                   {tr("Ver o editar mi ficha")}
                 </button>
