@@ -12,7 +12,7 @@ export const dynamic = "force-dynamic";
 // Avisos que se quedan solo en la campanita (no suenan en el celular)
 const QUIET_TYPES = new Set(["rest"]);
 // Avisos que deben llegar rápido aunque el celular esté ahorrando batería
-const URGENT_TYPES = new Set(["message", "announcement", "checkin_alert", "daily_alert"]);
+const URGENT_TYPES = new Set(["message", "announcement", "checkin_alert", "daily_alert", "access_granted", "workout_start", "workout_done"]);
 
 function vapidConfig() {
   const publicKey = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY;

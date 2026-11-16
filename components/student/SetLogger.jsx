@@ -21,8 +21,12 @@ const inputCls =
 
 // Hoja para registrar cada serie de un ejercicio (peso y reps)
 // readOnly = el entrenamiento ya se finalizó: solo se ven las series, no se cambian
-export function SetLogger({ exercise, routine, userId, onClose, onComplete, onUncomplete, onStartRest, readOnly = false, pet = null }) {
+// coachMode = lo abre el coach: NO puede marcar ni desmarcar series (eso solo lo hace el alumno);
+//             solo corrige el peso y las reps de las series que el alumno ya registró.
+export function SetLogger({ exercise, routine, userId, onClose, onComplete, onUncomplete, onStartRest, readOnly = false, pet = null, coachMode = false, onCorrected = null }) {
   const [rows, setRows] = useState([]);
+  const [dirty, setDirty] = useState(() => new Set()); // series corregidas por el coach sin guardar
+  const [savedMsg, setSavedMsg] = useState("");
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
   const [unit] = useWeightUnit(); // las series se guardan en kg; aquí se escriben en kg o lb
@@ -79,7 +83,7 @@ export function SetLogger({ exercise, routine, userId, onClose, onComplete, onUn
   };
 
   const toggleRow = async (idx) => {
-    if (busy || readOnly) return;
+    if (busy || readOnly || coachMode) return;
     setBusy(true);
     const r = rows[idx];
     let next = rows;
@@ -105,7 +109,7 @@ export function SetLogger({ exercise, routine, userId, onClose, onComplete, onUn
   };
 
   const markAllSuggested = async () => {
-    if (busy) return;
+    if (busy || coachMode) return;
     const pending = rows.filter((r) => !r.done);
     if (!pending.length) return;
     setBusy(true);
@@ -130,7 +134,45 @@ export function SetLogger({ exercise, routine, userId, onClose, onComplete, onUn
     if (exercise.completed) syncExercise(next);
   };
 
-  const update = (idx, field, value) => setRows((list) => list.map((r, i) => (i === idx ? { ...r, [field]: value } : r)));
+  const update = (idx, field, value) => {
+    setRows((list) => list.map((r, i) => (i === idx ? { ...r, [field]: value } : r)));
+    if (coachMode) {
+      setDirty((d) => new Set(d).add(idx));
+      setSavedMsg("");
+    }
+  };
+
+  // Coach: guarda la corrección de peso y reps de las series ya hechas (y el mejor peso del ejercicio)
+  const saveCorrection = async () => {
+    if (busy || !dirty.size) return;
+    setBusy(true);
+    for (const idx of dirty) {
+      const r = rows[idx];
+      if (!r?.done || !r.id) continue;
+      const v = rowValues(r);
+      const { error } = await supabase.from("progress_sets").update({ weight_kg: v.weight_kg, reps: v.reps }).eq("id", r.id);
+      if (error) {
+        setBusy(false);
+        return alert("No se pudo guardar la corrección. Revisá que el SQL «en vivo y avisos» esté aplicado en Supabase.");
+      }
+    }
+    if (exercise.completed) {
+      const ws = rows.filter((r) => r.done && r.weight !== "" && r.weight != null).map((r) => Number(r.weight)).filter(Number.isFinite);
+      let q = supabase
+        .from("progress")
+        .update({ weight_kg: ws.length ? Math.max(...ws) : null })
+        .eq("user_id", userId)
+        .eq("routine_id", routineId)
+        .eq("day_label", routine.day_label)
+        .gte("completed_at", currentWeekStartISO());
+      q = byItem ? q.eq("item_key", exercise.itemKey) : q.eq("exercise_id", exercise.exerciseId);
+      await q;
+    }
+    setDirty(new Set());
+    setSavedMsg("Corrección guardada");
+    setBusy(false);
+    onCorrected?.();
+  };
 
   const doneCount = rows.filter((r) => r.done).length;
 
@@ -180,7 +222,7 @@ export function SetLogger({ exercise, routine, userId, onClose, onComplete, onUn
                     placeholderKg={targetWeight}
                     placeholder="—"
                     toggle={false}
-                    disabled={r.done || readOnly}
+                    disabled={coachMode ? !r.done : r.done || readOnly}
                     className={inputCls}
                   />
                   <input
@@ -188,10 +230,19 @@ export function SetLogger({ exercise, routine, userId, onClose, onComplete, onUn
                     inputMode="numeric"
                     value={r.reps}
                     placeholder={exercise.targetReps || "—"}
-                    disabled={r.done || readOnly}
+                    disabled={coachMode ? !r.done : r.done || readOnly}
                     onChange={(e) => update(idx, "reps", cleanInt(e.target.value))}
                     className={inputCls}
                   />
+                  {coachMode ? (
+                    <span
+                      aria-label={r.done ? "Serie hecha por el alumno" : "Serie pendiente"}
+                      title={r.done ? "Hecha por el alumno" : "Pendiente: solo el alumno la marca"}
+                      className={`w-10 h-10 rounded-full flex items-center justify-center ${r.done ? "bg-accent" : "border-2 border-dashed border-field-strong"}`}
+                    >
+                      {r.done && <Check size={16} strokeWidth={3} className="text-app" />}
+                    </span>
+                  ) : (
                   <button
                     onClick={() => toggleRow(idx)}
                     disabled={busy || readOnly}
@@ -200,11 +251,22 @@ export function SetLogger({ exercise, routine, userId, onClose, onComplete, onUn
                   >
                     {r.done && <Check size={16} strokeWidth={3} className="text-app animate-check-pop" />}
                   </button>
+                  )}
                 </div>
               ))}
             </div>
 
-            {readOnly ? (
+            {coachMode ? (
+              <>
+                <p className="text-muted text-xs text-center mb-3">
+                  Solo el alumno marca las series. Vos podés corregir el peso y las reps de las que ya hizo{doneCount === 0 ? " (todavía no registró ninguna)" : ""}.
+                </p>
+                {savedMsg && <p className="text-accent text-xs text-center mb-2">{savedMsg}</p>}
+                <button onClick={dirty.size ? saveCorrection : onClose} disabled={busy} className="block w-full bg-accent text-app font-semibold text-sm rounded-xl py-3 disabled:opacity-60">
+                  {busy ? "Guardando..." : dirty.size ? "Guardar corrección" : "Listo"}
+                </button>
+              </>
+            ) : readOnly ? (
               <>
                 <p className="text-muted text-xs text-center mb-3">{tr("Entrenamiento finalizado: solo lectura.")}</p>
                 <button onClick={onClose} className="block w-full bg-accent text-app font-semibold text-sm rounded-xl py-3">{tr("Listo")}</button>
@@ -234,7 +296,7 @@ export function SetLogger({ exercise, routine, userId, onClose, onComplete, onUn
             )}
             </>
             )}
-            {pet && pet.mood ? (
+            {coachMode ? null : pet && pet.mood ? (
               <div className="flex items-center justify-center gap-2 mt-2">
                 <Chameleon mood={doneCount >= rows.length && rows.length > 0 ? 5 : pet.mood} size={64} />
                 <p className="text-soft text-xs">

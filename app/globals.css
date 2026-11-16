@@ -72,6 +72,42 @@ select optgroup {
   }
 }
 
+/* Campos de fecha y hora: en iPhone el control nativo tiene un ancho mínimo propio y se sale del
+   cuadro; además queda centrado y, vacío, pierde la altura. Así se ajustan al ancho de su caja. */
+input[type="date"],
+input[type="time"],
+input[type="month"],
+input[type="datetime-local"] {
+  -webkit-appearance: none;
+  appearance: none;
+  min-width: 0;
+  max-width: 100%;
+  box-sizing: border-box;
+  text-align: left;
+}
+input[type="date"]::-webkit-date-and-time-value,
+input[type="time"]::-webkit-date-and-time-value,
+input[type="month"]::-webkit-date-and-time-value,
+input[type="datetime-local"]::-webkit-date-and-time-value {
+  text-align: left;
+  margin: 0;
+}
+input[type="date"]::-webkit-calendar-picker-indicator,
+input[type="time"]::-webkit-calendar-picker-indicator,
+input[type="month"]::-webkit-calendar-picker-indicator,
+input[type="datetime-local"]::-webkit-calendar-picker-indicator {
+  opacity: 0.6;
+  cursor: pointer;
+}
+@media (max-width: 767px) {
+  input[type="date"],
+  input[type="time"],
+  input[type="month"],
+  input[type="datetime-local"] {
+    min-height: 2.75rem;
+  }
+}
+
 /* Que el fondo no "rebote" en blanco al hacer scroll en el celular */
 html,
 body {

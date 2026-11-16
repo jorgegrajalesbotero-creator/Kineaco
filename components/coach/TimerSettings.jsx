@@ -1,7 +1,8 @@
 "use client";
 
-import { Minus, Plus, Timer } from "lucide-react";
-import { CLOCK_DEFAULTS, CLOCK_FIELDS, formatClock, normalizeConfig, normalizeTimer } from "@/lib/clock";
+import { Timer } from "lucide-react";
+import { CLOCK_DEFAULTS, CLOCK_FIELDS, normalizeConfig, normalizeTimer } from "@/lib/clock";
+import { ClockField } from "@/components/ui/ClockField";
 
 const MODES = [
   ["", "Sin reloj programado"],
@@ -32,16 +33,12 @@ export function TimerSettings({ value, onChange, compact = false }) {
       {t && CLOCK_FIELDS[mode].length > 0 && (
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
           {CLOCK_FIELDS[mode].map((f) => (
-            <div key={f.key} className="bg-card rounded-lg px-2 py-1.5 flex items-center gap-1.5">
-              <span className="text-soft text-xs flex-1">{f.label}</span>
-              <button type="button" onClick={() => setField(f, t[f.key] - f.step)} disabled={t[f.key] <= f.min} aria-label={`Menos ${f.label}`} className="w-7 h-7 rounded-md bg-field text-ink flex items-center justify-center disabled:opacity-40"><Minus size={13} /></button>
-              <span className="text-ink text-sm font-semibold tabular-nums w-12 text-center">
-                {f.unit === "time" ? formatClock(t[f.key]) : f.unit === "minutes" ? `${t[f.key]} min` : t[f.key]}
-              </span>
-              <button type="button" onClick={() => setField(f, t[f.key] + f.step)} disabled={t[f.key] >= f.max} aria-label={`Más ${f.label}`} className="w-7 h-7 rounded-md bg-field text-ink flex items-center justify-center disabled:opacity-40"><Plus size={13} /></button>
-            </div>
+            <ClockField key={`${mode}-${f.key}`} field={f} value={t[f.key]} onChange={(v) => setField(f, v)} size="sm" />
           ))}
         </div>
+      )}
+      {t && CLOCK_FIELDS[mode].some((f) => f.unit === "time") && (
+        <p className="text-muted text-[11px] mt-1.5">Tocá el tiempo para escribirlo exacto (7, 0:08, 1:30…). Mantené − o + para ir más rápido.</p>
       )}
       {!t && !compact && (
         <p className="text-muted text-[11px] flex items-center gap-1"><Timer size={12} /> Sin reloj programado, el alumno usa el reloj normal.</p>

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Activity, Calendar, ChevronLeft, ChevronRight, Eye, Lock, LockOpen, PlusCircle } from "lucide-react";
 import { supabase } from "@/lib/supabaseClient";
 import { WEEK_DAYS, todayDayLabel } from "@/lib/dates";
@@ -34,6 +34,13 @@ export function RoutinePreviewPanel({ student, onClose, onOpenPanel }) {
   const [editingTimer, setEditingTimer] = useState(null); // { part, block } reloj solo para este alumno
   const [session, setSession] = useState(null); // ¿el alumno ya finalizó este día?
   const [sessionBusy, setSessionBusy] = useState(false);
+  // En vivo: cuando el alumno marca una serie, un ejercicio o finaliza, la vista se actualiza sola
+  const [liveTick, setLiveTick] = useState(0);
+  const [liveOn, setLiveOn] = useState(false);
+  const [lastActivity, setLastActivity] = useState(null); // { at: Date, day }
+  const view = useRef({});
+  useEffect(() => { view.current = { schedule, day, weekOffset }; });
+  const reloadTimer = useRef(null);
 
   async function loadWeekSchedule() {
     setSchedule(await loadSchedule(supabase, student.id, "*"));
@@ -55,6 +62,57 @@ export function RoutinePreviewPanel({ student, onClose, onOpenPanel }) {
     }
     setLoading(false);
   }
+
+  // Recarga sin mostrar "cargando" (para no hacer parpadear la pantalla en cada serie)
+  async function silentReload() {
+    const { schedule: sched, day: d, weekOffset: offset } = view.current;
+    if (!sched) return;
+    try {
+      const [r, s] = await Promise.all([
+        buildDay(supabase, student.id, d, { weekOffset: offset, schedule: sched }),
+        loadSession(supabase, student.id, weekStartISO(offset), d),
+      ]);
+      setRoutine(r);
+      setSession(s);
+      setLiveTick((t) => t + 1);
+    } catch {
+      // sin conexión: se intenta en el próximo cambio
+    }
+  }
+  const queueReload = () => {
+    clearTimeout(reloadTimer.current);
+    reloadTimer.current = setTimeout(silentReload, 350);
+  };
+
+  useEffect(() => {
+    if (weekOffset !== 0) return undefined;
+    const own = (payload) => {
+      const row = payload.new && Object.keys(payload.new).length ? payload.new : null;
+      if (row && row.user_id !== student.id) return;
+      if (row) setLastActivity({ at: new Date(), day: row.day_label || null });
+      queueReload();
+    };
+    const mine = { schema: "public", filter: `user_id=eq.${student.id}` };
+    const channel = supabase
+      .channel(`envivo-${student.id}-${Math.random().toString(36).slice(2)}`)
+      .on("postgres_changes", { event: "INSERT", table: "progress_sets", ...mine }, own)
+      .on("postgres_changes", { event: "UPDATE", table: "progress_sets", ...mine }, own)
+      .on("postgres_changes", { event: "INSERT", table: "progress", ...mine }, own)
+      .on("postgres_changes", { event: "INSERT", table: "workout_sessions", ...mine }, own)
+      .on("postgres_changes", { event: "UPDATE", table: "workout_sessions", ...mine }, own)
+      // Los borrados (desmarcar) no se pueden filtrar por alumno: se recarga y listo
+      .on("postgres_changes", { event: "DELETE", schema: "public", table: "progress_sets" }, own)
+      .on("postgres_changes", { event: "DELETE", schema: "public", table: "progress" }, own)
+      .subscribe((status) => setLiveOn(status === "SUBSCRIBED"));
+    // Respaldo por si el tiempo real no está activo: revisa cada 20 s con la pantalla visible
+    const poll = setInterval(() => { if (document.visibilityState === "visible") silentReload(); }, 20000);
+    return () => {
+      clearInterval(poll);
+      clearTimeout(reloadTimer.current);
+      supabase.removeChannel(channel);
+      setLiveOn(false);
+    };
+  }, [student.id, weekOffset]);
 
   const toggleLock = async () => {
     if (!session) return;
@@ -181,7 +239,24 @@ export function RoutinePreviewPanel({ student, onClose, onOpenPanel }) {
               </button>
             )}
           </div>
-          {weekOffset === 0 && <p className="text-muted text-[11px] mb-2">Para corregir vos un peso o unas reps: abrí el ejercicio → «Corregir peso y reps de cada serie».</p>}
+          {weekOffset === 0 && (
+            <div className="flex flex-wrap items-center gap-x-3 gap-y-1 mb-2">
+              <span className={`inline-flex items-center gap-1.5 text-[11px] font-semibold rounded-full px-2.5 py-1 ${liveOn ? "bg-accent/15 text-accent" : "bg-field text-soft"}`}>
+                <span className={`w-1.5 h-1.5 rounded-full ${liveOn ? "bg-accent animate-pulse" : "bg-muted"}`} />
+                {liveOn ? "En vivo" : "Se actualiza cada 20 s"}
+              </span>
+              {lastActivity && (
+                <span className="text-muted text-[11px]">
+                  Última actividad {lastActivity.at.toLocaleTimeString("es-CO", { hour: "numeric", minute: "2-digit" })}
+                  {lastActivity.day && lastActivity.day !== day ? ` · está entrenando el ${lastActivity.day}` : ""}
+                </span>
+              )}
+              {lastActivity?.day && lastActivity.day !== day && (
+                <button onClick={() => setDay(lastActivity.day)} className="text-accent text-[11px] font-semibold">Ver ese día</button>
+              )}
+            </div>
+          )}
+          {weekOffset === 0 && <p className="text-muted text-[11px] mb-2">Las series y ejercicios los marca solo el alumno; vos ves cada uno apenas lo marca. Para corregir un peso o unas reps de una serie ya hecha: abrí el ejercicio → «Corregir peso y reps de cada serie».</p>}
           {noteCount > 0 && <p className="text-accent text-xs mb-2">{noteCount} ejercicio{noteCount > 1 ? "s" : ""} con observación este día</p>}
           <div className="rounded-2xl border border-white/[0.06] overflow-hidden">
             <RoutineScreen
@@ -192,6 +267,7 @@ export function RoutinePreviewPanel({ student, onClose, onOpenPanel }) {
               onEditNote={setEditing}
               onEditTimer={(part, block) => setEditingTimer({ part, block })}
               coachEdit={weekOffset === 0}
+              liveTick={liveTick}
               onClose={onClose}
               onToggle={onToggle}
               onProgressChange={() => {}}

@@ -28,11 +28,13 @@ const SIZES = {
   md: { text: "text-sm", py: "py-2", pl: "pl-3", plIcon: "pl-9", pr: "pr-9", chevron: 15, right: "right-3", left: "left-3" },
   lg: { text: "text-sm", py: "py-2.5", pl: "pl-3", plIcon: "pl-9", pr: "pr-9", chevron: 15, right: "right-3", left: "left-3" },
   xl: { text: "text-[15px]", py: "py-3", pl: "pl-4", plIcon: "pl-10", pr: "pr-10", chevron: 16, right: "right-3.5", left: "left-3.5" },
+  // Igual de alto que xl pero más angosto por dentro (día · mes · año en una fila del celular)
+  xlTight: { text: "text-[15px]", py: "py-3", pl: "pl-3", plIcon: "pl-9", pr: "pr-7", chevron: 15, right: "right-2", left: "left-3" },
 };
 
 export function Select({ tone = "field", size = "md", icon: Icon, rounded, className = "", children, ...props }) {
   const s = SIZES[size] || SIZES.md;
-  const radius = rounded === "xl" || (!rounded && (tone === "soft" || size === "xl")) ? "rounded-xl" : "rounded-lg";
+  const radius = rounded === "xl" || (!rounded && (tone === "soft" || size === "xl" || size === "xlTight")) ? "rounded-xl" : "rounded-lg";
   return (
     <div className={`relative ${className}`}>
       {Icon && (

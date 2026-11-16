@@ -89,7 +89,7 @@ export function PushToggle({ userId, t = plainT }) {
 }
 
 // Tarjeta para Inicio (alumno) y el panel (coach): aparece hasta que active o la cierre.
-export function PushPromptCard({ userId, t = plainT, className = "" }) {
+export function PushPromptCard({ userId, t = plainT, className = "", body = null }) {
   const [status, setStatus] = usePushStatus(userId);
   const [dismissed, setDismissed] = useState(true);
   const [busy, setBusy] = useState(false);
@@ -126,7 +126,7 @@ export function PushPromptCard({ userId, t = plainT, className = "" }) {
         <p className="text-soft text-xs mt-0.5">
           {ios
             ? t("En Safari toque Compartir y luego \"Agregar a inicio\". Abra Kineaco desde ese ícono y active las notificaciones en Perfil.")
-            : t("Le avisamos de mensajes, anuncios y su entrenamiento del día, aunque la app esté cerrada.")}
+            : body || t("Le avisamos de mensajes, anuncios y su entrenamiento del día, aunque la app esté cerrada.")}
         </p>
         {!ios && (
           <button type="button" onClick={activate} disabled={busy} className="mt-2.5 bg-accent text-app text-xs font-semibold rounded-lg px-3.5 py-2 disabled:opacity-60">
