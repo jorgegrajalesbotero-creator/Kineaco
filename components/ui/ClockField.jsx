@@ -11,6 +11,53 @@ const SIZES = {
 
 const shown = (field, v) => (field.unit === "time" ? formatClock(v) : field.unit === "minutes" ? `${v} min` : String(v));
 
+// Botón − / + que se puede mantener presionado: llama a onStep una vez y, si se sostiene, cada 90 ms.
+function HoldButton({ onStep, disabled, label, className, children }) {
+  const timer = useRef(null);
+  const stop = () => {
+    if (!timer.current) return;
+    clearTimeout(timer.current.timeout);
+    clearInterval(timer.current.interval);
+    timer.current = null;
+  };
+  // Si llega al límite y el botón se desactiva, deja de repetir (un botón desactivado no avisa al soltar)
+  useEffect(() => {
+    if (disabled && timer.current) {
+      clearTimeout(timer.current.timeout);
+      clearInterval(timer.current.interval);
+      timer.current = null;
+    }
+  }, [disabled]);
+  useEffect(() => () => {
+    if (!timer.current) return;
+    clearTimeout(timer.current.timeout);
+    clearInterval(timer.current.interval);
+  }, []);
+  return (
+    <button
+      type="button"
+      disabled={disabled}
+      aria-label={label}
+      className={className}
+      onPointerDown={(e) => {
+        if (e.button !== undefined && e.button !== 0) return;
+        stop();
+        onStep();
+        const t = { timeout: null, interval: null };
+        t.timeout = setTimeout(() => { t.interval = setInterval(() => onStep(), 90); }, 420);
+        timer.current = t;
+      }}
+      onPointerUp={() => stop()}
+      onPointerLeave={() => stop()}
+      onPointerCancel={() => stop()}
+      onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); onStep(); } }}
+      onContextMenu={(e) => e.preventDefault()}
+    >
+      {children}
+    </button>
+  );
+}
+
 // Un campo del reloj (trabajo, descanso, rondas, minutos):
 // − / + (se pueden mantener presionados) y tocar el número para escribir el valor exacto (7, 0:08, 1:30...).
 export function ClockField({ field, value, onChange, t = (x) => x, size = "lg" }) {
@@ -18,37 +65,19 @@ export function ClockField({ field, value, onChange, t = (x) => x, size = "lg" }
   const [editing, setEditing] = useState(false);
   const [text, setText] = useState("");
   const [bad, setBad] = useState(false);
+  // Último valor (para que al mantener presionado siga sumando desde donde va)
   const latest = useRef(value);
   useEffect(() => { latest.current = value; }, [value]);
-  const hold = useRef(null);
-
-  const bump = (dir) => {
-    const next = stepFor(field, latest.current, dir);
+  const onStepDown = () => {
+    const next = stepFor(field, latest.current, -1);
     latest.current = next;
     onChange(next);
   };
-  const stopHold = () => {
-    if (hold.current) {
-      clearTimeout(hold.current.timeout);
-      clearInterval(hold.current.interval);
-      hold.current = null;
-    }
+  const onStepUp = () => {
+    const next = stepFor(field, latest.current, 1);
+    latest.current = next;
+    onChange(next);
   };
-  useEffect(() => stopHold, []);
-  const startHold = (dir) => (e) => {
-    if (e.button !== undefined && e.button !== 0) return;
-    stopHold();
-    bump(dir);
-    hold.current = { timeout: setTimeout(() => { hold.current.interval = setInterval(() => bump(dir), 90); }, 420) };
-  };
-  const holdProps = (dir) => ({
-    onPointerDown: startHold(dir),
-    onPointerUp: stopHold,
-    onPointerLeave: stopHold,
-    onPointerCancel: stopHold,
-    onKeyDown: (e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); bump(dir); } },
-    onContextMenu: (e) => e.preventDefault(),
-  });
 
   const openEdit = () => {
     setText(field.unit === "time" ? formatClock(value) : String(value));
@@ -70,9 +99,9 @@ export function ClockField({ field, value, onChange, t = (x) => x, size = "lg" }
   return (
     <div className={`${sz.box} flex items-center`}>
       <span className={`${sz.label} flex-1 min-w-0`}>{t(field.label)}</span>
-      <button type="button" {...holdProps(-1)} disabled={value <= field.min} aria-label={`${t("Menos")} ${t(field.label)}`} className={btnCls}>
+      <HoldButton onStep={onStepDown} disabled={value <= field.min} label={`${t("Menos")} ${t(field.label)}`} className={btnCls}>
         <Minus size={sz.icon} />
-      </button>
+      </HoldButton>
       {editing ? (
         <input
           autoFocus
@@ -99,9 +128,9 @@ export function ClockField({ field, value, onChange, t = (x) => x, size = "lg" }
           {shown(field, value)}
         </button>
       )}
-      <button type="button" {...holdProps(1)} disabled={value >= field.max} aria-label={`${t("Más")} ${t(field.label)}`} className={btnCls}>
+      <HoldButton onStep={onStepUp} disabled={value >= field.max} label={`${t("Más")} ${t(field.label)}`} className={btnCls}>
         <Plus size={sz.icon} />
-      </button>
+      </HoldButton>
     </div>
   );
 }
