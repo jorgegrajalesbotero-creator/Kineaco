@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { BellOff, ChevronDown, Flag, Minus, Pause, Play, RotateCcw, SkipForward } from "lucide-react";
 import { tr } from "@/lib/i18n";
 import { beep, vibrate } from "@/lib/alarm";
-import { CLOCK_FIELDS, CLOCK_MODES, formatClock, formatStopwatch, stateAt } from "@/lib/clock";
+import { CLOCK_FIELDS, CLOCK_MODES, formatClock, formatStopwatch, stateAt, visibleFields } from "@/lib/clock";
 import {
   addLap, addRestSeconds, addRound, backToProgrammed, clockPhases, elapsedMs as elapsedOf, isRunning, minimizeClock,
   pauseClock, removeRound, resetClock, resumeClock, setClockField, setClockMode, skipPhase, startClock, stopAlarm, useClock,
@@ -58,26 +58,34 @@ export function WorkoutClock() {
   const face = {
     work: "bg-accent text-app",
     rest: "bg-calm text-app",
+    setrest: "bg-calm text-app",
+    cooldown: "bg-calm text-app",
     prep: "bg-warning text-app",
     done: "bg-card text-ink",
   }[phaseType] || "bg-card text-ink";
   const phaseLabel = {
     work: mode === "amrap" ? tr("¡A trabajar!") : mode === "stopwatch" ? tr("Cronómetro") : tr("Trabajo"),
     rest: tr("Descanso"),
+    setrest: tr("Descanso entre series"),
+    cooldown: tr("Enfriamiento"),
     prep: tr("Prepárese"),
     done: tr("¡Terminado!"),
   }[phaseType] || tr(MODE_LABELS[mode]);
 
   let big;
   if (mode === "stopwatch") big = formatStopwatch(elapsedMs);
-  else if (!run) big = formatClock(phases[mode === "rest" ? 0 : 1]?.dur ?? 0);
+  else if (!run) big = formatClock((phases.find((p) => p.type === "work") || phases[0])?.dur ?? 0);
   else big = formatClock(st.remaining);
 
   let sub = "";
   if (mode === "tabata" || mode === "intervals") {
     const total = cfg.rounds;
     const round = run ? (finished ? total : st.phase.type === "prep" ? 1 : st.phase.round) : 1;
-    sub = tr("Ronda {p0} de {p1}", { p0: round, p1: total });
+    sub = tr("Ciclo {p0} de {p1}", { p0: round, p1: total });
+    if (cfg.sets > 1) {
+      const set = run ? (finished ? cfg.sets : st.phase.set) : 1;
+      sub = `${tr("Serie {p0} de {p1}", { p0: set, p1: cfg.sets })} · ${sub}`;
+    }
     if (run && !finished) sub += ` · ${tr("Total")} ${formatClock(st.totalRemaining)}`;
   } else if (mode === "amrap") {
     sub = tr("Rondas: {p0}", { p0: rounds });
@@ -122,7 +130,7 @@ export function WorkoutClock() {
           {/* Configuración (solo antes de iniciar) */}
           {!run && CLOCK_FIELDS[mode].length > 0 && (
             <div className="grid grid-cols-1 gap-2 mb-4">
-              {CLOCK_FIELDS[mode].map((f) => (
+              {visibleFields(mode, cfg).map((f) => (
                 <ClockField key={`${mode}-${f.key}`} field={f} value={cfg[f.key]} onChange={(v) => setField(f, v)} t={tr} />
               ))}
               {CLOCK_FIELDS[mode].some((f) => f.unit === "time") && (

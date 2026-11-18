@@ -5,7 +5,11 @@ import { WEEK_DAYS } from "@/lib/dates";
 import { SearchSelect } from "@/components/ui/Search";
 
 export function DayRoutinesEditor({ days, routines, onChangeDay, savingDay, emptyLabel }) {
-  const titleOf = (id) => routines.find((r) => r.id === id)?.title || "Rutina";
+  // Las versiones anteriores de una rutina (archivadas) se muestran con su nombre, pero no se pueden elegir de nuevo
+  const titleOf = (id) => {
+    const r = routines.find((x) => x.id === id);
+    return r ? `${r.title || "Rutina"}${r.archived_at ? " (versión anterior)" : ""}` : "Rutina";
+  };
   const btn = "w-7 h-7 rounded-md text-soft flex items-center justify-center disabled:opacity-30 hover:text-accent";
   return (
     <div className="bg-card rounded-xl">
@@ -42,7 +46,7 @@ export function DayRoutinesEditor({ days, routines, onChangeDay, savingDay, empt
               ))}
             </div>
             <SearchSelect
-              options={routines.map((r) => ({ value: r.id, label: r.title || "Rutina", sub: [r.level, r.goal].filter(Boolean).join(" · ") }))}
+              options={routines.filter((r) => !r.archived_at).map((r) => ({ value: r.id, label: r.title || "Rutina", sub: [r.level, r.goal].filter(Boolean).join(" · ") }))}
               value=""
               keepEmpty
               onChange={(id) => { if (id) onChangeDay(day, [...list, id]); }}

@@ -97,6 +97,8 @@ export function RoutinesView() {
   const [catalog, setCatalog] = useState([]);
   const filters = useFilterState("kineaco:filtros:rutinas", "recientes");
   const [assignedIds, setAssignedIds] = useState(() => new Set());
+  const [usersByRoutine, setUsersByRoutine] = useState({});
+  const [saveChoice, setSaveChoice] = useState(null); // { count } cuando la rutina editada ya la tienen alumnos
   const [creating, setCreating] = useState(false);
   const [draft, setDraft] = useState({ title: "", level: "Principiante", goal: "", duration: "" });
   const [draftExercises, setDraftExercises] = useState([]);
@@ -134,13 +136,25 @@ export function RoutinesView() {
     setLoading(false);
   }
 
-  // Rutinas que usa algún alumno: asignación fija o día de un plan
+  // Rutinas que usa algún alumno: asignación fija, día de un plan o extra. usersByRoutine = { rutina: Set(alumnos) }
   async function loadAssigned() {
-    const [fixed, planDays] = await Promise.all([
-      fetchAllRows(() => supabase.from("routine_assignments").select("routine_id").order("id")),
-      fetchAllRows(() => supabase.from("training_plan_days").select("routine_id").order("id")),
+    const [fixed, planDays, extras] = await Promise.all([
+      fetchAllRows(() => supabase.from("routine_assignments").select("routine_id, user_id").order("id")),
+      fetchAllRows(() => supabase.from("training_plan_days").select("routine_id, training_plans(user_id)").order("id")),
+      fetchAllRows(() => supabase.from("student_extras").select("routine_id, user_id").order("id")).catch(() => []),
     ]);
-    setAssignedIds(new Set([...fixed, ...planDays].map((r) => r.routine_id).filter(Boolean)));
+    const map = {};
+    const ids = new Set();
+    const add = (rid, uid) => {
+      if (!rid) return;
+      ids.add(rid);
+      (map[rid] = map[rid] || new Set()).add(uid || "?");
+    };
+    fixed.forEach((r) => add(r.routine_id, r.user_id));
+    planDays.forEach((r) => add(r.routine_id, r.training_plans?.user_id));
+    (extras || []).forEach((r) => add(r.routine_id, r.user_id));
+    setUsersByRoutine(map);
+    setAssignedIds(ids);
   }
 
   async function loadCatalog() {
@@ -299,8 +313,64 @@ export function RoutinesView() {
     setEditExForm({ exerciseId: "", sets: "", reps: "", targetWeight: "", restMinutes: "" });
   };
 
+  // Guardar cambios: si la rutina ya la tienen alumnos, se pregunta si el cambio es para ellos o solo para la biblioteca
   const saveEdit = async () => {
     if (!viewingId) return;
+    const count = usersByRoutine[viewingId]?.size || 0;
+    if (count > 0) return setSaveChoice({ count });
+    return saveEditForAll();
+  };
+
+  // Solo para la biblioteca: se crea una versión nueva con los cambios y la anterior queda archivada,
+  // así los alumnos que ya la tenían siguen igual (con su planeación, cargas, observaciones e historial).
+  // Los programas automáticos pasan a usar la versión nueva.
+  const saveEditAsNewVersion = async () => {
+    setSaveChoice(null);
+    setSavingEdit(true);
+    const { data: { user } } = await supabase.auth.getUser();
+    const { data: nr, error } = await supabase
+      .from("routines")
+      .insert({
+        title: editDraft.title.trim() || autoRoutineTitle(),
+        level: editDraft.level.toLowerCase(),
+        goal: editDraft.goal,
+        duration_minutes: Number(editDraft.duration) || 0,
+        created_by: user?.id,
+      })
+      .select("id")
+      .single();
+    if (error || !nr) {
+      setSavingEdit(false);
+      return alert("No se pudo guardar la nueva versión de la rutina.");
+    }
+    const strip = (arr) => arr.map((e) => ({ ...e, itemKey: null }));
+    const contentError = await writeRoutineContent(nr.id, editMode, strip(editExercises), editBlocks.map((b) => ({ ...b, exercises: strip(b.exercises || []) })), { timer: editTimer });
+    if (contentError) {
+      await supabase.from("routines").delete().eq("id", nr.id);
+      setSavingEdit(false);
+      return alert("Error al guardar los ejercicios de la rutina: " + (contentError.message || ""));
+    }
+    const { error: archErr } = await supabase.from("routines").update({ archived_at: new Date().toISOString() }).eq("id", viewingId);
+    if (archErr) {
+      await supabase.from("routines").delete().eq("id", nr.id);
+      setSavingEdit(false);
+      return alert("No se pudo guardar como versión nueva. Revisá que el SQL «versiones de rutinas» esté aplicado en Supabase.");
+    }
+    await supabase.from("program_days").update({ routine_id: nr.id }).eq("routine_id", viewingId);
+    if (deleteMerged && mergedFrom.length > 0) {
+      const ids = mergedFrom.map((m) => m.id).filter((id) => id !== viewingId);
+      const { error: delErr } = await supabase.from("routines").delete().in("id", ids);
+      if (delErr) alert("La rutina se guardó, pero no se pudieron eliminar las rutinas fusionadas: ");
+    }
+    setSavingEdit(false);
+    closeDetail();
+    loadRoutines();
+    loadAssigned();
+  };
+
+  // Para todos: cambia la rutina original (también para los alumnos que la tienen)
+  const saveEditForAll = async () => {
+    setSaveChoice(null);
     setSavingEdit(true);
 
     const { error: updateError } = await supabase
@@ -618,6 +688,27 @@ export function RoutinesView() {
             </div>
           )}
         </div>
+
+        {saveChoice && (
+          <div className="fixed inset-0 z-50 bg-black/60 flex items-end md:items-center justify-center p-0 md:p-4" onClick={() => setSaveChoice(null)}>
+            <div className="bg-deep border border-white/[0.06] w-full max-w-md rounded-t-2xl md:rounded-2xl p-5 pb-[calc(1.25rem+env(safe-area-inset-bottom))] md:pb-5" onClick={(e) => e.stopPropagation()}>
+              <h3 className="text-ink text-lg font-semibold mb-1">¿Para quién es este cambio?</h3>
+              <p className="text-soft text-sm mb-4">
+                Esta rutina ya la {saveChoice.count === 1 ? "tiene 1 alumno" : `tienen ${saveChoice.count} alumnos`} (días, planeación o extras).
+              </p>
+              <button onClick={saveEditAsNewVersion} className="w-full text-left bg-accent text-app rounded-xl px-4 py-3 mb-2">
+                <span className="block text-sm font-semibold">Solo para la biblioteca (recomendado)</span>
+                <span className="block text-xs text-app/75">Los alumnos que ya la tienen siguen igual. Lo nuevo que asignes usa la versión cambiada.</span>
+              </button>
+              <button onClick={saveEditForAll} className="w-full text-left bg-card rounded-xl px-4 py-3 mb-3 border border-white/[0.06]">
+                <span className="block text-ink text-sm font-semibold">También para los alumnos que la tienen</span>
+                <span className="block text-xs text-soft">El cambio les llega a todos, incluida su planeación ATR.</span>
+              </button>
+              <button onClick={() => setSaveChoice(null)} className="w-full text-muted text-sm py-2">Cancelar</button>
+              <p className="text-muted text-[11px] mt-2">Para cambiar algo a un solo alumno, usá su Planeación (quitar, sustituir o agregar ejercicios) o las observaciones de su rutina.</p>
+            </div>
+          </div>
+        )}
 
         <div className="flex items-center justify-between">
           <button onClick={saveEdit} disabled={savingEdit} className="bg-accent text-app font-semibold px-6 py-2.5 rounded-lg text-sm disabled:opacity-60">

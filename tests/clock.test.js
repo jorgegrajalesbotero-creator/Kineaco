@@ -75,3 +75,17 @@ describe("tiempos exactos", () => {
     expect(stepFor(work, 1, -1)).toBe(1);
   });
 });
+
+describe("series, descanso entre series y enfriamiento", () => {
+  it("arma preparación, ciclos por serie, descanso entre series y enfriamiento", () => {
+    const p = buildPhases("intervals", { prep: 5, work: 30, rest: 15, rounds: 3, sets: 2, setRest: 60, cooldown: 120 });
+    expect(p.map((x) => x.type)).toEqual([
+      "prep", "work", "rest", "work", "rest", "work", "setrest", "work", "rest", "work", "rest", "work", "cooldown",
+    ]);
+    expect(totalSeconds(p)).toBe(5 + 2 * (3 * 30 + 2 * 15) + 60 + 120);
+    expect(p[7]).toMatchObject({ type: "work", set: 2, round: 1, sets: 2 });
+  });
+  it("sin preparación arranca en trabajo", () => {
+    expect(buildPhases("tabata", { prep: 0, rounds: 2 })[0].type).toBe("work");
+  });
+});

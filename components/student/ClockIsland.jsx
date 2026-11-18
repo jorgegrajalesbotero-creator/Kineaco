@@ -190,11 +190,14 @@ function ClockIsland() {
       time = formatClock(st.remaining);
       frac = st.phase.dur ? st.remaining / st.phase.dur : 1;
       const type = st.phase.type;
-      tone = type === "rest" ? "calm" : type === "prep" ? "warning" : "accent";
+      tone = type === "rest" || type === "setrest" || type === "cooldown" ? "calm" : type === "prep" ? "warning" : "accent";
+      const setText = st.phase.sets > 1 ? ` · S${st.phase.set}/${st.phase.sets}` : "";
       if (type === "prep") label = tr("Prepárese");
+      else if (type === "setrest") label = `${tr("Descanso entre series")}${setText}`;
+      else if (type === "cooldown") label = tr("Enfriamiento");
       else if (s.mode === "rest") label = tr("Descanso");
       else if (s.mode === "amrap") label = `AMRAP · ${tr("Rondas: {p0}", { p0: s.rounds })}`;
-      else label = `${type === "rest" ? tr("Descanso") : tr("Trabajo")} · ${st.phase.round}/${st.phase.rounds}`;
+      else label = `${type === "rest" ? tr("Descanso") : tr("Trabajo")} · ${st.phase.round}/${st.phase.rounds}${setText}`;
     }
   }
 

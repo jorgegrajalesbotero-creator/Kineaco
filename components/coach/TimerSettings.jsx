@@ -1,7 +1,7 @@
 "use client";
 
 import { Timer } from "lucide-react";
-import { CLOCK_DEFAULTS, CLOCK_FIELDS, normalizeConfig, normalizeTimer } from "@/lib/clock";
+import { CLOCK_DEFAULTS, CLOCK_FIELDS, normalizeConfig, normalizeTimer, visibleFields } from "@/lib/clock";
 import { ClockField } from "@/components/ui/ClockField";
 
 const MODES = [
@@ -32,7 +32,7 @@ export function TimerSettings({ value, onChange, compact = false }) {
       </div>
       {t && CLOCK_FIELDS[mode].length > 0 && (
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
-          {CLOCK_FIELDS[mode].map((f) => (
+          {visibleFields(mode, t).map((f) => (
             <ClockField key={`${mode}-${f.key}`} field={f} value={t[f.key]} onChange={(v) => setField(f, v)} size="sm" />
           ))}
         </div>

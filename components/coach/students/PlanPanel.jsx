@@ -100,7 +100,10 @@ export function PlanPanel({ student, onClose }) {
         rex = ex.data || [];
         blocks = bl.data || [];
       }
-      const titleOf = (id) => routines.find((r) => String(r.id) === String(id))?.title || "Rutina";
+      const titleOf = (id) => {
+        const r = routines.find((x) => String(x.id) === String(id));
+        return r ? `${r.title || "Rutina"}${r.archived_at ? " (versión anterior)" : ""}` : "Rutina";
+      };
       const list = ids.map((id) => {
         const rb = blocks.filter((b) => String(b.routine_id) === String(id));
         const pos = (blockId) => { const i = rb.findIndex((b) => b.id === blockId); return i < 0 ? 999 : i; };
@@ -128,7 +131,7 @@ export function PlanPanel({ student, onClose }) {
     setLoading(true);
     const [schedule, { data: lib }, { data: tpls }, { data: cat }] = await Promise.all([
       loadSchedule(supabase, student.id, "id, title"),
-      libraryRoutines(supabase, "id, title, level, goal", (q) => q.order("title")),
+      libraryRoutines(supabase, "id, title, level, goal", (q) => q.order("title"), { withArchived: true }),
       supabase.from("plan_templates").select("id, name, plan_template_phases(*), plan_template_days(*)").order("name"),
       supabase.from("exercises").select("id, name").order("name"),
     ]);
