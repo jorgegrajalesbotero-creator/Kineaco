@@ -12,6 +12,9 @@ import { WorkoutClock } from "@/components/student/WorkoutClock";
 // Hora actual (fuera de los componentes: solo se usa en efectos)
 const nowMs = () => Date.now();
 
+// Cuánto tiempo suena la alarma y se ve la píldora roja al terminar
+const RING_MS = 10000;
+
 const MODE_LABELS = { rest: "Descanso", tabata: "Tabata", intervals: "Intervalos", amrap: "AMRAP", stopwatch: "Cronómetro" };
 
 // Texto del aviso que llega al celular si el reloj termina con la app cerrada
@@ -106,6 +109,14 @@ function ClockEngine({ userId }) {
     }
   }, [tick, s, userId]);
 
+  // Al terminar, la alarma suena y la píldora queda en rojo 10 segundos; después se apaga sola
+  // (también se puede apagar antes con "Apagar").
+  useEffect(() => {
+    if (!s.ringing) return undefined;
+    const id = setTimeout(stopAlarm, RING_MS);
+    return () => clearTimeout(id);
+  }, [s.ringing]);
+
   // Mantener la pantalla encendida mientras corre (si el navegador lo permite)
   useEffect(() => {
     let cancelled = false;
@@ -132,7 +143,7 @@ function ClockEngine({ userId }) {
     if (key === sentAlarm.current) return;
     const hadOne = sentAlarm.current !== 0;
     sentAlarm.current = key;
-    if (end && end - nowMs() > 15000 && DONE_TEXT[mode]) {
+    if (end && end - nowMs() > 5000 && DONE_TEXT[mode]) {
       supabase
         .rpc("set_clock_alarm", { p_fire_at: new Date(end).toISOString(), p_title: DONE_TEXT[mode], p_body: "Toque para volver a Kineaco." })
         .then(() => { }, () => { });
