@@ -1,10 +1,14 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
-import { BellOff, Flag, Minus, Pause, Play, RotateCcw, SkipForward, X } from "lucide-react";
+import { useEffect, useState } from "react";
+import { BellOff, ChevronDown, Flag, Minus, Pause, Play, RotateCcw, SkipForward } from "lucide-react";
 import { tr } from "@/lib/i18n";
-import { beep, getAudio, startAlarm, vibrate } from "@/lib/alarm";
-import { CLOCK_FIELDS, CLOCK_MODES, buildPhases, formatClock, formatStopwatch, normalizeConfig, normalizeTimer, stateAt } from "@/lib/clock";
+import { beep, vibrate } from "@/lib/alarm";
+import { CLOCK_FIELDS, CLOCK_MODES, formatClock, formatStopwatch, stateAt } from "@/lib/clock";
+import {
+  addLap, addRestSeconds, addRound, backToProgrammed, clockPhases, elapsedMs as elapsedOf, isRunning, minimizeClock,
+  pauseClock, removeRound, resetClock, resumeClock, setClockField, setClockMode, skipPhase, startClock, stopAlarm, useClock,
+} from "@/lib/clockStore";
 import { ClockField } from "@/components/ui/ClockField";
 
 const MODE_LABELS = { rest: "Descanso", tabata: "Tabata", intervals: "Intervalos", amrap: "AMRAP", stopwatch: "Cronómetro" };
@@ -15,169 +19,39 @@ const MODE_HINTS = {
   amrap: "Tantas rondas como pueda en el tiempo. Cuente cada ronda con «+1 ronda».",
   stopwatch: "Cuenta hacia arriba. Marque vueltas cuando quiera.",
 };
-const STORE_KEY = "workout_clock_v1";
 
-function loadSaved() {
-  try {
-    return JSON.parse(localStorage.getItem(STORE_KEY) || "{}") || {};
-  } catch {
-    return {};
-  }
-}
-
-// Reloj de entrenamiento a pantalla completa
-// Hora actual (fuera del componente: solo se usa en botones y efectos, nunca al dibujar)
+// Hora actual (fuera del componente: solo se usa en efectos, nunca al dibujar)
 const nowMs = () => Date.now();
 
-// preset = reloj programado por el coach ({ mode, ...valores }); el alumno igual lo puede ajustar.
-export function WorkoutClock({ onClose, initialMode, preset = null }) {
-  const [saved] = useState(loadSaved);
-  const [programmed] = useState(() => normalizeTimer(preset));
-  const [mode, setMode] = useState(() => programmed?.mode || (CLOCK_MODES.includes(initialMode) ? initialMode : CLOCK_MODES.includes(saved.mode) ? saved.mode : "tabata"));
-  const [configs, setConfigs] = useState(() => Object.fromEntries(CLOCK_MODES.map((m) => [m, normalizeConfig(m, programmed?.mode === m ? programmed : saved.configs?.[m])])));
-  // run = { startedAt, pausedAt (o null), pausedTotal, extra (s, solo descanso) }
-  const [run, setRun] = useState(null);
-  const [now, setNow] = useState(() => nowMs());
-  const [rounds, setRounds] = useState(0); // AMRAP
-  const [laps, setLaps] = useState([]); // Cronómetro (ms acumulados)
-  const alarmStop = useRef(null); // apaga la alarma final
-  const [ringing, setRinging] = useState(false);
-  const lastIndex = useRef(-1);
-  const lastTick = useRef(null);
-  const wakeLock = useRef(null);
-
-  const cfg = configs[mode];
-  const phases = buildPhases(mode, cfg, run?.extra || 0);
-  const running = !!run && !run.pausedAt;
-  const elapsedMs = run ? (run.pausedAt ?? now) - run.startedAt - run.pausedTotal : 0;
-  const st = mode === "stopwatch" ? null : stateAt(phases, elapsedMs);
-  const finished = !!st?.done && !!run;
-
-  // Guardar el modo y la configuración en este dispositivo (no si viene programado por el coach)
+// Reloj de entrenamiento a pantalla completa. El estado vive en lib/clockStore: al cerrarlo
+// el reloj sigue corriendo en la píldora de arriba. Los pitidos y la alarma los maneja ClockHost.
+export function WorkoutClock() {
+  const s = useClock();
+  const { mode, run, rounds, laps, ringing } = s;
+  const programmed = s.preset;
+  const cfg = s.configs[mode];
+  const [now, setNow] = useState(0);
+  const running = isRunning(s);
   useEffect(() => {
-    if (programmed) return;
-    try { localStorage.setItem(STORE_KEY, JSON.stringify({ mode, configs })); } catch { }
-  }, [mode, configs, programmed]);
-  const isProgrammed = !!programmed && mode === programmed.mode && CLOCK_FIELDS[mode].every((f) => configs[mode][f.key] === programmed[f.key]);
-
-
-  // Reloj interno: refresca la pantalla mientras corre
-  useEffect(() => {
-    if (!running) return;
+    setNow(nowMs());
+    if (!running) return undefined;
     const id = setInterval(() => setNow(nowMs()), mode === "stopwatch" ? 100 : 200);
     return () => clearInterval(id);
-  }, [running, mode]);
+  }, [running, mode, run?.id]);
 
-  // Mantener la pantalla encendida mientras corre (si el navegador lo permite)
-  useEffect(() => {
-    let cancelled = false;
-    if (running && "wakeLock" in navigator) {
-      navigator.wakeLock.request("screen").then((l) => {
-        if (cancelled) l.release().catch(() => { });
-        else wakeLock.current = l;
-      }).catch(() => { });
-    }
-    return () => {
-      cancelled = true;
-      wakeLock.current?.release().catch(() => { });
-      wakeLock.current = null;
-    };
-  }, [running]);
-
-  // Pitidos y vibración: cambio de fase, últimos 3 segundos y final
-  useEffect(() => {
-    if (!run || !st) return;
-    if (st.done) {
-      if (lastIndex.current !== phases.length) {
-        lastIndex.current = phases.length;
-        // Alarma que sigue sonando hasta que la apaguen
-        alarmStop.current?.();
-        alarmStop.current = startAlarm();
-        setRinging(true);
-        setRun((r) => (r && !r.pausedAt ? { ...r, pausedAt: nowMs() } : r));
-      }
-      return;
-    }
-    if (st.index !== lastIndex.current) {
-      if (lastIndex.current !== -1 || st.phase.type !== "prep") {
-        if (st.phase.type === "work") {
-          beep({ freq: 1175, dur: 0.6 });
-          vibrate([350]);
-        } else {
-          beep({ freq: 740, dur: 0.22 });
-          beep({ freq: 740, at: 0.3, dur: 0.22 });
-          vibrate([150, 100, 150]);
-        }
-      }
-      lastIndex.current = st.index;
-      lastTick.current = null;
-    }
-    if (running && st.remaining <= 3 && st.remaining >= 1 && lastTick.current !== `${st.index}:${st.remaining}`) {
-      lastTick.current = `${st.index}:${st.remaining}`;
-      beep({ freq: 988, dur: 0.12, vol: 0.7 });
-    }
-  });
-
-  const ensureAudio = () => getAudio();
-  const stopAlarm = () => {
-    alarmStop.current?.();
-    alarmStop.current = null;
-    setRinging(false);
-  };
-  // Al cerrar el reloj se apaga la alarma
-  useEffect(() => () => alarmStop.current?.(), []);
+  const phases = clockPhases(s);
+  const elapsedMs = run && now ? elapsedOf(s, now) : 0;
+  const st = mode === "stopwatch" ? null : stateAt(phases, elapsedMs);
+  const finished = !!st?.done && !!run;
+  const isProgrammed = !!programmed && mode === programmed.mode && CLOCK_FIELDS[mode].every((f) => cfg[f.key] === programmed[f.key]);
 
   const start = () => {
-    stopAlarm();
-    ensureAudio();
-    const t = nowMs();
-    setNow(t);
-    lastIndex.current = -1;
-    lastTick.current = null;
-    setRounds(0);
-    setLaps([]);
-    setRun({ startedAt: t, pausedAt: null, pausedTotal: 0, extra: 0 });
-    // El cronómetro no tiene fases: sonido de arranque
-    if (mode === "stopwatch") beep({ freq: 1175, dur: 0.25 });
+    startClock();
+    if (mode === "stopwatch") beep({ freq: 1175, dur: 0.25 }); // el cronómetro no tiene fases: sonido de arranque
   };
-  const pause = () => setRun((r) => (r ? { ...r, pausedAt: nowMs() } : r));
-  const resume = () => {
-    ensureAudio();
-    const t = nowMs();
-    setNow(t);
-    setRun((r) => (r ? { ...r, pausedTotal: r.pausedTotal + (t - r.pausedAt), pausedAt: null } : r));
-  };
-  const reset = () => {
-    stopAlarm();
-    setRun(null);
-    setRounds(0);
-    setLaps([]);
-    lastIndex.current = -1;
-  };
-  // Pasar a la siguiente fase (corre el inicio hacia atrás lo que falta de la fase actual)
-  const skip = () => {
-    if (!run || !st || st.done) return;
-    const ref = run.pausedAt ?? nowMs();
-    const endMs = phases.slice(0, st.index + 1).reduce((t, p) => t + p.dur, 0) * 1000;
-    setNow(nowMs());
-    setRun((r) => ({ ...r, startedAt: ref - r.pausedTotal - endMs }));
-  };
-  // Volver a lo que programó el coach
-  const backToProgrammed = () => {
-    reset();
-    setMode(programmed.mode);
-    setConfigs((c) => ({ ...c, [programmed.mode]: normalizeConfig(programmed.mode, programmed) }));
-  };
-  const addRest = (sec) => setRun((r) => (r ? { ...r, extra: r.extra + sec } : r));
-
-  const changeMode = (m) => {
-    if (m === mode) return;
-    reset();
-    setMode(m);
-  };
-  const setField = (field, value) => {
-    setConfigs((c) => ({ ...c, [mode]: normalizeConfig(mode, { ...c[mode], [field.key]: value }) }));
-  };
+  const changeMode = (m) => { if (m !== mode) setClockMode(m); };
+  const setField = (field, value) => setClockField(field, value);
+  const skip = () => { if (run && st && !st.done) skipPhase(st.index); };
 
   // Colores según la fase: trabajo en lima, descanso en azul, preparación en ámbar
   const phaseType = mode === "stopwatch" ? (run ? "work" : null) : finished ? "done" : run ? st.phase.type : null;
@@ -218,8 +92,8 @@ export function WorkoutClock({ onClose, initialMode, preset = null }) {
     <div className="fixed inset-0 z-[70] bg-app flex flex-col animate-fade-in" role="dialog" aria-modal="true" aria-label={tr("Reloj")}>
       <div className="flex items-center justify-between px-4 pt-[calc(0.75rem+env(safe-area-inset-top))] pb-2">
         <h2 className="text-ink text-lg font-semibold">{tr("Reloj")}</h2>
-        <button onClick={() => { stopAlarm(); onClose(); }} aria-label={tr("Cerrar")} className="w-10 h-10 rounded-full bg-card flex items-center justify-center text-soft">
-          <X size={18} />
+        <button onClick={minimizeClock} aria-label={run ? tr("Minimizar (el reloj sigue corriendo)") : tr("Cerrar")} className="w-10 h-10 rounded-full bg-card flex items-center justify-center text-soft">
+          <ChevronDown size={20} />
         </button>
       </div>
 
@@ -273,8 +147,8 @@ export function WorkoutClock({ onClose, initialMode, preset = null }) {
           {/* AMRAP: contador de rondas */}
           {mode === "amrap" && run && (
             <div className="flex gap-2 mt-3">
-              <button onClick={() => setRounds((r) => Math.max(0, r - 1))} disabled={rounds === 0} className={`${secondaryBtn} w-14`} aria-label={tr("Quitar ronda")}><Minus size={18} /></button>
-              <button onClick={() => { setRounds((r) => r + 1); vibrate(40); }} disabled={finished} className="flex-1 h-12 rounded-2xl bg-card border border-accent/40 text-accent text-base font-semibold active:scale-[0.97] transition-transform disabled:opacity-40">
+              <button onClick={removeRound} disabled={rounds === 0} className={`${secondaryBtn} w-14`} aria-label={tr("Quitar ronda")}><Minus size={18} /></button>
+              <button onClick={() => { addRound(); vibrate(40); }} disabled={finished} className="flex-1 h-12 rounded-2xl bg-card border border-accent/40 text-accent text-base font-semibold active:scale-[0.97] transition-transform disabled:opacity-40">
                 {tr("+1 ronda")}
               </button>
             </div>
@@ -291,16 +165,16 @@ export function WorkoutClock({ onClose, initialMode, preset = null }) {
                 <RotateCcw size={18} /> {tr("Repetir")}
               </button>
             ) : running ? (
-              <button onClick={pause} className="flex-1 h-14 rounded-2xl bg-ink text-app text-base font-semibold flex items-center justify-center gap-2">
+              <button onClick={pauseClock} className="flex-1 h-14 rounded-2xl bg-ink text-app text-base font-semibold flex items-center justify-center gap-2">
                 <Pause size={18} /> {tr("Pausar")}
               </button>
             ) : (
-              <button onClick={resume} className="flex-1 h-14 rounded-2xl bg-accent text-app text-base font-semibold flex items-center justify-center gap-2">
+              <button onClick={resumeClock} className="flex-1 h-14 rounded-2xl bg-accent text-app text-base font-semibold flex items-center justify-center gap-2">
                 <Play size={18} /> {tr("Seguir")}
               </button>
             )}
             {run && (
-              <button onClick={reset} className={`${secondaryBtn} w-14 h-14!`} aria-label={tr("Reiniciar")}><RotateCcw size={18} /></button>
+              <button onClick={resetClock} className={`${secondaryBtn} w-14 h-14!`} aria-label={tr("Reiniciar")}><RotateCcw size={18} /></button>
             )}
           </div>
 
@@ -308,12 +182,12 @@ export function WorkoutClock({ onClose, initialMode, preset = null }) {
             <div className="flex gap-2 mt-2">
               {mode === "rest" && (
                 <>
-                  <button onClick={() => addRest(-15)} className={`${secondaryBtn} flex-1`}>−15 s</button>
-                  <button onClick={() => addRest(15)} className={`${secondaryBtn} flex-1`}>+15 s</button>
+                  <button onClick={() => addRestSeconds(-15)} className={`${secondaryBtn} flex-1`}>−15 s</button>
+                  <button onClick={() => addRestSeconds(15)} className={`${secondaryBtn} flex-1`}>+15 s</button>
                 </>
               )}
               {mode === "stopwatch" ? (
-                <button onClick={() => setLaps((l) => [...l, elapsedMs])} className={`${secondaryBtn} flex-1`}><Flag size={16} /> {tr("Vuelta")}</button>
+                <button onClick={() => addLap(elapsedMs)} className={`${secondaryBtn} flex-1`}><Flag size={16} /> {tr("Vuelta")}</button>
               ) : (
                 <button onClick={skip} className={`${secondaryBtn} flex-1`}><SkipForward size={16} /> {mode === "rest" ? tr("Saltar") : tr("Siguiente fase")}</button>
               )}
@@ -336,7 +210,7 @@ export function WorkoutClock({ onClose, initialMode, preset = null }) {
             </div>
           )}
 
-          <p className="text-muted text-[11px] text-center mt-5">{tr("Suena y vibra en cada cambio; al final la alarma sigue hasta que la apague. Suba el volumen del celular.")}</p>
+          <p className="text-muted text-[11px] text-center mt-5">{tr("Puede cerrar el reloj o salir de la app: sigue corriendo en la píldora de arriba.")} {tr("Suena y vibra en cada cambio; al final la alarma sigue hasta que la apague. Suba el volumen del celular.")}</p>
         </div>
       </div>
     </div>

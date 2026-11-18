@@ -29,6 +29,7 @@ import { ConsentScreen } from "@/components/student/ConsentScreen";
 import { LEGAL_VERSION } from "@/lib/legal";
 import { RoutineScreen } from "@/components/student/RoutineScreen";
 import { CalendarScreen } from "@/components/student/CalendarScreen";
+import { ClockHost } from "@/components/student/ClockIsland";
 
 export default function App() {
   const [lang, setLangState] = useState("es");
@@ -702,6 +703,8 @@ export default function App() {
             content
           )}
         </main>
+        {/* Reloj del alumno: sigue corriendo en una píldora arriba aunque cambie de pantalla o salga de la app */}
+        {!hideNav && userId && <ClockHost userId={userId} />}
         {!hideNav && (
           <div className="md:hidden absolute inset-x-0 bottom-[max(0.75rem,calc(env(safe-area-inset-bottom)-0.5rem))] z-40 pointer-events-none">
             <BottomNav active={tab} onSelect={selectTab} unreadCount={unreadMessageCount} isCoach={isCoach} />

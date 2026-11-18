@@ -126,7 +126,7 @@ export function MessagesInbox({ onUnreadChange, initialStudentId, onInitialDone 
   };
 
   return (
-    <div className="p-4 md:p-8">
+    <div className="p-4 md:p-8 w-full max-w-6xl mx-auto">
       <div className="md:grid md:grid-cols-[minmax(260px,340px)_1fr] md:gap-6 md:items-start">
         <div className={selected ? "hidden md:block" : ""}>
           <div className="mb-4">

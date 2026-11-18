@@ -125,7 +125,7 @@ export function ExercisesView() {
   const visible = sortItems(result, SORTS, filters.sort);
 
   return (
-    <div className="p-4 md:p-8">
+    <div className="p-4 md:p-8 w-full max-w-6xl mx-auto">
       <h2 className="text-ink text-xl font-semibold mb-1">Catálogo de ejercicios</h2>
       <p className="text-muted text-sm mb-6">Estos ejercicios se reutilizan al armar cualquier rutina.</p>
 

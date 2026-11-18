@@ -12,9 +12,7 @@ import { safeHttpUrl } from "@/lib/url";
 import { formatWeight, useWeightUnit } from "@/lib/weightUnits";
 import { youtubeVideo } from "@/lib/youtube";
 import { Confetti } from "@/components/ui/Confetti";
-import { RestTimer } from "@/components/student/RestTimer";
-import { WorkoutClock } from "@/components/student/WorkoutClock";
-import { getAudio } from "@/lib/alarm";
+import { openClock, startRest as startRestClock, stopRest } from "@/lib/clockStore";
 import { timerLabel } from "@/lib/clock";
 import { SetLogger } from "@/components/student/SetLogger";
 import { Chameleon } from "@/components/ui/Chameleon";
@@ -37,8 +35,8 @@ export function RoutineScreen({ routine, userId, pet = null, onClose, onToggle, 
   const openDetail = (i) => { setPlaying(false); setDetailIndex(i); };
   const closeDetail = () => { setPlaying(false); setDetailIndex(null); };
   const [loggerIndex, setLoggerIndex] = useState(null);
-  const [rest, setRest] = useState(null); // { endsAt, total }
-  const [clock, setClock] = useState(null); // { preset } cuando el reloj está abierto
+  // El reloj y el descanso entre series viven en lib/clockStore (siguen corriendo en la píldora de arriba)
+  const intervalsByDefault = (routine.parts || [routine]).some((p) => p.blocks?.some((b) => b.block_type === "intermitentes"));
   const [celebrate, setCelebrate] = useState(false);
   const [pdfBusy, setPdfBusy] = useState(false);
   const [showPdf, pdfPreview] = usePdfPreview(tr);
@@ -214,10 +212,7 @@ export function RoutineScreen({ routine, userId, pet = null, onClose, onToggle, 
     }
   };
 
-  const startRest = (seconds) => {
-    getAudio(); // se activa el sonido con el toque (iPhone lo exige)
-    setRest({ endsAt: Date.now() + seconds * 1000, total: seconds });
-  };
+  const startRest = (seconds) => startRestClock(seconds);
   const detail = detailIndex !== null ? routine.exercises[detailIndex] : null;
   const videoLink = detail ? safeHttpUrl(detail.videoUrl) : null;
   const video = detail ? youtubeVideo(detail.videoUrl) : null;
@@ -233,7 +228,7 @@ export function RoutineScreen({ routine, userId, pet = null, onClose, onToggle, 
     setFinishing(false);
     if (error) return alert(tr("No se pudo finalizar: "));
     setSession(data);
-    setRest(null);
+    stopRest();
     navigator.vibrate?.([20, 60, 30]);
   };
 
@@ -327,7 +322,7 @@ export function RoutineScreen({ routine, userId, pet = null, onClose, onToggle, 
     }
     if (!b.timer) return null;
     return (
-      <button onClick={() => setClock({ preset: b.timer })} className="w-full flex items-center gap-2.5 rounded-xl px-3 py-2.5 mb-2 bg-accent/15 border border-accent/30 text-left active:scale-[0.99] transition-transform">
+      <button onClick={() => openClock({ preset: b.timer })} className="w-full flex items-center gap-2.5 rounded-xl px-3 py-2.5 mb-2 bg-accent/15 border border-accent/30 text-left active:scale-[0.99] transition-transform">
         <span className="w-8 h-8 rounded-lg bg-accent text-app flex items-center justify-center shrink-0"><Timer size={16} /></span>
         <span className="flex-1 min-w-0">
           <span className="block text-ink text-sm font-medium">{timerLabel(b.timer, tr)}</span>
@@ -358,7 +353,7 @@ export function RoutineScreen({ routine, userId, pet = null, onClose, onToggle, 
           </button>
           <div className="flex items-center gap-2">
             {!preview && (
-              <button onClick={() => setClock({ preset: null })} className="flex items-center gap-1.5 h-9 rounded-full bg-accent text-app px-3.5 text-xs font-semibold active:scale-95 transition-transform">
+              <button onClick={() => openClock({ initialMode: intervalsByDefault ? "intervals" : undefined })} className="flex items-center gap-1.5 h-9 rounded-full bg-accent text-app px-3.5 text-xs font-semibold active:scale-95 transition-transform">
                 <Timer size={14} /> {tr("Reloj")}
               </button>
             )}
@@ -560,21 +555,6 @@ export function RoutineScreen({ routine, userId, pet = null, onClose, onToggle, 
           onComplete={(w) => completeExercise(loggerIndex, w)}
           onUncomplete={() => uncompleteExercise(loggerIndex)}
           onStartRest={startRest}
-        />
-      )}
-      {rest && (
-        <RestTimer
-          endsAt={rest.endsAt}
-          total={rest.total}
-          onChange={(d) => setRest((r) => ({ endsAt: Math.max(Date.now(), r.endsAt + d * 1000), total: Math.max(15, r.total + d) }))}
-          onClose={() => setRest(null)}
-        />
-      )}
-      {clock && (
-        <WorkoutClock
-          onClose={() => setClock(null)}
-          preset={clock.preset}
-          initialMode={(routine.parts || [routine]).some((p) => p.blocks?.some((b) => b.block_type === "intermitentes")) ? "intervals" : undefined}
         />
       )}
       {pdfPreview}

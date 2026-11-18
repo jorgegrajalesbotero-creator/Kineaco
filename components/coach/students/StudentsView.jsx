@@ -149,7 +149,7 @@ export function StudentsView({ initialAction, onInitialActionDone }) {
   const filtered = sortItems(result, STUDENT_SORTS, filters.sort);
 
   return (
-    <div className="p-4 md:p-8">
+    <div className="p-4 md:p-8 w-full max-w-6xl mx-auto">
       <h2 className="text-ink text-xl font-semibold mb-1">Alumnos</h2>
       <p className="text-muted text-sm mb-6">Toque un alumno para abrir su ficha: entrenamiento, progreso, nutrición y más.</p>
 
@@ -184,7 +184,7 @@ export function StudentsView({ initialAction, onInitialActionDone }) {
         <Skeleton />
       ) : (
         <>
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 lg:grid-cols-2 2xl:grid-cols-3 gap-3">
             {filtered.map((s) => (
               <div
                 key={s.id}

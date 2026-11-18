@@ -167,7 +167,7 @@ export function ReportView({ onStudentAction }) {
   }));
 
   return (
-    <div className="p-4 md:p-8">
+    <div className="p-4 md:p-8 w-full max-w-6xl mx-auto">
       <div className="flex items-start justify-between flex-wrap mb-6 gap-4">
         <div>
           <h2 className="text-ink text-xl font-semibold mb-1">Reporte semanal</h2>
@@ -247,7 +247,7 @@ export function ReportView({ onStudentAction }) {
               {visible.length === 0 && (
                 <p className="text-muted text-sm mb-3">No hay alumnos que coincidan con la búsqueda o los filtros.</p>
               )}
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 lg:grid-cols-2 2xl:grid-cols-3 gap-3">
                 {visible.map((r) => (
                   <div key={r.id} className="bg-card rounded-xl p-4">
                     <div className="flex items-start justify-between gap-3 mb-3">

@@ -435,7 +435,7 @@ export function RoutinesView() {
 
   if (creating) {
     return (
-      <div className="p-4 md:p-8 max-w-2xl">
+      <div className="p-4 md:p-8 max-w-2xl w-full mx-auto">
         <div className="flex items-center justify-between mb-6">
           <h2 className="text-ink text-xl font-semibold">Nueva rutina</h2>
           <button onClick={() => setCreating(false)} className="text-muted"><X size={20} /></button>
@@ -513,7 +513,7 @@ export function RoutinesView() {
 
   if (viewingId) {
     return (
-      <div className="p-4 md:p-8 max-w-2xl">
+      <div className="p-4 md:p-8 max-w-2xl w-full mx-auto">
         <div className="flex items-center justify-between mb-6">
           <h2 className="text-ink text-xl font-semibold">Editar rutina</h2>
           <button onClick={closeDetail} className="text-muted"><X size={20} /></button>
@@ -642,7 +642,7 @@ export function RoutinesView() {
   const quickBtn = "flex items-center gap-1 text-xs rounded-lg px-2.5 py-1.5 bg-field text-soft hover:text-ink disabled:opacity-40";
 
   return (
-    <div className="p-4 md:p-8">
+    <div className="p-4 md:p-8 w-full max-w-6xl mx-auto">
       <div className="flex items-center justify-between gap-3 flex-wrap mb-6">
         <div>
           <h2 className="text-ink text-xl font-semibold">Rutinas</h2>
@@ -684,7 +684,7 @@ export function RoutinesView() {
         <p className="text-muted text-sm mb-4">No hay rutinas que coincidan con la búsqueda o los filtros.</p>
       )}
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-2 2xl:grid-cols-3 gap-4">
         {visible.map((r) => {
           const busy = busyId === r.id;
           const checked = selected.includes(r.id);

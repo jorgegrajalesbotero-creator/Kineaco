@@ -120,7 +120,7 @@ export function UsersView() {
   if (loading) return <div className="p-6 text-muted text-sm">Cargando usuarios...</div>;
 
   return (
-    <div className="flex-1 overflow-y-auto p-5">
+    <div className="flex-1 overflow-y-auto p-5 md:p-8 w-full max-w-6xl mx-auto">
       <div className="flex items-center gap-2 mb-1">
         <Shield size={18} className="text-accent" />
         <h1 className="text-ink text-xl font-semibold">Usuarios y roles</h1>

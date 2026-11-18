@@ -117,7 +117,7 @@ export function ProgramsView() {
   if (managingKey) {
     const [goal, location] = managingKey.split("_");
     return (
-      <div className="p-4 md:p-8 max-w-2xl">
+      <div className="p-4 md:p-8 max-w-2xl w-full mx-auto">
         <div className="flex items-center justify-between mb-6">
           <h2 className="text-ink text-xl font-semibold">
             {PROGRAM_GOALS.find((g) => g.key === goal).label} · {PROGRAM_LOCATIONS.find((l) => l.key === location).label}
@@ -150,7 +150,7 @@ export function ProgramsView() {
   }
 
   return (
-    <div className="p-4 md:p-8">
+    <div className="p-4 md:p-8 w-full max-w-6xl mx-auto">
       <h2 className="text-ink text-xl font-semibold mb-1">Programas</h2>
       <p className="text-muted text-sm mb-6">Cuando un alumno cambia su objetivo o lugar de entreno en Nutrición, se le asigna automáticamente el programa correspondiente.</p>
 
