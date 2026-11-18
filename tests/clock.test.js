@@ -53,7 +53,7 @@ describe("formatos", () => {
 });
 
 describe("tiempos exactos", () => {
-  const work = CLOCK_FIELDS.tabata[0];
+  const work = CLOCK_FIELDS.tabata.find((f) => f.key === "work");
   it("lee lo que se escribe", () => {
     expect(parseClockInput("8")).toBe(8);
     expect(parseClockInput("0:07")).toBe(7);
