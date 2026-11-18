@@ -84,7 +84,9 @@ function ClockEngine({ userId }) {
         lastIndex.current = phases.length;
         if (!run.pausedAt) pauseClock(); // se queda en 0:00
         if (!s.ringing && !run.acked) ringAlarm();
-        if (userId) supabase.rpc("clear_clock_alarm").then(() => { }, () => { });
+        // Con la app a la vista se borra el aviso al celular (ya suena aquí). Si la app está en segundo
+        // plano (otra pestaña u otra app) se deja, para que llegue la notificación.
+        if (userId && document.visibilityState === "visible") supabase.rpc("clear_clock_alarm").then(() => { }, () => { });
         sentAlarm.current = 0;
       }
       return;
