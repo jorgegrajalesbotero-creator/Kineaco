@@ -30,7 +30,7 @@ export function ProgramsView() {
 
   async function loadAll() {
     setLoading(true);
-    const { data: routinesData } = await libraryRoutines(supabase, "id, title", (q) => q.order("title"));
+    const { data: routinesData } = await libraryRoutines(supabase, "id, title", (q) => q.order("title"), { withArchived: true });
     setRoutines(routinesData || []);
 
     const { data: programsData } = await supabase

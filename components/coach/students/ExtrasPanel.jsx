@@ -10,7 +10,7 @@ import { blockTypeLabel } from "@/lib/blocks";
 import { loadTimers, timersFor } from "@/lib/routineTimers";
 import { timerLabel } from "@/lib/clock";
 import { BlockEditor } from "@/components/coach/routines/BlockEditor";
-import { defaultBlockTitle, loadRoutineContent, tmpKey, writeRoutineContent } from "@/components/coach/routines/routineHelpers";
+import { defaultBlockTitle, listToBlocks, loadRoutineContent, tmpKey, writeRoutineContent } from "@/components/coach/routines/routineHelpers";
 import { SearchSelect } from "@/components/ui/Search";
 import { Skeleton } from "@/components/ui/Skeleton";
 import { PanelLayout } from "./PanelLayout";
@@ -63,7 +63,7 @@ export function ExtrasPanel({ student, onClose, onOpenPanel }) {
   useEffect(() => {
     if (!form || library.length) return;
     Promise.all([
-      libraryRoutines(supabase, "id, title, goal", (q) => q.order("title")),
+      libraryRoutines(supabase, "id, title, goal", (q) => q.order("title"), { withArchived: true }),
       supabase.from("exercises").select("id, name, muscle_group").order("name"),
     ]).then(([{ data: r }, { data: c }]) => {
       setLibrary(r || []);
@@ -96,6 +96,30 @@ export function ExtrasPanel({ student, onClose, onOpenPanel }) {
     if (!isPrivate) return setForm({ ...base, source: "library" });
     const content = await loadRoutineContent(x.routine_id);
     setForm({ ...base, source: "quick", blocks: content.blocks });
+  };
+
+  // Trae una rutina, intermitente o remate de la biblioteca para editarlo SOLO para este alumno:
+  // se copia como bloque propio del alumno (la de la biblioteca no cambia).
+  const [copying, setCopying] = useState(false);
+  const copyFromLibrary = async (routineId) => {
+    if (!routineId) return;
+    const f = form;
+    if (f.source === "quick" && f.blocks.some((b) => b.exercises.length > 0) && !confirm("Se reemplaza lo que armaste por la rutina elegida. ¿Seguir?")) return;
+    setCopying(true);
+    try {
+      const content = await loadRoutineContent(routineId);
+      const strip = (arr) => (arr || []).map((e) => ({ ...e, itemKey: null }));
+      let blocks = content.mode === "bloques"
+        ? content.blocks.map((b) => ({ ...b, key: tmpKey(), exercises: strip(b.exercises) }))
+        : listToBlocks(strip(content.list));
+      if (content.mode !== "bloques" && content.timer && blocks[0]) blocks = blocks.map((b, i) => (i === 0 ? { ...b, timer: content.timer } : b));
+      if (!blocks.length) blocks = [newQuickBlock("remate")];
+      const title = library.find((r) => r.id === routineId)?.title || f.title;
+      setForm((x) => ({ ...x, source: "quick", routineId: "", title, blocks }));
+    } catch {
+      alert("No se pudo traer la rutina.");
+    }
+    setCopying(false);
   };
 
   const toggleDay = (d) => setForm((f) => ({ ...f, days: f.days.includes(d) ? f.days.filter((x) => x !== d) : WEEK_DAYS.filter((w) => w === d || f.days.includes(w)) }));
@@ -178,15 +202,30 @@ export function ExtrasPanel({ student, onClose, onOpenPanel }) {
           <div className="mb-5">
             <p className="text-soft text-xs mb-1.5">Rutina</p>
             <SearchSelect
-              options={library.map((r) => ({ value: r.id, label: r.title, sub: r.goal || "" }))}
+              options={library.filter((r) => !r.archived_at || r.id === form.routineId).map((r) => ({ value: r.id, label: `${r.title}${r.archived_at ? " (versión anterior)" : ""}`, sub: r.goal || "" }))}
               value={form.routineId}
               onChange={(id) => setForm((f) => ({ ...f, routineId: id }))}
               placeholder="Buscar rutina..."
             />
             <p className="text-muted text-[11px] mt-1.5">Se usa tal como está en la biblioteca (con su reloj programado, si tiene). Las cargas del ATR no se aplican.</p>
+            {form.routineId && (
+              <button type="button" onClick={() => copyFromLibrary(form.routineId)} disabled={copying} className="mt-3 w-full flex items-center justify-center gap-1.5 bg-card border border-accent/30 text-accent text-sm font-medium rounded-xl py-2.5 disabled:opacity-60">
+                <Pencil size={14} /> {copying ? "Trayendo..." : "Editarla solo para este alumno"}
+              </button>
+            )}
           </div>
         ) : (
           <div className="mb-2">
+            <p className="text-soft text-xs mb-1.5">Partir de una rutina, intermitente o remate que ya tengas (opcional)</p>
+            <SearchSelect
+              options={library.filter((r) => !r.archived_at).map((r) => ({ value: r.id, label: r.title, sub: r.goal || "" }))}
+              value=""
+              keepEmpty
+              onChange={(id) => copyFromLibrary(id)}
+              disabled={copying}
+              placeholder={copying ? "Trayendo..." : "Buscar en la biblioteca para copiar y editar..."}
+            />
+            <p className="text-muted text-[11px] mt-1.5 mb-4">Se copia solo para este alumno: podés cambiar ejercicios, series, reps y reloj sin tocar la de la biblioteca.</p>
             <p className="text-soft text-xs mb-1.5">Nombre (lo ve el alumno)</p>
             <input value={form.title} onChange={(e) => setForm((f) => ({ ...f, title: e.target.value }))} placeholder="Ej: Remate de core" className={`${input} w-full mb-4`} />
             <BlockEditor blocks={form.blocks} setBlocks={(fn) => setForm((f) => ({ ...f, blocks: typeof fn === "function" ? fn(f.blocks) : fn }))} catalog={catalog} onCreateExercise={createExercise} />
