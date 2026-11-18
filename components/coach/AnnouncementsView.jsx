@@ -118,7 +118,7 @@ export function AnnouncementsView() {
   const pickList = students.filter((s) => matchesSearch(s.name, query));
 
   return (
-    <div className="p-4 md:p-8 max-w-5xl">
+    <div className="p-4 md:p-8 max-w-5xl w-full mx-auto">
       <h2 className="text-ink text-xl font-semibold mb-1">Anuncios</h2>
       <p className="text-muted text-sm mb-6">Un mensaje para todos tus alumnos o para un grupo. Les aparece en Inicio y en la campanita.</p>
 

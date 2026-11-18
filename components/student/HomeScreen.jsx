@@ -1,6 +1,5 @@
 "use client";
 
-import { useState } from "react";
 import { CalendarDays, Check, ChevronRight, Clock, Dumbbell, Flame, Info, Play, Timer, User } from "lucide-react";
 import { WEEK_DAYS } from "@/lib/dates";
 import { appLocale, dayLetters, tr } from "@/lib/i18n";
@@ -8,7 +7,7 @@ import { AnnouncementCard } from "@/components/student/Announcements";
 import { Chameleon } from "@/components/ui/Chameleon";
 import { PET_SAYINGS } from "@/lib/chameleon";
 import { CheckinCard, CoachMessage, GoalsAndReminders, TodayNutrition, WeekSummary, useHomeExtras } from "@/components/student/HomeExtras";
-import { WorkoutClock } from "@/components/student/WorkoutClock";
+import { openClock } from "@/lib/clockStore";
 
 function greeting() {
   const h = new Date().getHours();
@@ -50,7 +49,6 @@ function ProgressRing({ done, total, size = 76 }) {
 
 export function HomeScreen({ userId, onNavigate, onOpenCheckin, onOpenAnnouncements, onAnnouncementRead, onOpenRoutine, onOpenPetCheckin, onOpenCalendar, fullName, avatarUrl, pet, routine, loading, selectedDay, onSelectDay, streak, onGoToNutrition, hasNutritionProfile, needsIntake, onOpenIntake, bell, pushCard }) {
   const extras = useHomeExtras(userId);
-  const [clockOpen, setClockOpen] = useState(false);
   const doneCount = routine ? routine.exercises.filter((e) => e.completed).length : 0;
   const total = routine ? routine.exercises.length : 0;
   const today = new Date();
@@ -196,7 +194,7 @@ export function HomeScreen({ userId, onNavigate, onOpenCheckin, onOpenAnnounceme
                 {extras?.planWeek && <span className="text-accent normal-case tracking-normal font-normal"> · {tr("Plan: semana {p0} de {p1}", { p0: extras.planWeek, p1: extras.plan.weeks })}</span>}
               </p>
               <div className="flex items-center gap-3">
-                <button onClick={() => setClockOpen(true)} className="flex items-center gap-1 text-accent text-xs font-medium">
+                <button onClick={() => openClock()} className="flex items-center gap-1 text-accent text-xs font-medium">
                   <Timer size={13} /> {tr("Reloj")}
                 </button>
                 {extras?.hasSchedule && (
@@ -243,7 +241,6 @@ export function HomeScreen({ userId, onNavigate, onOpenCheckin, onOpenAnnounceme
           </div>
         </div>
       </div>
-      {clockOpen && <WorkoutClock onClose={() => setClockOpen(false)} />}
     </div>
   );
 }

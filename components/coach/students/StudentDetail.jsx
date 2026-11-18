@@ -86,7 +86,7 @@ export function StudentDetail({ student, onClose, onChanged, initialPanel = null
   const rowBtn = "w-full bg-card rounded-xl px-4 py-3 flex items-center gap-3 text-left active:scale-[0.99] transition-transform";
 
   return (
-    <div className="p-4 md:p-8 max-w-2xl">
+    <div className="p-4 md:p-8 max-w-2xl w-full mx-auto">
       <div className="flex items-center gap-3 mb-6">
         <button onClick={onClose} aria-label="Volver" className="w-10 h-10 rounded-full bg-card border border-white/[0.06] flex items-center justify-center text-soft shrink-0">
           <ArrowLeft size={18} />

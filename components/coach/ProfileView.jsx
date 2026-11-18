@@ -102,11 +102,11 @@ export function ProfileView({ onProfileUpdate }) {
   };
 
   if (loading) {
-    return <div className="p-4 md:p-8"><Skeleton /></div>;
+    return <div className="p-4 md:p-8 w-full max-w-6xl mx-auto"><Skeleton /></div>;
   }
 
   return (
-    <div className="p-4 md:p-8 max-w-xl">
+    <div className="p-4 md:p-8 max-w-xl w-full mx-auto">
       <h2 className="text-ink text-xl font-semibold mb-1">Mi perfil</h2>
       <p className="text-muted text-sm mb-6">Así te van a ver tus alumnos dentro de la app.</p>
       <div className="flex items-center gap-4 mb-6">

@@ -69,6 +69,7 @@ lib/                      Lógica sin pantallas
 - `RoutinePreviewPanel` escucha `progress_sets`, `progress` y `workout_sessions` con Supabase Realtime (las tablas están en la publicación `supabase_realtime`) y revisa cada 20 s como respaldo.
 - El coach no marca series: `SetLogger` con `coachMode` solo corrige peso y reps de series ya hechas (políticas UPDATE "personal corrige series" y "personal corrige mejor peso").
 - Reloj: `components/ui/ClockField.jsx` (escribir el tiempo exacto, mantener − / +); pasos en `stepFor` y lectura en `parseClockInput` (`lib/clock.js`).
+- Reloj global: `lib/clockStore.js` (un solo reloj, guardado en el celular) + `components/student/ClockIsland.jsx` (`ClockHost`: motor de pitidos/alarma, píldora tipo isla arriba y el reloj grande). El descanso entre series usa el mismo reloj. Si termina con la app cerrada, `set_clock_alarm` deja el aviso en `clock_alarms` y un trabajo de pg_cron (`kineaco-reloj`, cada 10 s) lo pasa a `notifications` con tipo `clock` (no se muestra en la campanita).
 - Fechas de nacimiento: `components/ui/DateSelect.jsx` (día · mes · año). No usar `<input type="date">` en formularios del alumno.
 
 ## Colores
