@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useScrollMemory } from "@/lib/useScrollMemory";
 import Link from "next/link";
 import { supabase } from "@/lib/supabaseClient";
 import { intakeHasAlert } from "@/lib/intake";
@@ -133,6 +134,9 @@ export function StudentsView({ initialAction, onInitialActionDone }) {
     if (target) setOpen({ student: target, initialPanel: ACTION_TO_PANEL[initialAction.action] || null });
     onInitialActionDone?.();
   }, [initialAction, students]);
+
+  // Al volver de la ficha, la lista queda en el mismo alumno (no vuelve al primero)
+  useScrollMemory(!!open);
 
   if (open) {
     return <StudentDetail student={open.student} initialPanel={open.initialPanel} onClose={() => setOpen(null)} onChanged={loadData} />;

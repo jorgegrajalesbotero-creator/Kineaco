@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useScrollMemory } from "@/lib/useScrollMemory";
 import Link from "next/link";
 import { Activity, ArrowLeft, Calendar, Camera, ChevronDown, ChevronRight, ClipboardCheck, Download, Dumbbell, Eye, TrendingUp, Lock, MessageCircle, PlusCircle, Ruler, UserCog, Utensils } from "lucide-react";
 import { supabase } from "@/lib/supabaseClient";
@@ -76,6 +77,8 @@ export function StudentDetail({ student, onClose, onChanged, initialPanel = null
     }
     setPdfBusy(false);
   };
+
+  useScrollMemory(!!panel);
 
   if (panel) {
     const Panel = PANELS[panel];

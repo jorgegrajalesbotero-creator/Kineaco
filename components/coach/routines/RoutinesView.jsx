@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useScrollMemory } from "@/lib/useScrollMemory";
 import { Check, ChevronRight, Clock, Copy, Download, GitMerge, GripVertical, Pencil, Plus, Trash2, UserPlus, X } from "lucide-react";
 import { matchesSearch } from "@/lib/search";
 import { filterItems, sortItems } from "@/lib/filters";
@@ -502,6 +503,9 @@ export function RoutinesView() {
     exitSelectMode();
     loadRoutines();
   };
+
+  // Al volver de crear/editar una rutina, la lista queda donde estaba
+  useScrollMemory(!!creating || !!viewingId);
 
   if (creating) {
     return (

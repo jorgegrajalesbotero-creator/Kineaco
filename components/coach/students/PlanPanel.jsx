@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
+import { useScrollMemory } from "@/lib/useScrollMemory";
 import { CalendarDays, Copy, CopyPlus, Download, Layers, Minus, Pencil, Plus, Trash2 } from "lucide-react";
 import { WEEK_DAYS, localDateString } from "@/lib/dates";
 import { supabase } from "@/lib/supabaseClient";
@@ -72,6 +73,21 @@ export function PlanPanel({ student, onClose }) {
   const [editing, setEditing] = useState(null); // { id?, name, start, weeks, data: [...] }
   const [week, setWeek] = useState(0);
   const [saving, setSaving] = useState(false);
+  // Foto del plan al abrir el editor, para saber si hay cambios sin guardar
+  const editBase = useRef(null);
+  useEffect(() => {
+    if (!editing) editBase.current = null;
+    else if (editBase.current == null) editBase.current = JSON.stringify(editing);
+  }, [editing]);
+  // Con cambios sin guardar, el navegador avisa antes de cerrar o recargar la página
+  useEffect(() => {
+    if (!editing) return;
+    const onLeave = (e) => {
+      if (editBase.current != null && editBase.current !== JSON.stringify(editing)) { e.preventDefault(); e.returnValue = ""; }
+    };
+    window.addEventListener("beforeunload", onLeave);
+    return () => window.removeEventListener("beforeunload", onLeave);
+  }, [editing]);
   const [pdfBusy, setPdfBusy] = useState(null);
   const [tab, setTab] = useState("rutinas"); // rutinas | cargas
   const [templates, setTemplates] = useState([]);
@@ -289,82 +305,122 @@ export function PlanPanel({ student, onClose }) {
   // El plan siempre empieza un lunes
   const startMonday = editing ? localDateString(mondayOf(parseDate(editing.start || localDateString()))) : null;
 
+  // Reemplaza todas las filas de una tabla del plan. Si la inserción falla, vuelve a poner
+  // las filas que había, para no perder nada (antes se borraban y quedaba vacío).
+  const replaceRows = async (table, planId, rows, { optional = false } = {}) => {
+    const { data: old, error: readErr } = await supabase.from(table).select("*").eq("plan_id", planId);
+    if (readErr) return optional && rows.length === 0 ? {} : { error: readErr };
+    const { error: delErr } = await supabase.from(table).delete().eq("plan_id", planId);
+    if (delErr) return { error: delErr };
+    if (rows.length === 0) return {};
+    const { error } = await supabase.from(table).insert(rows);
+    if (error) {
+      if (old?.length) await supabase.from(table).insert(old);
+      return { error };
+    }
+    return {};
+  };
+
+  // Un solo cambio (quitar / sustituir) por ejercicio y semana: si hay dos, vale el último
+  const dedupeChanges = (list) => {
+    const out = [];
+    const seen = new Map();
+    (list || []).forEach((c) => {
+      if (c.action === "add") { out.push(c); return; }
+      const k = `${c.routine_id}|${c.item_key}|${Number(c.from_week) || 1}`;
+      if (seen.has(k)) out[seen.get(k)] = c;
+      else { seen.set(k, out.length); out.push(c); }
+    });
+    return out;
+  };
+
   const save = async () => {
+    if (saving) return;
     const candidate = { start_date: startMonday, weeks: editing.weeks };
     const clash = plans.find((p) => p.id !== editing.id && plansOverlap(p, candidate));
     if (clash) return alert(`Las fechas se cruzan con otro plan (${fmtDay(planStart(clash))} – ${fmtDay(planLastDay(clash), true)}). Cambiá la fecha de inicio o la cantidad de semanas.`);
     const total = editing.data.reduce((s, w) => s + Object.values(w).reduce((x, l) => x + l.length, 0), 0);
     if (total === 0 && !confirm("El plan no tiene ninguna rutina. ¿Guardarlo igual?")) return;
 
+    const why = (err) => (err?.message ? `\n\nDetalle: ${err.message}` : "");
+    const keep = "\n\nSus cambios siguen en pantalla: puede intentar Guardar de nuevo.";
     setSaving(true);
-    const row = { user_id: student.id, name: editing.name.trim() || null, start_date: startMonday, weeks: editing.weeks };
-    let planId = editing.id;
-    if (planId) {
-      const { error } = await supabase.from("training_plans").update(row).eq("id", planId);
-      if (error) { setSaving(false); return alert("No se pudo guardar el plan: "); }
-      const { error: delErr } = await supabase.from("training_plan_days").delete().eq("plan_id", planId);
-      if (delErr) { setSaving(false); return alert("No se pudieron actualizar los días: "); }
-    } else {
-      const { data, error } = await supabase.from("training_plans").insert(row).select("id").single();
-      if (error || !data) { setSaving(false); return alert("No se pudo crear el plan."); }
-      planId = data.id;
-    }
-    const rows = [];
-    editing.data.forEach((w, i) => {
-      WEEK_DAYS.forEach((day) => {
-        (w[day] || []).forEach((rid, order) => rows.push({ plan_id: planId, week_index: i + 1, day_label: day, routine_id: rid, order_index: order }));
+    try {
+      const row = { user_id: student.id, name: editing.name.trim() || null, start_date: startMonday, weeks: editing.weeks };
+      let planId = editing.id;
+      if (planId) {
+        const { error } = await supabase.from("training_plans").update(row).eq("id", planId);
+        if (error) return alert(`No se pudo guardar el plan.${why(error)}${keep}`);
+      } else {
+        const { data, error } = await supabase.from("training_plans").insert(row).select("id").single();
+        if (error || !data) return alert(`No se pudo crear el plan.${why(error)}${keep}`);
+        planId = data.id;
+        setEditing((e) => (e ? { ...e, id: planId } : e)); // si algo falla después, el reintento no duplica el plan
+      }
+      const n = editing.weeks;
+
+      const dayRows = [];
+      editing.data.forEach((w, i) => {
+        WEEK_DAYS.forEach((day) => {
+          (w[day] || []).forEach((rid, order) => dayRows.push({ plan_id: planId, week_index: i + 1, day_label: day, routine_id: rid, order_index: order }));
+        });
       });
-    });
-    if (rows.length > 0) {
-      const { error } = await supabase.from("training_plan_days").insert(rows);
-      if (error) { setSaving(false); return alert("El plan se guardó, pero hubo un error con los días: "); }
-    }
 
-    // Fases, % por semana, bases de carga y casillas escritas a mano
-    const n = editing.weeks;
-    const del = await Promise.all(
-      ["training_plan_phases", "training_plan_weeks", "training_plan_loads", "training_plan_load_cells"].map((t) => supabase.from(t).delete().eq("plan_id", planId))
-    );
-    if (del.some((r) => r.error)) { setSaving(false); return alert("El plan se guardó, pero no se pudieron actualizar las fases y cargas."); }
-    const phaseRows = editing.phases
-      .filter((p) => Number(p.weeks) > 0)
-      .map((p, i) => ({ plan_id: planId, order_index: i, phase_type: p.phase_type, name: p.name.trim() || null, weeks: Number(p.weeks), pct_start: nOrNull(p.pct_start), pct_end: nOrNull(p.pct_end), reps_start: p.reps_start.trim() || null, reps_end: p.reps_end.trim() || null, sets_start: setsOrNull(p.sets_start), sets_end: setsOrNull(p.sets_end) }));
-    const weekRows = Object.entries(editing.weekOv)
-      .filter(([w]) => Number(w) <= n)
-      .map(([w, v]) => ({ plan_id: planId, week_index: Number(w), pct: nOrNull(v.pct), reps: (v.reps || "").trim() || null, sets: setsOrNull(v.sets) }))
-      .filter((r) => r.pct != null || r.reps || r.sets != null);
-    const seenBase = new Set();
-    const loadRows = editing.loads
-      .filter((l) => Number(l.from_week) <= n && (l.base_type === "reps" || (nOrNull(l.weight_kg) > 0 && (l.base_type === "rm" || Number(l.reps) > 0))))
-      .filter((l) => { const k = `${l.exercise_id}:${l.from_week}`; if (seenBase.has(k)) return false; seenBase.add(k); return true; })
-      .map((l) => ({ plan_id: planId, exercise_id: l.exercise_id, from_week: Number(l.from_week) || 1, base_type: l.base_type, weight_kg: l.base_type === "reps" ? null : nOrNull(l.weight_kg), reps: l.base_type === "work" ? Number(l.reps) : null, rounding: Number(l.rounding) || 2.5 }));
-    const cellRows = Object.entries(editing.cells)
-      .map(([k, v]) => { const [ex, w] = k.split(":"); return { plan_id: planId, exercise_id: ex, week_index: Number(w), value_type: "kg", value: nOrNull(v.value), reps: (v.reps || "").trim() || null, sets: setsOrNull(v.sets) }; })
-      .filter((c) => c.week_index <= n && (c.value != null || c.reps || c.sets != null));
-    const inserts = [
-      ["training_plan_phases", phaseRows], ["training_plan_weeks", weekRows], ["training_plan_loads", loadRows], ["training_plan_load_cells", cellRows],
-    ].filter(([, r]) => r.length > 0);
-    const res = await Promise.all(inserts.map(([t, r]) => supabase.from(t).insert(r)));
-    if (res.some((r) => r.error)) { setSaving(false); return alert("El plan se guardó, pero hubo un error con las fases o las cargas."); }
+      // Fases, % por semana, bases de carga y casillas escritas a mano
+      const phaseRows = editing.phases
+        .filter((p) => Number(p.weeks) > 0)
+        .map((p, i) => ({ plan_id: planId, order_index: i, phase_type: p.phase_type, name: p.name.trim() || null, weeks: Number(p.weeks), pct_start: nOrNull(p.pct_start), pct_end: nOrNull(p.pct_end), reps_start: p.reps_start.trim() || null, reps_end: p.reps_end.trim() || null, sets_start: setsOrNull(p.sets_start), sets_end: setsOrNull(p.sets_end) }));
+      const weekRows = Object.entries(editing.weekOv)
+        .filter(([w]) => Number(w) <= n)
+        .map(([w, v]) => ({ plan_id: planId, week_index: Number(w), pct: nOrNull(v.pct), reps: (v.reps || "").trim() || null, sets: setsOrNull(v.sets) }))
+        .filter((r) => r.pct != null || r.reps || r.sets != null);
+      const seenBase = new Set();
+      const loadRows = editing.loads
+        .filter((l) => Number(l.from_week) <= n && (l.base_type === "reps" || (nOrNull(l.weight_kg) > 0 && (l.base_type === "rm" || Number(l.reps) > 0))))
+        .filter((l) => { const k = `${l.exercise_id}:${l.from_week}`; if (seenBase.has(k)) return false; seenBase.add(k); return true; })
+        .map((l) => ({ plan_id: planId, exercise_id: l.exercise_id, from_week: Number(l.from_week) || 1, base_type: l.base_type, weight_kg: l.base_type === "reps" ? null : nOrNull(l.weight_kg), reps: l.base_type === "work" ? Number(l.reps) : null, rounding: Number(l.rounding) || 2.5 }));
+      const cellRows = Object.entries(editing.cells)
+        .map(([k, v]) => { const [ex, w] = k.split(":"); return { plan_id: planId, exercise_id: ex, week_index: Number(w), value_type: "kg", value: nOrNull(v.value), reps: (v.reps || "").trim() || null, sets: setsOrNull(v.sets) }; })
+        .filter((c) => c.week_index <= n && (c.value != null || c.reps || c.sets != null));
 
-    // Cambios de ejercicios (quitar / sustituir / agregar) de este alumno
-    const changeRows = (editing.changes || [])
-      .filter((c) => Number(c.from_week) <= n)
-      .map((c, i) => ({
-        plan_id: planId, routine_id: c.routine_id, from_week: Number(c.from_week) || 1, action: c.action,
-        item_key: c.item_key || null, exercise_id: c.exercise_id || null, after_item_key: c.after_item_key || null,
-        ...(c.new_item_key ? { new_item_key: c.new_item_key } : {}),
-        sets: setsOrNull(c.sets), reps: (c.reps || "").toString().trim() || null, rest_minutes: nOrNull(c.rest_minutes), order_index: i,
-      }));
-    const { error: chDelErr } = await supabase.from("training_plan_exercise_changes").delete().eq("plan_id", planId);
-    if (chDelErr && changeRows.length > 0) { setSaving(false); return alert("El plan se guardó, pero no se pudieron guardar los cambios de ejercicios (¿falta correr el SQL en Supabase?)."); }
-    if (changeRows.length > 0) {
-      const { error: chErr } = await supabase.from("training_plan_exercise_changes").insert(changeRows);
-      if (chErr) { setSaving(false); return alert("El plan se guardó, pero hubo un error con los cambios de ejercicios."); }
+      // Cambios de ejercicios (quitar / sustituir / agregar) de este alumno
+      const changeRows = dedupeChanges(editing.changes)
+        .filter((c) => Number(c.from_week) <= n)
+        .map((c, i) => ({
+          plan_id: planId, routine_id: c.routine_id, from_week: Number(c.from_week) || 1, action: c.action,
+          item_key: c.item_key || null, exercise_id: c.exercise_id || null, after_item_key: c.after_item_key || null,
+          ...(c.new_item_key ? { new_item_key: c.new_item_key } : {}),
+          sets: setsOrNull(c.sets), reps: (c.reps || "").toString().trim() || null, rest_minutes: nOrNull(c.rest_minutes), order_index: i,
+        }));
+
+      // De a una tabla por vez (antes iban todas juntas y, con muchos cambios, alguna fallaba a medias)
+      const steps = [
+        ["training_plan_days", dayRows, "los días del plan"],
+        ["training_plan_phases", phaseRows, "las fases"],
+        ["training_plan_weeks", weekRows, "el % por semana"],
+        ["training_plan_loads", loadRows, "las cargas"],
+        ["training_plan_load_cells", cellRows, "los pesos escritos a mano"],
+        ["training_plan_exercise_changes", changeRows, "los cambios de ejercicios", true],
+      ];
+      for (const [table, rows, label, optional] of steps) {
+        const { error } = await replaceRows(table, planId, rows, { optional });
+        if (error) return alert(`El plan se guardó, pero no se pudieron guardar ${label}.${why(error)}${keep}`);
+      }
+      setEditing(null);
+      load();
+    } catch (err) {
+      alert(`Se cortó la conexión mientras se guardaba.${why(err)}${keep}`);
+    } finally {
+      setSaving(false);
     }
-    setSaving(false);
+  };
+
+  // Salir del editor: si hay cambios sin guardar, avisa antes de perderlos
+  const closeEditor = () => {
+    if (saving) return;
+    const dirty = editing && editBase.current != null && editBase.current !== JSON.stringify(editing);
+    if (dirty && !confirm("Tiene cambios sin guardar en este plan. ¿Salir sin guardar?")) return;
     setEditing(null);
-    load();
   };
 
   const remove = async (plan) => {
@@ -387,12 +443,14 @@ export function PlanPanel({ student, onClose }) {
   const input = "w-full bg-field text-ink text-sm rounded-lg px-3 py-2 outline-none focus:ring-1 focus:ring-accent";
   const chip = "bg-field text-soft text-xs rounded-lg px-3 py-2 flex items-center gap-1.5 hover:text-ink disabled:opacity-40";
 
+  useScrollMemory(!!editing);
+
   if (editing) {
     const wStart = addDays(parseDate(startMonday), week * 7);
     const countOf = (w) => Object.values(w).reduce((x, l) => x + l.length, 0);
     const weeksInfo = planWeeks(editing.phases, editing.weeks, editing.weekOv);
     return (
-      <PanelLayout title={editing.id ? "Editar plan" : "Nuevo plan"} subtitle={student.name} onClose={() => setEditing(null)} width="max-w-4xl">
+      <PanelLayout title={editing.id ? "Editar plan" : "Nuevo plan"} subtitle={student.name} onClose={closeEditor} width="max-w-4xl">
         <div className="bg-card rounded-xl p-4 mb-4 grid grid-cols-1 sm:grid-cols-2 gap-3">
           <label className="block sm:col-span-2">
             <span className="text-muted text-xs">Nombre del plan (opcional)</span>
@@ -494,7 +552,7 @@ export function PlanPanel({ student, onClose }) {
           <button onClick={save} disabled={saving} className="bg-accent text-app font-semibold px-6 py-2.5 rounded-lg text-sm disabled:opacity-60">
             {saving ? "Guardando..." : "Guardar plan"}
           </button>
-          <button onClick={() => setEditing(null)} className="text-muted text-sm px-4">Cancelar</button>
+          <button onClick={closeEditor} className="text-muted text-sm px-4">Cancelar</button>
         </div>
       </PanelLayout>
     );
