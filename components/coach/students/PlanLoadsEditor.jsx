@@ -24,8 +24,9 @@ const newKey = () => (typeof crypto !== "undefined" && crypto.randomUUID ? crypt
 // changes = [{ routine_id, from_week, action: "remove" | "replace" | "add", item_key, exercise_id, after_item_key, new_item_key, sets, reps, exercises: { name } }]
 // extra = ejercicios con cargas guardadas que ya no están en las rutinas del plan [{ exercise_id, name }]
 // userId = alumno: las observaciones por ejercicio se guardan al instante y aparte (no cambian el plan)
-export function PlanLoadsEditor({ userId, weeks, routines, catalog, changes, onChanges, extra = [], loads, cells, weekOv, onLoads, onCells, onWeekOv }) {
+export function PlanLoadsEditor({ userId, weeks, routines, catalog, changes, onChanges, extra = [], loads, cells, weekOv, onLoads, onCells, onWeekOv, onCreateExercise }) {
   const [routineId, setRoutineId] = useState(routines[0]?.id || null);
+  const [creatingEx, setCreatingEx] = useState(false);
   const [form, setForm] = useState(null); // { kind, itemKey?, afterKey?, exerciseId, fromWeek, sets, reps }
   const [unit] = useWeightUnit();
   const total = weeks.length;
@@ -148,10 +149,19 @@ export function PlanLoadsEditor({ userId, weeks, routines, catalog, changes, onC
   const exerciseOptions = useMemo(() => (catalog || []).map((e) => ({ value: e.id, label: e.name })), [catalog]);
   const weekOptions = weeks.map((w) => <option key={w.week} value={w.week}>Desde la semana {w.week}</option>);
 
-  const saveForm = () => {
-    if (!form) return;
-    const ex = (catalog || []).find((e) => String(e.id) === String(form.exerciseId));
-    if (form.kind !== "remove" && !ex) return alert("Elegí un ejercicio.");
+  const saveForm = async () => {
+    if (!form || creatingEx) return;
+    let ex = (catalog || []).find((e) => String(e.id) === String(form.exerciseId));
+    // Ejercicio nuevo creado aquí mismo: queda en el catálogo para todas las rutinas
+    if (form.kind !== "remove" && form.exerciseId === "__new__") {
+      if (!(form.newName || "").trim()) return alert("Escriba el nombre del ejercicio nuevo.");
+      if (!onCreateExercise) return;
+      setCreatingEx(true);
+      ex = await onCreateExercise(form.newName, form.newGroup);
+      setCreatingEx(false);
+      if (!ex) return;
+    }
+    if (form.kind !== "remove" && !ex) return alert("Elija un ejercicio de la lista o la opción «+ Crear ejercicio nuevo».");
     const base = { routine_id: routineId, from_week: Number(form.fromWeek) || 1, sets: form.sets ? Number(form.sets) : null, reps: (form.reps || "").trim() || null, rest_minutes: null, order_index: (changes || []).length };
     let c;
     if (form.kind === "remove") c = { ...base, action: "remove", item_key: form.itemKey, exercise_id: null };
@@ -328,7 +338,17 @@ export function PlanLoadsEditor({ userId, weeks, routines, catalog, changes, onC
     <div className="bg-deep border border-field rounded-xl p-3 mt-3 space-y-2">
       <p className="text-ink text-sm font-medium">{title}</p>
       {form.kind !== "remove" && (
-        <SearchSelect options={exerciseOptions} value={form.exerciseId} onChange={(v) => setForm((f) => ({ ...f, exerciseId: v }))} placeholder="Buscar ejercicio del catálogo..." />
+        <SearchSelect options={exerciseOptions} value={form.exerciseId}
+          topOption={onCreateExercise ? { value: "__new__", label: "+ Crear ejercicio nuevo" } : undefined}
+          onChange={(v, typed) => setForm((f) => (v === "__new__" ? { ...f, exerciseId: v, newName: f.newName || typed || "", newGroup: f.newGroup || "" } : { ...f, exerciseId: v }))}
+          placeholder="Buscar ejercicio del catálogo..." />
+      )}
+      {form.kind !== "remove" && form.exerciseId === "__new__" && (
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+          <input autoFocus value={form.newName || ""} maxLength={80} onChange={(e) => setForm((f) => ({ ...f, newName: e.target.value }))} placeholder="Nombre del ejercicio nuevo" className={`${field} sm:col-span-2`} />
+          <input value={form.newGroup || ""} maxLength={40} onChange={(e) => setForm((f) => ({ ...f, newGroup: e.target.value }))} placeholder="Grupo muscular (opcional)" className={field} />
+          <p className="text-muted text-[11px] sm:col-span-3">Queda guardado en Ejercicios para usarlo en cualquier rutina. El video se agrega después desde Ejercicios.</p>
+        </div>
       )}
       <div className="flex flex-wrap items-center gap-2">
         <Select size="sm" aria-label="Desde la semana" value={form.fromWeek} onChange={(e) => setForm((f) => ({ ...f, fromWeek: Number(e.target.value) }))}>
@@ -347,7 +367,7 @@ export function PlanLoadsEditor({ userId, weeks, routines, catalog, changes, onC
           : "Series y reps son opcionales: si los dejás vacíos, se usan los de la rutina o los de la progresión. La rutina original no cambia."}
       </p>
       <div className="flex gap-2">
-        <button onClick={saveForm} className="bg-accent text-app text-xs font-semibold rounded-lg px-3.5 py-2">Guardar cambio</button>
+        <button onClick={saveForm} disabled={creatingEx} className="bg-accent text-app text-xs font-semibold rounded-lg px-3.5 py-2 disabled:opacity-60">{creatingEx ? "Creando ejercicio..." : "Guardar cambio"}</button>
         <button onClick={() => setForm(null)} className="bg-field text-soft text-xs rounded-lg px-3.5 py-2">Cancelar</button>
       </div>
     </div>

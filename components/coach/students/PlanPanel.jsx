@@ -423,6 +423,17 @@ export function PlanPanel({ student, onClose }) {
     setEditing(null);
   };
 
+  // Ejercicio nuevo creado desde Cargas y ejercicios: entra al catálogo general
+  const createExercise = async (name, group) => {
+    const { data, error } = await supabase.from("exercises").insert({ name: name.trim(), muscle_group: group?.trim() || null, video_url: null }).select("id, name").single();
+    if (error || !data) {
+      alert("No se pudo crear el ejercicio.");
+      return null;
+    }
+    setCatalog((c) => [...c, data].sort((a, b) => a.name.localeCompare(b.name, "es")));
+    return data;
+  };
+
   const remove = async (plan) => {
     if (!confirm(`¿Eliminar el plan del ${fmtDay(planStart(plan))} al ${fmtDay(planLastDay(plan), true)}? El alumno vuelve a ver sus días fijos en esas fechas. Su historial de entrenamientos se conserva.`)) return;
     const { error } = await supabase.from("training_plans").delete().eq("id", plan.id);
@@ -504,6 +515,7 @@ export function PlanPanel({ student, onClose }) {
               routines={planRoutines}
               extra={extraLoads}
               catalog={catalog}
+              onCreateExercise={createExercise}
               changes={editing.changes || []}
               onChanges={(changes) => setEditing((e) => ({ ...e, changes }))}
               loads={editing.loads}
