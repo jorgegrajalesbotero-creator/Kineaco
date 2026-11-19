@@ -36,7 +36,7 @@ export function RoutineScreen({ routine, userId, pet = null, onClose, onToggle, 
   const closeDetail = () => { setPlaying(false); setDetailIndex(null); };
   const [loggerIndex, setLoggerIndex] = useState(null);
   // El reloj y el descanso entre series viven en lib/clockStore (siguen corriendo en la píldora de arriba)
-  const intervalsByDefault = (routine.parts || [routine]).some((p) => p.blocks?.some((b) => b.block_type === "intermitentes"));
+  const tabataByDefault = (routine.parts || [routine]).some((p) => p.blocks?.some((b) => b.block_type === "intermitentes"));
   const [celebrate, setCelebrate] = useState(false);
   const [pdfBusy, setPdfBusy] = useState(false);
   const [showPdf, pdfPreview] = usePdfPreview(tr);
@@ -310,6 +310,11 @@ export function RoutineScreen({ routine, userId, pet = null, onClose, onToggle, 
   );
 
   // Reloj programado por el coach (de un bloque, o de toda la rutina en "lista simple")
+  // Ejercicios del bloque (o de la rutina en lista simple) para que el reloj diga cuál toca y cuál sigue
+  const clockExercisesOf = (part, b) => routine.exercises
+    .filter((ex) => (ex.partIndex ?? 0) === (part.partIndex ?? 0) && (b === part || ex.blockId === b.id))
+    .map((ex) => ({ name: ex.name, detail: [b === part ? ex.sets : ex.rowLabel, formatWeight(ex.targetWeight, unit)].filter(Boolean).join(" · ") }));
+
   const timerChip = (part, b) => {
     if (preview && onEditTimer) {
       return (
@@ -322,7 +327,7 @@ export function RoutineScreen({ routine, userId, pet = null, onClose, onToggle, 
     }
     if (!b.timer) return null;
     return (
-      <button onClick={() => openClock({ preset: b.timer })} className="w-full flex items-center gap-2.5 rounded-xl px-3 py-2.5 mb-2 bg-accent/15 border border-accent/30 text-left active:scale-[0.99] transition-transform">
+      <button onClick={() => openClock({ preset: b.timer, exercises: clockExercisesOf(part, b), fromRoutine: true })} className="w-full flex items-center gap-2.5 rounded-xl px-3 py-2.5 mb-2 bg-accent/15 border border-accent/30 text-left active:scale-[0.99] transition-transform">
         <span className="w-8 h-8 rounded-lg bg-accent text-app flex items-center justify-center shrink-0"><Timer size={16} /></span>
         <span className="flex-1 min-w-0">
           <span className="block text-ink text-sm font-medium">{timerLabel(b.timer, tr)}</span>
@@ -353,7 +358,7 @@ export function RoutineScreen({ routine, userId, pet = null, onClose, onToggle, 
           </button>
           <div className="flex items-center gap-2">
             {!preview && (
-              <button onClick={() => openClock({ initialMode: intervalsByDefault ? "intervals" : undefined })} className="flex items-center gap-1.5 h-9 rounded-full bg-accent text-app px-3.5 text-xs font-semibold active:scale-95 transition-transform">
+              <button onClick={() => openClock({ initialMode: tabataByDefault ? "tabata" : undefined, fromRoutine: true })} className="flex items-center gap-1.5 h-9 rounded-full bg-accent text-app px-3.5 text-xs font-semibold active:scale-95 transition-transform">
                 <Timer size={14} /> {tr("Reloj")}
               </button>
             )}
@@ -426,7 +431,14 @@ export function RoutineScreen({ routine, userId, pet = null, onClose, onToggle, 
                               {items.length > 0 && <p className="text-muted text-[11px]">{doneCount}/{items.length} {tr("hechos")}</p>}
                             </div>
                           </div>
-                          {b.notes && <p className="text-soft text-xs bg-card rounded-lg px-3 py-2 mb-2">{b.notes}</p>}
+                          {b.notes && (
+                            <div className="bg-accent/10 border border-accent/30 rounded-xl px-3.5 py-3 mb-3">
+                              <p className="text-accent text-xs font-semibold flex items-center gap-1.5 mb-1">
+                                <MessageSquareText size={14} /> {tr("Indicaciones de su coach")}
+                              </p>
+                              <p className="text-ink text-sm whitespace-pre-wrap break-words">{b.notes}</p>
+                            </div>
+                          )}
                           {timerChip(part, b)}
                           <div className="space-y-2">
                             {items.map(({ ex, i }) => exerciseRow(ex, i, [ex.rowLabel, formatWeight(ex.targetWeight, unit)].filter(Boolean).join(" · ")))}

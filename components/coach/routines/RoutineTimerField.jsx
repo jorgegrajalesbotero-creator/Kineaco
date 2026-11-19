@@ -13,7 +13,7 @@ export function RoutineTimerField({ value, onChange }) {
       <button type="button" onClick={() => setOpen((o) => !o)} aria-expanded={open}
         className={`w-full flex items-center gap-2 rounded-xl px-4 py-3 text-sm text-left ${value ? "bg-accent/15 text-accent" : "bg-card text-soft hover:text-ink"}`}>
         <Timer size={16} />
-        <span className="flex-1">{value ? `Reloj de la rutina: ${timerLabel(value)}` : "Programar reloj (opcional): Tabata, intervalos, AMRAP..."}</span>
+        <span className="flex-1">{value ? `Reloj de la rutina: ${timerLabel(value)}` : "Programar reloj (opcional): Tabata / intermitentes, AMRAP..."}</span>
         <ChevronDown size={15} className={`transition-transform ${open ? "rotate-180" : ""}`} />
       </button>
       {open && (
