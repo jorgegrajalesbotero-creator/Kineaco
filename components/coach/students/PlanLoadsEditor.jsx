@@ -127,11 +127,23 @@ export function PlanLoadsEditor({ userId, weeks, routines, catalog, changes, onC
   const addChangeOf = (key) => rChanges.find((c) => c.action === "add" && String(c.new_item_key) === String(key));
   const removeChange = (c) => onChanges(changes.filter((x) => x !== c));
 
-  // Ejercicio en otras rutinas del plan (la progresión es la misma: va por ejercicio)
-  const otherRoutines = (exId) =>
-    routines.filter((r) => r.id !== routineId && applyPlanChanges(r.items, (changes || []).filter((c) => c.action === "add" && String(c.routine_id) === String(r.id)).map((c) => ({ ...c, from_week: 1 })), r.id, 1)
-      .concat((changes || []).filter((c) => c.action === "replace" && String(c.routine_id) === String(r.id)))
-      .some((i) => String(i.exercise_id) === String(exId))).map((r) => r.title);
+  // Ejercicio en otras rutinas del plan (la progresión es la misma: va por ejercicio).
+  // Se calcula una sola vez por cambio (antes se recalculaba en cada fila y cada tecla, y con
+  // muchos ejercicios cambiados la pantalla se trababa).
+  const routinesByExercise = useMemo(() => {
+    const m = new Map();
+    routines.forEach((r) => {
+      const rc = (changes || []).filter((c) => String(c.routine_id) === String(r.id));
+      const items = applyPlanChanges(r.items, rc.filter((c) => c.action === "add").map((c) => ({ ...c, from_week: 1 })), r.id, 1)
+        .concat(rc.filter((c) => c.action === "replace"));
+      new Set(items.map((i) => String(i.exercise_id))).forEach((id) => {
+        if (!m.has(id)) m.set(id, []);
+        m.get(id).push(r);
+      });
+    });
+    return m;
+  }, [routines, changes]);
+  const otherRoutines = (exId) => (routinesByExercise.get(String(exId)) || []).filter((r) => r.id !== routineId).map((r) => r.title);
 
   const exerciseOptions = useMemo(() => (catalog || []).map((e) => ({ value: e.id, label: e.name })), [catalog]);
   const weekOptions = weeks.map((w) => <option key={w.week} value={w.week}>Desde la semana {w.week}</option>);
@@ -145,7 +157,11 @@ export function PlanLoadsEditor({ userId, weeks, routines, catalog, changes, onC
     if (form.kind === "remove") c = { ...base, action: "remove", item_key: form.itemKey, exercise_id: null };
     else if (form.kind === "replace") c = { ...base, action: "replace", item_key: form.itemKey, exercise_id: ex.id, exercises: { name: ex.name } };
     else c = { ...base, action: "add", item_key: null, after_item_key: form.afterKey || null, new_item_key: newKey(), exercise_id: ex.id, exercises: { name: ex.name } };
-    onChanges([...(changes || []), c]);
+    // Un solo cambio por ejercicio y semana: si ya había uno (quitar / sustituir) en esa
+    // misma semana, el nuevo lo reemplaza en vez de sumarse (dos iguales no se podían guardar)
+    const sameSpot = (x) => c.action !== "add" && x.action !== "add" && String(x.routine_id) === String(routineId)
+      && String(x.item_key) === String(c.item_key) && (Number(x.from_week) || 1) === c.from_week;
+    onChanges([...(changes || []).filter((x) => !sameSpot(x)), c]);
     setForm(null);
   };
 
