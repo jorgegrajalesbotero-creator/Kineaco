@@ -1,12 +1,12 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { BellOff, Pause } from "lucide-react";
+import { BellOff, ChevronDown, ChevronUp, Maximize2, Pause, Play, SkipForward } from "lucide-react";
 import { supabase } from "@/lib/supabaseClient";
 import { tr } from "@/lib/i18n";
 import { beep, vibrate } from "@/lib/alarm";
-import { formatClock, stateAt } from "@/lib/clock";
-import { clockPhases, elapsedMs, endAt, isRunning, openClock, pauseClock, ringAlarm, stopAlarm, useClock } from "@/lib/clockStore";
+import { clockExercises, formatClock, stateAt } from "@/lib/clock";
+import { clockPhases, elapsedMs, endAt, isRunning, openClock, pauseClock, resumeClock, ringAlarm, setIslandCompact, skipPhase, stopAlarm, useClock } from "@/lib/clockStore";
 import { WorkoutClock } from "@/components/student/WorkoutClock";
 
 // Hora actual (fuera de los componentes: solo se usa en efectos)
@@ -15,13 +15,12 @@ const nowMs = () => Date.now();
 // Cuánto tiempo suena la alarma y se ve la píldora roja al terminar
 const RING_MS = 10000;
 
-const MODE_LABELS = { rest: "Descanso", tabata: "Tabata", intervals: "Intervalos", amrap: "AMRAP", stopwatch: "Cronómetro" };
+const MODE_LABELS = { rest: "Descanso", tabata: "Tabata", amrap: "AMRAP", stopwatch: "Cronómetro" };
 
 // Texto del aviso que llega al celular si el reloj termina con la app cerrada
 const DONE_TEXT = {
   rest: "Terminó su descanso",
   tabata: "Terminó su Tabata",
-  intervals: "Terminaron sus intervalos",
   amrap: "Terminó el AMRAP",
 };
 
@@ -171,6 +170,7 @@ function ClockIsland() {
   }, [running, s.run?.id]);
 
   if (!s.run || !now) return null;
+  if (!s.ringing && !s.compact && (s.mode === "tabata" || s.mode === "amrap")) return <BigIsland s={s} now={now} />;
 
   const paused = !!s.run.pausedAt && !s.ringing;
   let time;
@@ -230,8 +230,116 @@ function ClockIsland() {
           </span>
           <span className="text-soft text-xs truncate">{paused ? tr("En pausa") : label}</span>
           <span className="text-ink text-[15px] font-semibold tabular-nums">{time}</span>
+          {(s.mode === "tabata" || s.mode === "amrap") && (
+            <span
+              role="button"
+              tabIndex={0}
+              aria-label={tr("Agrandar")}
+              onClick={(e) => { e.stopPropagation(); setIslandCompact(false); }}
+              onKeyDown={(e) => { if (e.key === "Enter") { e.stopPropagation(); setIslandCompact(false); } }}
+              className="-mr-2 w-7 h-7 rounded-full bg-white/10 flex items-center justify-center text-soft"
+            >
+              <ChevronDown size={14} />
+            </span>
+          )}
         </button>
       )}
+    </div>
+  );
+}
+
+// Píldora grande y translúcida para Tabata y AMRAP: tiempo grande + qué ejercicio toca y cuál sigue
+// (en AMRAP, la lista de la ronda, sin marcar nada),
+// sin tapar la rutina (se ven los ejercicios por detrás). Se puede achicar a la píldora normal.
+function BigIsland({ s, now }) {
+  const phases = clockPhases(s);
+  const st = stateAt(phases, elapsedMs(s, now));
+  const paused = !!s.run.pausedAt && !st.done;
+  const type = st.done ? "done" : st.phase.type;
+  const isAmrap = s.mode === "amrap";
+  const { current, next } = clockExercises(s.mode, phases, st, s.exercises);
+  const hasExercises = s.exercises.length > 0;
+
+  const tone = type === "rest" || type === "setrest" || type === "cooldown" ? "calm" : type === "prep" ? "warning" : "accent";
+  const color = { accent: "var(--color-accent)", calm: "var(--color-calm)", warning: "var(--color-warning)" }[tone];
+  const textColor = { accent: "text-accent", calm: "text-calm", warning: "text-warning" }[tone];
+  const frac = st.done ? 0 : st.phase.dur ? st.remaining / st.phase.dur : 1;
+
+  let label;
+  if (st.done) label = tr("¡Terminado!");
+  else if (type === "prep") label = tr("Prepárese");
+  else if (type === "setrest") label = tr("Descanso entre series");
+  else if (type === "cooldown") label = tr("Enfriamiento");
+  else if (type === "rest") label = tr("Descanso");
+  else label = isAmrap ? "AMRAP" : tr("Trabajo");
+
+  let counter = "";
+  if (isAmrap) counter = tr("Rondas: {p0}", { p0: s.rounds });
+  else if (!st.done && st.phase.type !== "prep") {
+    counter = tr("Ciclo {p0} de {p1}", { p0: st.phase.round, p1: st.phase.rounds });
+    if (st.phase.sets > 1) counter = `${tr("Serie {p0} de {p1}", { p0: st.phase.set, p1: st.phase.sets })} · ${counter}`;
+  }
+
+  const working = !st.done && type === "work";
+  const ctrl = "w-10 h-10 rounded-full bg-white/10 flex items-center justify-center text-ink active:scale-90 transition-transform";
+
+  return (
+    <div className="fixed inset-x-0 z-[60] flex justify-center pointer-events-none top-[calc(env(safe-area-inset-top)+0.5rem)] md:top-4 px-3">
+      <div className="pointer-events-auto w-full max-w-md rounded-3xl bg-black/55 backdrop-blur-md border border-white/[0.1] shadow-[0_14px_40px_-12px_rgba(0,0,0,0.85)] px-4 pt-3 pb-3 animate-fade-in">
+        <div className="flex items-center gap-2">
+          <span className={`text-[11px] font-semibold uppercase tracking-[0.14em] ${textColor}`}>{paused ? tr("En pausa") : label}</span>
+          {counter && <span className="text-soft text-[11px] truncate">· {counter}</span>}
+          <span className="flex-1" />
+          <button onClick={() => openClock()} aria-label={tr("Abrir el reloj completo")} className="w-8 h-8 rounded-full bg-white/10 flex items-center justify-center text-soft"><Maximize2 size={14} /></button>
+          <button onClick={() => setIslandCompact(true)} aria-label={tr("Achicar")} className="w-8 h-8 rounded-full bg-white/10 flex items-center justify-center text-soft"><ChevronUp size={16} /></button>
+        </div>
+
+        <div className="flex items-center gap-3 mt-1">
+          <p className="text-ink text-5xl font-semibold tabular-nums leading-none flex-1">{st.done ? "0:00" : formatClock(st.remaining)}</p>
+          {!st.done && (
+            paused ? (
+              <button onClick={resumeClock} aria-label={tr("Seguir")} className={ctrl}><Play size={18} /></button>
+            ) : (
+              <button onClick={pauseClock} aria-label={tr("Pausar")} className={ctrl}><Pause size={18} /></button>
+            )
+          )}
+          {!st.done && !isAmrap && (
+            <button onClick={() => skipPhase(st.index)} aria-label={tr("Siguiente fase")} className={ctrl}><SkipForward size={18} /></button>
+          )}
+        </div>
+
+        <div className="h-1 rounded-full bg-white/10 overflow-hidden mt-2.5">
+          <div className="h-full rounded-full" style={{ width: `${Math.max(0, Math.min(1, frac)) * 100}%`, background: color, transition: "width 0.25s linear" }} />
+        </div>
+
+        {hasExercises && (current || next) && (
+          <div className="mt-2.5 space-y-1">
+            {current && (
+              <p className="text-ink text-base font-semibold leading-snug">
+                <span className="text-accent text-[11px] font-semibold uppercase tracking-wider mr-1.5">{tr("Ahora")}</span>
+                {current.name}{current.detail && <span className="text-soft text-xs font-normal"> · {current.detail}</span>}
+              </p>
+            )}
+            {next && (
+              <p className={current ? "text-soft text-sm leading-snug" : "text-ink text-base font-semibold leading-snug"}>
+                <span className="text-muted text-[11px] font-semibold uppercase tracking-wider mr-1.5">{tr("Sigue")}</span>
+                {next.name}{next.detail && <span className="text-muted text-xs font-normal"> · {next.detail}</span>}
+              </p>
+            )}
+          </div>
+        )}
+
+        {isAmrap && hasExercises && !st.done && (
+          <ol className="mt-2.5 space-y-0.5">
+            {s.exercises.map((e, i) => (
+              <li key={i} className="text-ink text-sm leading-snug flex gap-2">
+                <span className="text-muted text-xs w-4 shrink-0 pt-0.5">{i + 1}</span>
+                <span className="min-w-0">{e.name}{e.detail && <span className="text-soft text-xs"> · {e.detail}</span>}</span>
+              </li>
+            ))}
+          </ol>
+        )}
+      </div>
     </div>
   );
 }

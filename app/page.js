@@ -296,6 +296,7 @@ export default function App() {
   };
 
   const handleToggleExercise = (i, newValue) => {
+    lastToggleRef.current = Date.now();
     // Se copian los objetos conservando sus "getters" (etiquetas que cambian con el idioma)
     const cloneWith = (obj, patch) => Object.assign(Object.create(Object.getPrototypeOf(obj), Object.getOwnPropertyDescriptors(obj)), patch);
     setRoutine((r) =>
@@ -389,6 +390,7 @@ export default function App() {
 
   const loadedDayRef = useRef(null);
   const uidRef = useRef(null);
+  const lastToggleRef = useRef(0); // última vez que el alumno marcó algo (para no pisarlo al recargar)
   const [routineReady, setRoutineReady] = useState(false);
 
   // Arranque: se ejecuta UNA sola vez al montar. Antes, con deps [selectedDay],
@@ -501,6 +503,36 @@ export default function App() {
     if (loadedDayRef.current === selectedDay) return; // ya cargada (incluida la de hoy al montar)
     loadedDayRef.current = selectedDay;
     refreshRoutine(uidRef.current, selectedDay);
+  }, [routineReady, selectedDay, accessBlocked]);
+
+  // Cambios del coach (rutina, plan, observaciones, reloj…): antes solo se veían al volver a abrir la app.
+  // Ahora la rutina del día se vuelve a pedir apenas el alumno vuelve a la app y cada 30 s mientras está abierta.
+  useEffect(() => {
+    if (!routineReady || accessBlocked) return undefined;
+    let alive = true;
+    let busy = false;
+    const reload = () => {
+      if (busy || !uidRef.current || document.visibilityState !== "visible") return;
+      if (Date.now() - lastToggleRef.current < 8000) return; // está marcando: se recarga en la próxima vuelta
+      busy = true;
+      buildDay(uidRef.current, selectedDay)
+        .then((r) => { if (alive) setRoutine(r); })
+        .catch(() => { })
+        .finally(() => { busy = false; });
+    };
+    const onVisible = () => { if (document.visibilityState === "visible") reload(); };
+    document.addEventListener("visibilitychange", onVisible);
+    window.addEventListener("focus", reload);
+    window.addEventListener("pageshow", reload);
+    const id = setInterval(reload, 30000);
+    return () => {
+      alive = false;
+      clearInterval(id);
+      document.removeEventListener("visibilitychange", onVisible);
+      window.removeEventListener("focus", reload);
+      window.removeEventListener("pageshow", reload);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [routineReady, selectedDay, accessBlocked]);
 
   // Al tocar una notificación en la barra del celular, abre la sección de ese aviso

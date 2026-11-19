@@ -24,7 +24,7 @@ const QUICK_TYPES = [
 const fmtDate = (s) => parseDate(s).toLocaleDateString("es-CO", { day: "numeric", month: "short" });
 
 function newQuickBlock(type) {
-  return { key: tmpKey(), block_type: type, title: defaultBlockTitle(type, []), sets: "", notes: "", exercises: [], timer: type === "intermitentes" ? { mode: "intervals", work: 40, rest: 20, rounds: 10 } : null };
+  return { key: tmpKey(), block_type: type, title: defaultBlockTitle(type, []), sets: "", notes: "", exercises: [], timer: type === "intermitentes" ? { mode: "tabata", work: 40, rest: 20, rounds: 10 } : null };
 }
 
 function status(x, today) {

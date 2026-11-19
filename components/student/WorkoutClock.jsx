@@ -4,18 +4,17 @@ import { useEffect, useState } from "react";
 import { BellOff, ChevronDown, Flag, Minus, Pause, Play, RotateCcw, SkipForward } from "lucide-react";
 import { tr } from "@/lib/i18n";
 import { beep, vibrate } from "@/lib/alarm";
-import { CLOCK_FIELDS, CLOCK_MODES, formatClock, formatStopwatch, stateAt, visibleFields } from "@/lib/clock";
+import { CLOCK_FIELDS, CLOCK_MODES, clockExercises, formatClock, formatStopwatch, stateAt, visibleFields } from "@/lib/clock";
 import {
   addLap, addRestSeconds, addRound, backToProgrammed, clockPhases, elapsedMs as elapsedOf, isRunning, minimizeClock,
   pauseClock, removeRound, resetClock, resumeClock, setClockField, setClockMode, skipPhase, startClock, stopAlarm, useClock,
 } from "@/lib/clockStore";
 import { ClockField } from "@/components/ui/ClockField";
 
-const MODE_LABELS = { rest: "Descanso", tabata: "Tabata", intervals: "Intervalos", amrap: "AMRAP", stopwatch: "Cronómetro" };
+const MODE_LABELS = { rest: "Descanso", tabata: "Tabata", amrap: "AMRAP", stopwatch: "Cronómetro" };
 const MODE_HINTS = {
   rest: "Cuenta regresiva entre series.",
-  tabata: "Trabajo y descanso por rondas (clásico: 20 s / 10 s × 8).",
-  intervals: "Intermitentes con los tiempos que usted quiera.",
+  tabata: "Trabajo y descanso por ciclos: Tabata clásico (20 s / 10 s × 8) o intermitentes con los tiempos que usted quiera.",
   amrap: "Tantas rondas como pueda en el tiempo. Cuente cada ronda con «+1 ronda».",
   stopwatch: "Cuenta hacia arriba. Marque vueltas cuando quiera.",
 };
@@ -78,7 +77,7 @@ export function WorkoutClock() {
   else big = formatClock(st.remaining);
 
   let sub = "";
-  if (mode === "tabata" || mode === "intervals") {
+  if (mode === "tabata") {
     const total = cfg.rounds;
     const round = run ? (finished ? total : st.phase.type === "prep" ? 1 : st.phase.round) : 1;
     sub = tr("Ciclo {p0} de {p1}", { p0: round, p1: total });
@@ -92,6 +91,11 @@ export function WorkoutClock() {
   } else if (mode === "rest" && run && !finished) {
     sub = tr("Toque +15 s si necesita más tiempo");
   }
+
+  // Ejercicios del bloque (Tabata / AMRAP): cuál toca ahora y cuál sigue
+  const exList = mode === "tabata" || mode === "amrap" ? s.exercises : [];
+  const { current: exNow, next: exNext } = clockExercises(mode, phases, run ? st : null, exList);
+  const nowIdx = exNow ? exList.indexOf(exNow) : -1;
 
   const lapRows = laps.map((t, i) => ({ n: i + 1, split: t - (laps[i - 1] || 0), total: t })).reverse();
   const secondaryBtn = "h-12 rounded-2xl bg-field text-ink text-sm font-medium flex items-center justify-center gap-1.5 active:scale-[0.97] transition-transform disabled:opacity-40";
@@ -153,6 +157,24 @@ export function WorkoutClock() {
           )}
 
           {/* AMRAP: contador de rondas */}
+          {/* Ejercicio actual y siguiente */}
+          {exList.length > 0 && (exNow || exNext) && (
+            <div className="bg-card rounded-2xl px-4 py-3 mt-3 space-y-1.5">
+              {exNow && (
+                <p className="text-ink text-lg font-semibold leading-snug">
+                  <span className="text-accent text-xs font-semibold uppercase tracking-wider mr-2">{tr("Ahora")}</span>
+                  {exNow.name}{exNow.detail && <span className="text-soft text-sm font-normal"> · {exNow.detail}</span>}
+                </p>
+              )}
+              {exNext && (
+                <p className={exNow ? "text-soft text-sm" : "text-ink text-lg font-semibold leading-snug"}>
+                  <span className="text-muted text-xs font-semibold uppercase tracking-wider mr-2">{tr("Sigue")}</span>
+                  {exNext.name}{exNext.detail && <span className="text-muted text-xs font-normal"> · {exNext.detail}</span>}
+                </p>
+              )}
+            </div>
+          )}
+
           {mode === "amrap" && run && (
             <div className="flex gap-2 mt-3">
               <button onClick={removeRound} disabled={rounds === 0} className={`${secondaryBtn} w-14`} aria-label={tr("Quitar ronda")}><Minus size={18} /></button>
@@ -199,6 +221,20 @@ export function WorkoutClock() {
               ) : (
                 <button onClick={skip} className={`${secondaryBtn} flex-1`}><SkipForward size={16} /> {mode === "rest" ? tr("Saltar") : tr("Siguiente fase")}</button>
               )}
+            </div>
+          )}
+
+          {exList.length > 0 && (
+            <div className="mt-4">
+              <p className="text-muted text-xs mb-1.5">{mode === "tabata" ? tr("Un ejercicio por ciclo, en este orden:") : tr("Ejercicios de cada ronda:")}</p>
+              <ol className="bg-card rounded-xl divide-y divide-white/[0.05]">
+                {exList.map((e, i) => (
+                  <li key={i} className={`flex items-baseline gap-2 px-4 py-2 text-sm ${i === nowIdx ? "text-accent font-semibold" : "text-soft"}`}>
+                    <span className="text-muted text-xs w-4 shrink-0">{i + 1}</span>
+                    <span className="flex-1 min-w-0">{e.name}{e.detail && <span className="text-muted text-xs font-normal"> · {e.detail}</span>}</span>
+                  </li>
+                ))}
+              </ol>
             </div>
           )}
 

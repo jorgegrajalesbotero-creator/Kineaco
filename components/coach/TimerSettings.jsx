@@ -6,8 +6,7 @@ import { ClockField } from "@/components/ui/ClockField";
 
 const MODES = [
   ["", "Sin reloj programado"],
-  ["tabata", "Tabata"],
-  ["intervals", "Intervalos (intermitentes)"],
+  ["tabata", "Tabata / intermitentes"],
   ["amrap", "AMRAP"],
   ["rest", "Descanso"],
   ["stopwatch", "Cronómetro"],
