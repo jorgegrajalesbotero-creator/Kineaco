@@ -7,6 +7,7 @@ import { tr } from "@/lib/i18n";
 import { beep, vibrate } from "@/lib/alarm";
 import { clockExerciseProgress, clockExercises, formatClock, stateAt } from "@/lib/clock";
 import { markBlockDone } from "@/lib/clockProgress";
+import { hideNowPlaying, showNowPlaying } from "@/lib/clockMedia";
 import { clockPhases, elapsedMs, endAt, isRunning, openClock, pauseClock, resumeClock, ringAlarm, setIslandCompact, skipPhase, stopAlarm, useClock } from "@/lib/clockStore";
 import { WorkoutClock } from "@/components/student/WorkoutClock";
 
@@ -121,6 +122,48 @@ function ClockEngine({ userId, onProgressMarked }) {
       beep({ freq: 988, dur: 0.12, vol: 0.7 });
     }
   }, [tick, s, userId]);
+
+  // Tarjeta en la pantalla de bloqueo y el centro de control mientras el reloj corre.
+  // La píldora es HTML y solo se ve dentro de la app; esto es lo que el alumno ve con el
+  // celular bloqueado (en iPhone sale además en la isla dinámica, como actividad de audio).
+  useEffect(() => {
+    if (!tick) return;
+    if (!s.run) {
+      hideNowPlaying();
+      return;
+    }
+    const phases = clockPhases(s);
+    const st = s.mode === "stopwatch" ? null : stateAt(phases, elapsedMs(s, nowMs()));
+    const paused = !!s.run.pausedAt;
+    let title;
+    let subtitle;
+    if (!st) {
+      title = tr("Cronómetro");
+      subtitle = formatClock(elapsedMs(s, nowMs()) / 1000);
+    } else if (st.done) {
+      title = tr("¡Terminado!");
+      subtitle = tr(MODE_LABELS[s.mode]);
+    } else {
+      const type = st.phase.type;
+      const fase = type === "prep" ? tr("Prepárese")
+        : type === "work" ? tr("Trabajo")
+          : type === "setrest" ? tr("Descanso entre series")
+            : type === "cooldown" ? tr("Enfriamiento") : tr("Descanso");
+      const { current } = clockExercises(s.mode, phases, st, s.exercises);
+      title = current ? current.name : fase;
+      const partes = [formatClock(st.remaining)];
+      if (current) partes.push(fase);
+      if (s.mode === "tabata" && type !== "prep") {
+        if (st.phase.sets > 1) partes.push(tr("Serie {p0} de {p1}", { p0: st.phase.set, p1: st.phase.sets }));
+        partes.push(tr("Ciclo {p0} de {p1}", { p0: st.phase.round, p1: st.phase.rounds }));
+      }
+      subtitle = partes.join(" · ");
+    }
+    showNowPlaying({ title, subtitle, paused, onPlay: resumeClock, onPause: pauseClock });
+  }, [tick, s]);
+
+  // Al salir de la app del alumno, no dejar la tarjeta colgada
+  useEffect(() => () => hideNowPlaying(), []);
 
   // Al terminar, la alarma suena y la píldora queda en rojo 10 segundos; después se apaga sola
   // (también se puede apagar antes con "Apagar").
