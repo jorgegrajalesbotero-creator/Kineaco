@@ -79,3 +79,51 @@ describe("planBlockMarks", () => {
     expect(planBlockMarks(undefined, {})).toEqual({ setRows: [], doneRows: [] });
   });
 });
+
+// ---- Marcado ejercicio por ejercicio mientras corre el Tabata ----
+import { exerciseMarks, planExerciseMarks } from "@/lib/clockProgress";
+import { buildPhases, stateAt } from "@/lib/clock";
+
+describe("exerciseMarks", () => {
+  // 3 ejercicios, 6 ciclos (cada uno 2 veces por serie), 2 series, sin preparación
+  const cfg = { prep: 0, work: 20, rest: 10, rounds: 6, sets: 2, setRest: 60, cooldown: 0 };
+  const phases = buildPhases("tabata", cfg);
+  const ex = [porSerie(1, 2), porSerie(2, 2), porSerie(3, 2)];
+  const marcas = (seg) => exerciseMarks(phases, stateAt(phases, seg * 1000), ex);
+
+  it("al empezar no hay nada hecho", () => {
+    expect(marcas(1).map((m) => m.setsDone)).toEqual([0, 0, 0]);
+  });
+
+  it("un ejercicio queda hecho en la serie apenas termina sus dos turnos, sin esperar a los demás", () => {
+    // Ciclos 1-4 terminados (4 × 30 s = 120 s): el 1 ya hizo sus dos turnos (ciclos 1 y 4)
+    const m = marcas(121);
+    expect(m[0]).toEqual({ setsDone: 1, allDone: false });
+    expect(m[1].setsDone).toBe(0); // le falta el ciclo 5
+    expect(m[2].setsDone).toBe(0);
+  });
+
+  it("al terminar todo, cada ejercicio queda completo en todas las series", () => {
+    expect(marcas(100000)).toEqual([
+      { setsDone: 2, allDone: true },
+      { setsDone: 2, allDone: true },
+      { setsDone: 2, allDone: true },
+    ]);
+  });
+
+  it("planExerciseMarks marca la serie del ejercicio terminado y no repite lo ya guardado", () => {
+    const m = marcas(121);
+    const { setRows, doneRows } = planExerciseMarks(ex, m);
+    expect(setRows.map((r) => `${r.ex.itemKey}#${r.setNumber}`)).toEqual(["item-1#1"]);
+    expect(doneRows).toHaveLength(0);
+    const otraVez = planExerciseMarks(ex, m, { doneSets: { "rut-1|item-1": [1] } });
+    expect(otraVez.setRows).toHaveLength(0);
+  });
+
+  it("un ejercicio sin series se da por hecho solo cuando terminó en todas las series", () => {
+    const sueltos = [suelto(1), suelto(2), suelto(3)];
+    expect(planExerciseMarks(sueltos, exerciseMarks(phases, stateAt(phases, 121000), sueltos)).doneRows).toHaveLength(0);
+    const fin = planExerciseMarks(sueltos, exerciseMarks(phases, stateAt(phases, 100000000), sueltos));
+    expect(fin.doneRows.map((r) => r.ex.itemKey)).toEqual(["item-1", "item-2", "item-3"]);
+  });
+});
