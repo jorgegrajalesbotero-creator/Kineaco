@@ -109,8 +109,7 @@ function ClockEngine({ userId, onProgressMarked }) {
           beep({ freq: 1175, dur: 0.6 });
           vibrate([350]);
         } else {
-          beep({ freq: 740, dur: 0.22 });
-          beep({ freq: 740, at: 0.3, dur: 0.22 });
+          beep([{ freq: 740, dur: 0.22 }, { freq: 740, at: 0.3, dur: 0.22 }]); // los dos en una sola pista
           vibrate([150, 100, 150]);
         }
       }
