@@ -5,9 +5,10 @@ import { BellOff, Check, ChevronDown, ChevronUp, Maximize2, Pause, Play, SkipFor
 import { supabase } from "@/lib/supabaseClient";
 import { tr } from "@/lib/i18n";
 import { beep, vibrate } from "@/lib/alarm";
-import { clockExerciseProgress, clockExercises, formatClock, stateAt } from "@/lib/clock";
+import { clockCardText, clockExerciseProgress, clockExercises, formatClock, stateAt } from "@/lib/clock";
 import { markBlockDone } from "@/lib/clockProgress";
-import { hideNowPlaying, showNowPlaying } from "@/lib/clockMedia";
+import { hideNowPlaying, updateClockPosition, updateNowPlaying } from "@/lib/clockMedia";
+import { drawCard } from "@/lib/clockArtwork";
 import { clockPhases, elapsedMs, endAt, isRunning, openClock, pauseClock, resumeClock, ringAlarm, setIslandCompact, skipPhase, stopAlarm, useClock } from "@/lib/clockStore";
 import { WorkoutClock } from "@/components/student/WorkoutClock";
 
@@ -52,6 +53,8 @@ function ClockEngine({ userId, onProgressMarked }) {
   const wakeLock = useRef(null);
   const sentAlarm = useRef(0);
   const marked = useRef(null); // reloj cuyo bloque ya se dio por hecho (para no marcarlo dos veces)
+  const lastCard = useRef(""); // ciclo y fase que ya tiene la tarjeta (para no redibujarla por gusto)
+  const cardUrl = useRef(null); // carátula dibujada en uso
   const avisar = useRef(onProgressMarked); // en un ref: cambia en cada dibujo y no debe reiniciar el motor
   useEffect(() => { avisar.current = onProgressMarked; }, [onProgressMarked]);
 
@@ -134,34 +137,35 @@ function ClockEngine({ userId, onProgressMarked }) {
     const phases = clockPhases(s);
     const st = s.mode === "stopwatch" ? null : stateAt(phases, elapsedMs(s, nowMs()));
     const paused = !!s.run.pausedAt;
-    let title;
-    let subtitle;
-    if (!st) {
-      title = tr("Cronómetro");
-      subtitle = formatClock(elapsedMs(s, nowMs()) / 1000);
-    } else if (st.done) {
-      title = tr("¡Terminado!");
-      subtitle = tr(MODE_LABELS[s.mode]);
-    } else {
-      const type = st.phase.type;
-      const fase = type === "prep" ? tr("Prepárese")
-        : type === "work" ? tr("Trabajo")
-          : type === "setrest" ? tr("Descanso entre series")
-            : type === "cooldown" ? tr("Enfriamiento") : tr("Descanso");
-      const { current } = clockExercises(s.mode, phases, st, s.exercises);
-      title = current ? current.name : fase;
-      const partes = [formatClock(st.remaining)];
-      if (current) partes.push(fase);
-      if (s.mode === "tabata" && type !== "prep") {
-        if (st.phase.sets > 1) partes.push(tr("Serie {p0} de {p1}", { p0: st.phase.set, p1: st.phase.sets }));
-        partes.push(tr("Ciclo {p0} de {p1}", { p0: st.phase.round, p1: st.phase.rounds }));
-      }
-      subtitle = partes.join(" · ");
-    }
-    // La barra de progreso muestra la fase en curso (el trabajo, el descanso…)
+
+    // 1) El cronómetro: va cada segundo y lo anima el celular solo, sin tocar nada más
     const duration = st && !st.done ? st.phase.dur : 0;
     const position = duration ? duration - st.remaining : 0;
-    showNowPlaying({ title, subtitle, paused, duration, position, onPlay: resumeClock, onPause: pauseClock });
+    updateClockPosition({ duration, position, paused });
+
+    // 2) Los textos y la carátula: solo cuando cambian de ciclo o de fase. Si esto se hiciera
+    // cada segundo, el celular borraría y recargaría la carátula y la pantalla parpadearía.
+    const texto = clockCardText({ mode: s.mode, phases, st, exercises: s.exercises, tr });
+    const clave = `${texto.phase}|${texto.cycle}|${texto.set}|${texto.title}`;
+    const poner = (artwork) => {
+      if (artwork) cardUrl.current = artwork;
+      updateNowPlaying({ ...texto, artwork: artwork || cardUrl.current, onPlay: resumeClock, onPause: pauseClock });
+    };
+    if (clave !== lastCard.current) {
+      lastCard.current = clave;
+      const dibujada = drawCard({
+        phase: texto.phase,
+        label: texto.artist.split(" · ")[0] || texto.title,
+        cycle: texto.cycle,
+        cycles: texto.cycles,
+        set: texto.set,
+        sets: texto.sets,
+        onReady: poner, // la imagen tarda un instante en estar lista
+      });
+      poner(dibujada);
+    } else {
+      poner(cardUrl.current);
+    }
   }, [tick, s]);
 
   // Al salir de la app del alumno, no dejar la tarjeta colgada
