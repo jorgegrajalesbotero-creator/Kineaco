@@ -11,6 +11,11 @@ describe("clockCardText", () => {
     const c = card(12000); // ciclo 1 de la serie 1
     expect(c.title).toBe("Burpees");
     expect(c.artist).toBe("Trabajo · Serie 1 de 2");
+    expect(c.album).toBe("Sigue: Sentadilla");
+  });
+
+  it("sin ejercicios, la tercera línea lleva el ciclo y lo que falta", () => {
+    const c = card(12000, []);
     expect(c.album).toContain("Ciclo 1 de 4");
     expect(c.album).toContain("min");
   });
@@ -83,7 +88,7 @@ describe("clockCardText en AMRAP", () => {
   });
 
   it("en Tabata no aparecen las rondas: ahí se cuentan ciclos", () => {
-    const t = clockCardText({ mode: "tabata", phases, st: stateAt(phases, 12000), exercises: ex, rounds: 5 });
+    const t = clockCardText({ mode: "tabata", phases, st: stateAt(phases, 12000), exercises: [], rounds: 5 });
     expect(t.artist).not.toContain("Rondas");
     expect(t.album).toContain("Ciclo");
   });

@@ -14,6 +14,7 @@ import { youtubeVideo } from "@/lib/youtube";
 import { Confetti } from "@/components/ui/Confetti";
 import { openClock, startRest as startRestClock, stopRest } from "@/lib/clockStore";
 import { timerLabel } from "@/lib/clock";
+import { useClockExercise } from "@/lib/useClockExercise";
 import { SetLogger } from "@/components/student/SetLogger";
 import { Chameleon } from "@/components/ui/Chameleon";
 import { finishSession, fmtFinished, isLocked, loadSession, weekStartISO } from "@/lib/workoutSession";
@@ -76,7 +77,11 @@ export function RoutineScreen({ routine, userId, pet = null, onClose, onToggle, 
     });
     setSetsDone(map);
   }
-  useEffect(() => { loadSets(); }, [routine.day_label, routine.id, userId, liveTick]);
+  // También se recarga cuando la rutina cambia (por ejemplo, cuando el reloj marca un ejercicio)
+  useEffect(() => { loadSets(); }, [routine.day_label, routine.id, routine.exercises, userId, liveTick]);
+  // Ejercicio que el Tabata está haciendo ahora: se resalta en la lista
+  const enCurso = useClockExercise(preview ? null : routine.day_label);
+  const isEnCurso = (ex) => !!enCurso && enCurso === `${ex.routineId || routine.id}|${ex.itemKey ?? ex.exerciseId}`;
   const doneOf = (ex) => setsDone[setKey(ex)] || [];
 
   // Marca la siguiente serie del ejercicio (con el peso y las reps sugeridas)
@@ -269,7 +274,7 @@ export function RoutineScreen({ routine, userId, pet = null, onClose, onToggle, 
 
   // Fila de un ejercicio. Si el coach le dejó una observación, se ve la marca antes de abrirlo.
   const exerciseRow = (ex, i, subtitle) => (
-    <div key={i} onClick={() => openDetail(i)} className={`flex items-center justify-between gap-2 rounded-2xl px-4 py-3 group cursor-pointer transition duration-200 ease-out hover:scale-[1.02] hover:bg-card-hover active:scale-[0.99] ${ex.completed ? "bg-card/60" : "bg-card"}`}>
+    <div key={i} onClick={() => openDetail(i)} className={`flex items-center justify-between gap-2 rounded-2xl px-4 py-3 group cursor-pointer transition duration-200 ease-out hover:scale-[1.02] hover:bg-card-hover active:scale-[0.99] ${isEnCurso(ex) ? "bg-accent/15 ring-1 ring-accent/50" : ex.completed ? "bg-card/60" : "bg-card"}`}>
       <div className="flex items-center gap-3 min-w-0">
         <button
           onClick={(e) => { e.stopPropagation(); toggle(i); }}
@@ -284,7 +289,8 @@ export function RoutineScreen({ routine, userId, pet = null, onClose, onToggle, 
           ) : null}
         </button>
         <div className="min-w-0">
-          <p className={`text-sm ${ex.completed ? "text-muted line-through" : "text-ink"}`}>{ex.name}</p>
+          <p className={`text-sm ${isEnCurso(ex) ? "text-accent font-semibold" : ex.completed ? "text-muted line-through" : "text-ink"}`}>{ex.name}</p>
+          {isEnCurso(ex) && <p className="text-accent text-[11px] font-medium">{tr("En curso")}</p>}
           {subtitle && <p className="text-muted text-xs">{subtitle}</p>}
           {bySet(ex) && setDots(ex, i)}
           {ex.note && (

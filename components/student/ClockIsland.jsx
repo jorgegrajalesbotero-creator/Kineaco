@@ -1,15 +1,15 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { BellOff, Check, ChevronDown, ChevronUp, Maximize2, Pause, Play, SkipForward, X } from "lucide-react";
+import { BellOff, ChevronDown, ChevronUp, Clock, ListChecks, Pause, Play, SkipForward, X } from "lucide-react";
 import { supabase } from "@/lib/supabaseClient";
 import { tr } from "@/lib/i18n";
 import { beep, vibrate } from "@/lib/alarm";
-import { clockCardText, clockExerciseProgress, clockExercises, formatClock, stateAt } from "@/lib/clock";
-import { markBlockDone } from "@/lib/clockProgress";
+import { clockCardText, clockExercises, formatClock, stateAt, timerLabel } from "@/lib/clock";
+import { exerciseMarks, markBlockDone, markExercisesDone } from "@/lib/clockProgress";
 import { hideNowPlaying, updateClockPosition, updateNowPlaying } from "@/lib/clockMedia";
 import { drawCard } from "@/lib/clockArtwork";
-import { REFRESCO_MS, hideClockNotification, showClockNotification } from "@/lib/clockNotification";
+import { hideClockNotification, showClockNotification } from "@/lib/clockNotification";
 import { clockPhases, elapsedMs, endAt, getClock, isRunning, openClock, pauseClock, resumeClock, addRound, removeRound, resetClock, ringAlarm, setIslandCompact, skipPhase, stopAlarm, useClock } from "@/lib/clockStore";
 import { WorkoutClock } from "@/components/student/WorkoutClock";
 
@@ -53,6 +53,15 @@ const DONE_TEXT = {
   amrap: "Terminó el AMRAP",
 };
 
+// Aviso al celular cuando el reloj arranca. Solo dos avisos por reloj: este y el de "terminó"
+// (antes había una ficha que se actualizaba cada 2 segundos y llenaba el celular de avisos).
+const START_TEXT = {
+  rest: "Empezó su descanso",
+  tabata: "Empezó su Tabata",
+  amrap: "Empezó el AMRAP",
+  stopwatch: "Empezó el cronómetro",
+};
+
 // Todo el reloj del alumno: el motor (sonidos, alarma, aviso al celular), la píldora y el reloj grande.
 // Va una sola vez en la app del alumno.
 // onProgressMarked: avisa a la rutina de que el reloj dio el bloque por hecho, para que se vuelva a dibujar.
@@ -79,6 +88,10 @@ function ClockEngine({ userId, onProgressMarked }) {
   const wakeLock = useRef(null);
   const sentAlarm = useRef(0);
   const marked = useRef(null); // reloj cuyo bloque ya se dio por hecho (para no marcarlo dos veces)
+  const marcasEj = useRef(""); // ejercicios del Tabata ya marcados mientras corre (para no repetir)
+  const cola = useRef(Promise.resolve()); // los marcados van uno detrás de otro (nunca dos a la vez)
+  const avisoInicio = useRef(null); // reloj al que ya se le mandó el aviso de inicio
+  const avisoFin = useRef(null); // reloj al que ya se le mandó el aviso de fin
   const lastCard = useRef(""); // ciclo y fase que ya tiene la tarjeta (para no redibujarla por gusto)
   const cardUrl = useRef(null); // carátula dibujada en uso
   const avisar = useRef(onProgressMarked); // en un ref: cambia en cada dibujo y no debe reiniciar el motor
@@ -117,9 +130,24 @@ function ClockEngine({ userId, onProgressMarked }) {
       runId.current = run.id;
       lastIndex.current = -1;
       lastTick.current = null;
+      marcasEj.current = "";
     }
     const phases = clockPhases(s);
     const st = stateAt(phases, elapsedMs(s, nowMs()));
+
+    // Tabata desde la rutina: cada ejercicio queda marcado apenas termina sus turnos,
+    // sin esperar al final. Solo se escribe cuando cambia algo.
+    if (userId && s.mode === "tabata" && s.fromRoutine && s.dayLabel && s.exercises.length) {
+      const marcas = exerciseMarks(phases, st, s.exercises);
+      const firma = `${run.id}:${marcas.map((m) => `${m.setsDone}${m.allDone ? "+" : ""}`).join(",")}`;
+      if (firma !== marcasEj.current && marcas.some((m) => m.setsDone > 0 || m.allDone)) {
+        marcasEj.current = firma;
+        const datos = { exercises: s.exercises, dayLabel: s.dayLabel, marks: marcas };
+        cola.current = cola.current
+          .then(() => markExercisesDone(supabase, userId, datos))
+          .then((r) => { if (r.sets || r.done) avisar.current?.(); }, () => { });
+      }
+    }
     if (st.done) {
       if (lastIndex.current !== phases.length) {
         lastIndex.current = phases.length;
@@ -133,8 +161,16 @@ function ClockEngine({ userId, onProgressMarked }) {
         // Solo una vez por reloj, y solo si se abrió desde la rutina (el reloj suelto no marca nada).
         if (userId && s.fromRoutine && s.dayLabel && marked.current !== run.id) {
           marked.current = run.id;
-          markBlockDone(supabase, userId, { exercises: s.exercises, dayLabel: s.dayLabel, mode: s.mode, cfg: s.configs[s.mode] })
+          const datos = { exercises: s.exercises, dayLabel: s.dayLabel, mode: s.mode, cfg: s.configs[s.mode] };
+          cola.current = cola.current
+            .then(() => markBlockDone(supabase, userId, datos))
             .then((r) => { if (r.sets || r.done) avisar.current?.(); }, () => { });
+        }
+        // Aviso de fin. Con la app a la vista lo pone la app; con la app cerrada lo manda Supabase
+        // (así nunca llegan dos).
+        if (avisoFin.current !== run.id && document.visibilityState === "visible") {
+          avisoFin.current = run.id;
+          showClockNotification({ title: tr(DONE_TEXT[s.mode] || "¡Terminado!"), body: s.mode === "amrap" ? tr("Rondas: {p0}", { p0: s.rounds }) : tr("Toque para volver a Kineaco.") });
         }
       }
       return;
@@ -215,38 +251,19 @@ function ClockEngine({ userId, onProgressMarked }) {
     }
   }, [tick, s]);
 
-  // Ficha en el panel de notificaciones, con forma de cronómetro (no de reproductor).
-  // Se refresca cada dos segundos y en silencio; es la única forma, desde la web, de que la
-  // ficha NO tenga el marco del reproductor de música que impone el celular.
+  // Aviso de inicio: uno solo por reloj, al arrancar (pausar y seguir no vuelve a avisar).
+  // El de fin va arriba, cuando termina. Si se cierra el reloj, el aviso se quita.
+  const runKey = s.run?.id || null;
   useEffect(() => {
-    if (!s.run) {
+    if (!runKey) {
       hideClockNotification();
-      return undefined;
+      return;
     }
-    const pintar = () => {
-      const phases = clockPhases(s);
-      const st = s.mode === "stopwatch" ? null : stateAt(phases, elapsedMs(s, nowMs()));
-      if (st?.done) {
-        showClockNotification({ title: tr("¡Terminado!"), body: tr(MODE_LABELS[s.mode]) });
-        return;
-      }
-      const tiempo = st ? formatClock(st.remaining) : formatClock(elapsedMs(s, nowMs()) / 1000);
-      const texto = clockCardText({ mode: s.mode, phases, st, exercises: s.exercises, tr });
-      const pausa = s.run.pausedAt ? ` · ${tr("En pausa")}` : "";
-      const esAmrap = s.mode === "amrap";
-      showClockNotification({
-        title: `${tiempo} · ${texto.artist || texto.title}${pausa}`,
-        body: [
-          esAmrap ? tr("Rondas: {p0}", { p0: s.rounds }) : texto.title !== texto.artist ? texto.title : "",
-          texto.album,
-        ].filter(Boolean).join(" · "),
-        rondas: esAmrap && !st?.done,
-      });
-    };
-    pintar();
-    const id = setInterval(pintar, REFRESCO_MS);
-    return () => clearInterval(id);
-  }, [s]);
+    const c = getClock();
+    if (avisoInicio.current === runKey || c.run?.pausedAt) return;
+    avisoInicio.current = runKey;
+    showClockNotification({ title: tr(START_TEXT[c.mode] || "Reloj"), body: timerLabel({ mode: c.mode, ...c.configs[c.mode] }, tr) });
+  }, [runKey]);
 
   // Rondas contadas desde los botones de la notificación: el service worker avisa por aquí
   useEffect(() => {
@@ -420,9 +437,9 @@ function ClockIsland() {
   );
 }
 
-// Píldora grande y translúcida para Tabata y AMRAP: tiempo grande + qué ejercicio toca y cuál sigue
-// (en AMRAP, la lista de la ronda, sin marcar nada),
-// sin tapar la rutina (se ven los ejercicios por detrás). Se puede achicar a la píldora normal.
+// Píldora grande y translúcida para Tabata y AMRAP: el tiempo, el ejercicio que se está haciendo
+// (grande y resaltado) y cuál sigue. Un solo ejercicio a la vez: la lista completa se ve en la
+// rutina ("Ver rutina" achica la píldora) o en el reloj grande ("Abrir reloj").
 function BigIsland({ s, now }) {
   const phases = clockPhases(s);
   const st = stateAt(phases, elapsedMs(s, now));
@@ -430,9 +447,6 @@ function BigIsland({ s, now }) {
   const type = st.done ? "done" : st.phase.type;
   const isAmrap = s.mode === "amrap";
   const { current, next } = clockExercises(s.mode, phases, st, s.exercises);
-  const hasExercises = s.exercises.length > 0;
-  // Cuenta por serie: cuántas veces lleva cada ejercicio y cuáles ya terminó (solo Tabata)
-  const progress = clockExerciseProgress(s.mode, phases, st, s.exercises);
 
   const tone = type === "rest" || type === "setrest" || type === "cooldown" ? "calm" : type === "prep" ? "warning" : "accent";
   const color = { accent: "var(--color-accent)", calm: "var(--color-calm)", warning: "var(--color-warning)" }[tone];
@@ -447,40 +461,38 @@ function BigIsland({ s, now }) {
   else if (type === "rest") label = tr("Descanso");
   else label = isAmrap ? "AMRAP" : tr("Trabajo");
 
+  // Serie y ciclo, cortos, a la derecha de la fase
   let counter = "";
   if (isAmrap) counter = tr("Rondas: {p0}", { p0: s.rounds });
   else if (!st.done && st.phase.type !== "prep") {
-    counter = tr("Ciclo {p0} de {p1}", { p0: st.phase.round, p1: st.phase.rounds });
-    if (st.phase.sets > 1) counter = `${tr("Serie {p0} de {p1}", { p0: st.phase.set, p1: st.phase.sets })} · ${counter}`;
+    counter = `${tr("Ciclo")} ${st.phase.round}/${st.phase.rounds}`;
+    if (st.phase.sets > 1) counter = `${tr("Serie")} ${st.phase.set}/${st.phase.sets} · ${counter}`;
   }
 
-  const working = !st.done && type === "work";
   // Botón redondo translúcido, como los de las tarjetas del sistema
   const ctrl = "w-9 h-9 rounded-full bg-white/[0.12] flex items-center justify-center text-ink active:scale-90 transition-transform";
+  const chip = "flex items-center gap-1.5 bg-white/[0.12] rounded-full px-3 py-1.5 text-[13px] text-ink active:scale-95 transition-transform";
   const RING = 29;
   const RING_C = 2 * Math.PI * RING;
 
   return (
     <div className="fixed inset-x-0 z-[60] flex justify-center pointer-events-none top-[calc(env(safe-area-inset-top)+0.5rem)] md:top-4 px-3">
-      <div className="pointer-events-auto w-full max-w-md rounded-[28px] bg-black/75 backdrop-blur-2xl border border-white/[0.07] shadow-[0_20px_50px_-12px_rgb(0_0_0/0.9)] px-5 pt-4 pb-4 animate-fade-in">
-        {/* Fase, con su punto de color, y las acciones de la tarjeta */}
+      <div className="pointer-events-auto w-full max-w-md rounded-[28px] bg-black/80 backdrop-blur-2xl border border-white/[0.07] shadow-[0_20px_50px_-12px_rgb(0_0_0/0.9)] px-5 pt-4 pb-4 animate-fade-in">
+        {/* Fase con su punto de color, serie y ciclo, y las acciones de la tarjeta */}
         <div className="flex items-center gap-2">
           <span className="w-[7px] h-[7px] rounded-full shrink-0" style={{ background: color }} aria-hidden="true" />
           <span className={`text-[13px] font-medium ${textColor}`}>{paused ? tr("En pausa") : label}</span>
+          {counter && <span className="text-soft text-[13px] tabular-nums truncate">· {counter}</span>}
           <span className="flex-1" />
-          <button onClick={() => openClock()} aria-label={tr("Abrir el reloj completo")} className="w-8 h-8 rounded-full bg-white/[0.08] flex items-center justify-center text-soft active:scale-90 transition-transform"><Maximize2 size={14} /></button>
           <button onClick={() => setIslandCompact(true)} aria-label={tr("Achicar")} className="w-8 h-8 rounded-full bg-white/[0.08] flex items-center justify-center text-soft active:scale-90 transition-transform"><ChevronUp size={16} /></button>
           <button onClick={cerrarReloj} aria-label={tr("Cerrar el reloj")} className="w-8 h-8 rounded-full bg-white/[0.08] flex items-center justify-center text-soft active:scale-90 transition-transform"><X size={16} /></button>
         </div>
 
         {/* El tiempo manda; a su derecha el anillo que lo acompaña, con la pausa dentro */}
-        <div className="flex items-end gap-3 mt-2">
-          <div className="flex-1 min-w-0">
-            <p className="font-rounded text-ink text-[3.5rem] font-semibold leading-[1.02] tracking-[-0.035em]">
-              {st.done ? "0:00" : formatClock(st.remaining)}
-            </p>
-            {counter && <p className="text-soft text-[13px] leading-tight mt-1 truncate">{counter}</p>}
-          </div>
+        <div className="flex items-end gap-3 mt-1">
+          <p className="flex-1 min-w-0 font-rounded text-ink text-[3.5rem] font-semibold leading-[1.02] tracking-[-0.035em] tabular-nums">
+            {st.done ? "0:00" : formatClock(st.remaining)}
+          </p>
 
           {!st.done && !isAmrap && (
             <button onClick={() => skipPhase(st.index)} aria-label={tr("Siguiente fase")} className={`${ctrl} mb-1.5`}><SkipForward size={16} /></button>
@@ -505,51 +517,25 @@ function BigIsland({ s, now }) {
           )}
         </div>
 
-        {hasExercises && (current || next) && (
-          <div className="mt-3">
-            {current && (
-              <p className="text-ink text-[17px] font-semibold leading-snug truncate">
-                {current.name}{current.detail && <span className="text-soft text-[13px] font-normal"> · {current.detail}</span>}
-              </p>
-            )}
-            {next && (
-              <p className="text-soft text-[13px] leading-snug truncate mt-0.5">
-                {tr("Sigue")}: {next.name}{next.detail && <span className="text-muted"> · {next.detail}</span>}
-              </p>
-            )}
+        {/* El ejercicio que se está haciendo: grande y resaltado en el color de la app */}
+        {current && (
+          <div className="mt-3 rounded-2xl bg-accent/15 border border-accent/40 px-3.5 py-2.5">
+            <p className="text-accent text-[11px] font-semibold uppercase tracking-[0.12em]">{tr("Ahora")}</p>
+            <p className="text-accent text-[1.65rem] font-semibold leading-tight break-words">{current.name}</p>
+            {current.detail && <p className="text-soft text-[13px] leading-snug mt-0.5 truncate">{current.detail}</p>}
           </div>
         )}
-
-        {/* Tabata: la lista completa, contando y tachando lo que ya hizo en esta serie */}
-        {progress && (
-          <ol className="mt-3 pt-3 border-t border-white/[0.06] max-h-[8.5rem] overflow-y-auto overscroll-contain space-y-1">
-            {progress.items.map((e, i) => (
-              <li
-                key={i}
-                aria-label={tr("{p0}: {p1} de {p2} veces", { p0: e.name, p1: e.done, p2: e.total })}
-                className={`flex items-baseline gap-2.5 text-[13px] leading-snug ${e.current ? "text-accent font-semibold" : e.complete ? "text-muted" : "text-soft"}`}
-              >
-                <span className="text-muted w-3 shrink-0 tabular-nums">{i + 1}</span>
-                <span className={`flex-1 min-w-0 truncate ${e.complete ? "line-through" : ""}`}>{e.name}</span>
-                <span className="shrink-0 flex items-center gap-1 tabular-nums" aria-hidden="true">
-                  {e.done}/{e.total}
-                  <Check size={12} strokeWidth={3} className={e.complete ? "text-accent" : "text-transparent"} />
-                </span>
-              </li>
-            ))}
-          </ol>
+        {next && (
+          <p className={`text-soft text-[13px] leading-snug truncate ${current ? "mt-2" : "mt-3"}`}>
+            {tr("Sigue")}: <span className="text-ink">{next.name}</span>{next.detail && <span className="text-muted"> · {next.detail}</span>}
+          </p>
         )}
 
-        {isAmrap && hasExercises && !st.done && (
-          <ol className="mt-3 pt-3 border-t border-white/[0.06] space-y-1">
-            {s.exercises.map((e, i) => (
-              <li key={i} className="text-soft text-[13px] leading-snug flex gap-2.5">
-                <span className="text-muted w-3 shrink-0 tabular-nums">{i + 1}</span>
-                <span className="min-w-0 truncate">{e.name}{e.detail && <span className="text-muted"> · {e.detail}</span>}</span>
-              </li>
-            ))}
-          </ol>
-        )}
+        {/* La lista completa no va aquí: se ve en la rutina o en el reloj grande */}
+        <div className="flex gap-2 mt-3">
+          <button onClick={() => setIslandCompact(true)} className={chip}><ListChecks size={14} /> {tr("Ver rutina")}</button>
+          <button onClick={() => openClock()} className={chip}><Clock size={14} /> {tr("Abrir reloj")}</button>
+        </div>
       </div>
     </div>
   );

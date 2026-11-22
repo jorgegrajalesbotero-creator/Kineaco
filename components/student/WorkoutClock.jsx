@@ -155,20 +155,20 @@ export function WorkoutClock() {
             </button>
           )}
 
-          {/* AMRAP: contador de rondas */}
-          {/* Ejercicio actual y siguiente */}
+          {/* Ejercicio actual (grande y resaltado) y el que sigue */}
           {exList.length > 0 && (exNow || exNext) && (
-            <div className="bg-card rounded-2xl px-4 py-3 mt-3 space-y-1.5">
+            <div className="mt-3 space-y-2">
               {exNow && (
-                <p className="text-ink text-lg font-semibold leading-snug">
-                  <span className="text-accent text-xs font-semibold uppercase tracking-wider mr-2">{tr("Ahora")}</span>
-                  {exNow.name}{exNow.detail && <span className="text-soft text-sm font-normal"> · {exNow.detail}</span>}
-                </p>
+                <div className="rounded-2xl bg-accent/15 border border-accent/40 px-4 py-3">
+                  <p className="text-accent text-xs font-semibold uppercase tracking-[0.12em]">{tr("Ahora")}</p>
+                  <p className="text-accent text-[2rem] font-semibold leading-tight break-words">{exNow.name}</p>
+                  {exNow.detail && <p className="text-soft text-sm mt-0.5">{exNow.detail}</p>}
+                </div>
               )}
               {exNext && (
-                <p className={exNow ? "text-soft text-sm" : "text-ink text-lg font-semibold leading-snug"}>
+                <p className="text-soft text-sm px-1">
                   <span className="text-muted text-xs font-semibold uppercase tracking-wider mr-2">{tr("Sigue")}</span>
-                  {exNext.name}{exNext.detail && <span className="text-muted text-xs font-normal"> · {exNext.detail}</span>}
+                  <span className="text-ink">{exNext.name}</span>{exNext.detail && <span className="text-muted text-xs"> · {exNext.detail}</span>}
                 </p>
               )}
             </div>
