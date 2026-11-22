@@ -9,6 +9,7 @@ import { clockCardText, clockExerciseProgress, clockExercises, formatClock, stat
 import { markBlockDone } from "@/lib/clockProgress";
 import { hideNowPlaying, updateClockPosition, updateNowPlaying } from "@/lib/clockMedia";
 import { drawCard } from "@/lib/clockArtwork";
+import { REFRESCO_MS, hideClockNotification, showClockNotification } from "@/lib/clockNotification";
 import { clockPhases, elapsedMs, endAt, isRunning, openClock, pauseClock, resumeClock, ringAlarm, setIslandCompact, skipPhase, stopAlarm, useClock } from "@/lib/clockStore";
 import { WorkoutClock } from "@/components/student/WorkoutClock";
 
@@ -169,8 +170,36 @@ function ClockEngine({ userId, onProgressMarked }) {
     }
   }, [tick, s]);
 
-  // Al salir de la app del alumno, no dejar la tarjeta colgada
-  useEffect(() => () => hideNowPlaying(), []);
+  // Ficha en el panel de notificaciones, con forma de cronómetro (no de reproductor).
+  // Se refresca cada dos segundos y en silencio; es la única forma, desde la web, de que la
+  // ficha NO tenga el marco del reproductor de música que impone el celular.
+  useEffect(() => {
+    if (!s.run) {
+      hideClockNotification();
+      return undefined;
+    }
+    const pintar = () => {
+      const phases = clockPhases(s);
+      const st = s.mode === "stopwatch" ? null : stateAt(phases, elapsedMs(s, nowMs()));
+      if (st?.done) {
+        showClockNotification({ title: tr("¡Terminado!"), body: tr(MODE_LABELS[s.mode]) });
+        return;
+      }
+      const tiempo = st ? formatClock(st.remaining) : formatClock(elapsedMs(s, nowMs()) / 1000);
+      const texto = clockCardText({ mode: s.mode, phases, st, exercises: s.exercises, tr });
+      const pausa = s.run.pausedAt ? ` · ${tr("En pausa")}` : "";
+      showClockNotification({
+        title: `${tiempo} · ${texto.artist || texto.title}${pausa}`,
+        body: [texto.title !== texto.artist ? texto.title : "", texto.album].filter(Boolean).join(" · "),
+      });
+    };
+    pintar();
+    const id = setInterval(pintar, REFRESCO_MS);
+    return () => clearInterval(id);
+  }, [s]);
+
+  // Al salir de la app del alumno, no dejar nada colgado
+  useEffect(() => () => { hideNowPlaying(); hideClockNotification(); }, []);
 
   // Al terminar, la alarma suena y la píldora queda en rojo 10 segundos; después se apaga sola
   // (también se puede apagar antes con "Apagar").
