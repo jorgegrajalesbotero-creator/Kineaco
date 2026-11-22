@@ -6,6 +6,7 @@ import { supabase } from "@/lib/supabaseClient";
 import { tr } from "@/lib/i18n";
 import { beep, vibrate } from "@/lib/alarm";
 import { clockExerciseProgress, clockExercises, formatClock, stateAt } from "@/lib/clock";
+import { markBlockDone } from "@/lib/clockProgress";
 import { clockPhases, elapsedMs, endAt, isRunning, openClock, pauseClock, resumeClock, ringAlarm, setIslandCompact, skipPhase, stopAlarm, useClock } from "@/lib/clockStore";
 import { WorkoutClock } from "@/components/student/WorkoutClock";
 
@@ -26,11 +27,12 @@ const DONE_TEXT = {
 
 // Todo el reloj del alumno: el motor (sonidos, alarma, aviso al celular), la píldora y el reloj grande.
 // Va una sola vez en la app del alumno.
-export function ClockHost({ userId }) {
+// onProgressMarked: avisa a la rutina de que el reloj dio el bloque por hecho, para que se vuelva a dibujar.
+export function ClockHost({ userId, onProgressMarked }) {
   const s = useClock();
   return (
     <>
-      <ClockEngine userId={userId} />
+      <ClockEngine userId={userId} onProgressMarked={onProgressMarked} />
       {!s.open && <ClockIsland />}
       {s.open && <WorkoutClock />}
     </>
@@ -39,7 +41,7 @@ export function ClockHost({ userId }) {
 
 // Lleva la cuenta aunque no se vea el reloj: pitidos en cada cambio, alarma al final,
 // pantalla encendida mientras corre y el aviso programado para cuando la app está cerrada.
-function ClockEngine({ userId }) {
+function ClockEngine({ userId, onProgressMarked }) {
   const s = useClock();
   const running = isRunning(s);
   const [tick, setTick] = useState(0);
@@ -48,6 +50,9 @@ function ClockEngine({ userId }) {
   const runId = useRef(null);
   const wakeLock = useRef(null);
   const sentAlarm = useRef(0);
+  const marked = useRef(null); // reloj cuyo bloque ya se dio por hecho (para no marcarlo dos veces)
+  const avisar = useRef(onProgressMarked); // en un ref: cambia en cada dibujo y no debe reiniciar el motor
+  useEffect(() => { avisar.current = onProgressMarked; }, [onProgressMarked]);
 
   // Refresca mientras corre, y apenas el alumno vuelve a la app
   useEffect(() => {
@@ -81,12 +86,19 @@ function ClockEngine({ userId }) {
     if (st.done) {
       if (lastIndex.current !== phases.length) {
         lastIndex.current = phases.length;
-        if (!run.pausedAt) pauseClock(); // se queda en 0:00
+        if (!run.pausedAt) pauseClock(true); // se queda en 0:00 (sin pitido: ya suena la alarma)
         if (!s.ringing && !run.acked) ringAlarm();
         // Con la app a la vista se borra el aviso al celular (ya suena aquí). Si la app está en segundo
         // plano (otra pestaña u otra app) se deja, para que llegue la notificación.
         if (userId && document.visibilityState === "visible") supabase.rpc("clear_clock_alarm").then(() => { }, () => { });
         sentAlarm.current = 0;
+        // Terminó el reloj de un bloque de la rutina: sus ejercicios quedan marcados como hechos.
+        // Solo una vez por reloj, y solo si se abrió desde la rutina (el reloj suelto no marca nada).
+        if (userId && s.fromRoutine && s.dayLabel && marked.current !== run.id) {
+          marked.current = run.id;
+          markBlockDone(supabase, userId, { exercises: s.exercises, dayLabel: s.dayLabel, mode: s.mode, cfg: s.configs[s.mode] })
+            .then((r) => { if (r.sets || r.done) avisar.current?.(); }, () => { });
+        }
       }
       return;
     }

@@ -736,7 +736,7 @@ export default function App() {
           )}
         </main>
         {/* Reloj del alumno: sigue corriendo en una píldora arriba aunque cambie de pantalla o salga de la app */}
-        {!hideNav && userId && <ClockHost userId={userId} />}
+        {!hideNav && userId && <ClockHost userId={userId} onProgressMarked={() => refreshRoutine(uidRef.current, selectedDay)} />}
         {!hideNav && (
           <div className="md:hidden absolute inset-x-0 bottom-[max(0.75rem,calc(env(safe-area-inset-bottom)-0.5rem))] z-40 pointer-events-none">
             <BottomNav active={tab} onSelect={selectTab} unreadCount={unreadMessageCount} isCoach={isCoach} />

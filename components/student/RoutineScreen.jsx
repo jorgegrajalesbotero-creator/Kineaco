@@ -313,7 +313,18 @@ export function RoutineScreen({ routine, userId, pet = null, onClose, onToggle, 
   // Ejercicios del bloque (o de la rutina en lista simple) para que el reloj diga cuál toca y cuál sigue
   const clockExercisesOf = (part, b) => routine.exercises
     .filter((ex) => (ex.partIndex ?? 0) === (part.partIndex ?? 0) && (b === part || ex.blockId === b.id))
-    .map((ex) => ({ name: ex.name, detail: [b === part ? ex.sets : ex.rowLabel, formatWeight(ex.targetWeight, unit)].filter(Boolean).join(" · ") }));
+    .map((ex) => ({
+      name: ex.name,
+      detail: [b === part ? ex.sets : ex.rowLabel, formatWeight(ex.targetWeight, unit)].filter(Boolean).join(" · "),
+      // Identidad del ejercicio: con esto el reloj puede dar el bloque por hecho al terminar
+      exerciseId: ex.exerciseId,
+      itemKey: ex.itemKey,
+      routineId: ex.routineId || routine.id,
+      setsCount: ex.setsCount,
+      byItem: ex.byItem,
+      targetWeight: ex.targetWeight,
+      targetReps: ex.targetReps,
+    }));
 
   const timerChip = (part, b) => {
     if (preview && onEditTimer) {
@@ -327,7 +338,7 @@ export function RoutineScreen({ routine, userId, pet = null, onClose, onToggle, 
     }
     if (!b.timer) return null;
     return (
-      <button onClick={() => openClock({ preset: b.timer, exercises: clockExercisesOf(part, b), fromRoutine: true })} className="w-full flex items-center gap-2.5 rounded-xl px-3 py-2.5 mb-2 bg-accent/15 border border-accent/30 text-left active:scale-[0.99] transition-transform">
+      <button onClick={() => openClock({ preset: b.timer, exercises: clockExercisesOf(part, b), dayLabel: routine.day_label, fromRoutine: !preview })} className="w-full flex items-center gap-2.5 rounded-xl px-3 py-2.5 mb-2 bg-accent/15 border border-accent/30 text-left active:scale-[0.99] transition-transform">
         <span className="w-8 h-8 rounded-lg bg-accent text-app flex items-center justify-center shrink-0"><Timer size={16} /></span>
         <span className="flex-1 min-w-0">
           <span className="block text-ink text-sm font-medium">{timerLabel(b.timer, tr)}</span>

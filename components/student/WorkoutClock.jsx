@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { BellOff, Check, ChevronDown, Flag, Minus, Pause, Play, RotateCcw, SkipForward } from "lucide-react";
 import { tr } from "@/lib/i18n";
-import { beep, vibrate } from "@/lib/alarm";
+import { vibrate } from "@/lib/alarm";
 import { CLOCK_FIELDS, CLOCK_MODES, clockExerciseProgress, clockExercises, formatClock, formatStopwatch, stateAt, visibleFields } from "@/lib/clock";
 import {
   addLap, addRestSeconds, addRound, backToProgrammed, clockPhases, elapsedMs as elapsedOf, isRunning, minimizeClock,
@@ -44,10 +44,7 @@ export function WorkoutClock() {
   const finished = !!st?.done && !!run;
   const isProgrammed = !!programmed && mode === programmed.mode && CLOCK_FIELDS[mode].every((f) => cfg[f.key] === programmed[f.key]);
 
-  const start = () => {
-    startClock();
-    if (mode === "stopwatch") beep({ freq: 1175, dur: 0.25 }); // el cronómetro no tiene fases: sonido de arranque
-  };
+  const start = () => startClock(); // el pitido de arranque lo hace startClock, dentro del toque
   const changeMode = (m) => { if (m !== mode) setClockMode(m); };
   const setField = (field, value) => setClockField(field, value);
   const skip = () => { if (run && st && !st.done) skipPhase(st.index); };
