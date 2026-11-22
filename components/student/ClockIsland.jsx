@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { BellOff, Check, ChevronDown, ChevronUp, Maximize2, Pause, Play, SkipForward } from "lucide-react";
+import { BellOff, Check, ChevronDown, ChevronUp, Maximize2, Pause, Play, SkipForward, X } from "lucide-react";
 import { supabase } from "@/lib/supabaseClient";
 import { tr } from "@/lib/i18n";
 import { beep, vibrate } from "@/lib/alarm";
@@ -10,11 +10,22 @@ import { markBlockDone } from "@/lib/clockProgress";
 import { hideNowPlaying, updateClockPosition, updateNowPlaying } from "@/lib/clockMedia";
 import { drawCard } from "@/lib/clockArtwork";
 import { REFRESCO_MS, hideClockNotification, showClockNotification } from "@/lib/clockNotification";
-import { clockPhases, elapsedMs, endAt, getClock, isRunning, openClock, pauseClock, resumeClock, ringAlarm, setIslandCompact, skipPhase, stopAlarm, useClock } from "@/lib/clockStore";
+import { clockPhases, elapsedMs, endAt, getClock, isRunning, openClock, pauseClock, resumeClock, resetClock, ringAlarm, setIslandCompact, skipPhase, stopAlarm, useClock } from "@/lib/clockStore";
 import { WorkoutClock } from "@/components/student/WorkoutClock";
 
 // Hora actual (fuera de los componentes: solo se usa en efectos)
 const nowMs = () => Date.now();
+
+// Cerrar el reloj y quitarlo de todos lados: la ficha, la notificación y la pantalla de
+// bloqueo (eso último sale solo, porque sin reloj los avisos se retiran).
+// Si está corriendo se pregunta: un toque sin querer no puede borrar un Tabata a medias.
+function cerrarReloj() {
+  const s = getClock();
+  const corriendo = !!s.run && !s.run.pausedAt && !s.ringing;
+  if (corriendo && !window.confirm(tr("¿Cerrar el reloj? Va a detenerse y perderá la cuenta."))) return;
+  stopAlarm();
+  resetClock();
+}
 
 // Cuánto falta para que el reloj cambie de segundo. Los pulsos se acomodan a esto en vez de
 // ir cada 200 ms a ciegas: así el número baja justo cuando toca, sin quedarse pegado ni
@@ -332,6 +343,9 @@ function ClockIsland() {
           <button onClick={stopAlarm} className="flex items-center gap-1.5 bg-app/15 rounded-full px-3.5 py-1.5 text-[15px] font-semibold active:scale-95 transition-transform">
             <BellOff size={15} /> {tr("Apagar")}
           </button>
+          <button onClick={cerrarReloj} aria-label={tr("Cerrar el reloj")} className="w-8 h-8 rounded-full bg-app/15 flex items-center justify-center shrink-0 active:scale-90 transition-transform">
+            <X size={16} />
+          </button>
         </div>
       ) : (
         <button
@@ -356,11 +370,21 @@ function ClockIsland() {
               aria-label={tr("Agrandar")}
               onClick={(e) => { e.stopPropagation(); setIslandCompact(false); }}
               onKeyDown={(e) => { if (e.key === "Enter") { e.stopPropagation(); setIslandCompact(false); } }}
-              className="-mr-2.5 w-7 h-7 rounded-full bg-white/[0.12] flex items-center justify-center text-soft"
+              className="w-7 h-7 rounded-full bg-white/[0.12] flex items-center justify-center text-soft"
             >
               <ChevronDown size={14} />
             </span>
           )}
+          <span
+            role="button"
+            tabIndex={0}
+            aria-label={tr("Cerrar el reloj")}
+            onClick={(e) => { e.stopPropagation(); cerrarReloj(); }}
+            onKeyDown={(e) => { if (e.key === "Enter") { e.stopPropagation(); cerrarReloj(); } }}
+            className="-mr-2.5 w-7 h-7 rounded-full bg-white/[0.12] flex items-center justify-center text-soft"
+          >
+            <X size={14} />
+          </span>
         </button>
       )}
     </div>
@@ -417,6 +441,7 @@ function BigIsland({ s, now }) {
           <span className="flex-1" />
           <button onClick={() => openClock()} aria-label={tr("Abrir el reloj completo")} className="w-8 h-8 rounded-full bg-white/[0.08] flex items-center justify-center text-soft active:scale-90 transition-transform"><Maximize2 size={14} /></button>
           <button onClick={() => setIslandCompact(true)} aria-label={tr("Achicar")} className="w-8 h-8 rounded-full bg-white/[0.08] flex items-center justify-center text-soft active:scale-90 transition-transform"><ChevronUp size={16} /></button>
+          <button onClick={cerrarReloj} aria-label={tr("Cerrar el reloj")} className="w-8 h-8 rounded-full bg-white/[0.08] flex items-center justify-center text-soft active:scale-90 transition-transform"><X size={16} /></button>
         </div>
 
         {/* El tiempo manda; a su derecha el anillo que lo acompaña, con la pausa dentro */}
