@@ -159,7 +159,10 @@ function ClockEngine({ userId, onProgressMarked }) {
       }
       subtitle = partes.join(" · ");
     }
-    showNowPlaying({ title, subtitle, paused, onPlay: resumeClock, onPause: pauseClock });
+    // La barra de progreso muestra la fase en curso (el trabajo, el descanso…)
+    const duration = st && !st.done ? st.phase.dur : 0;
+    const position = duration ? duration - st.remaining : 0;
+    showNowPlaying({ title, subtitle, paused, duration, position, onPlay: resumeClock, onPause: pauseClock });
   }, [tick, s]);
 
   // Al salir de la app del alumno, no dejar la tarjeta colgada
