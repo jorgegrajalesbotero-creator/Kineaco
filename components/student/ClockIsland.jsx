@@ -325,10 +325,106 @@ function ClockEngine({ userId, onProgressMarked }) {
   return null;
 }
 
+// La ficha del reloj (píldora o grande) se puede arrastrar con el dedo a cualquier parte de
+// la pantalla. Se guarda dónde quedó y la próxima vez aparece ahí. Un toque normal sigue
+// abriendo el reloj o usando sus botones; solo cuenta como arrastre si el dedo se mueve.
+const POS_KEY = "reloj.posicion";
+let posGuardada = null;
+function leerPosicion() {
+  if (posGuardada) return posGuardada;
+  try {
+    const v = JSON.parse(localStorage.getItem(POS_KEY) || "null");
+    posGuardada = v && Number.isFinite(v.x) && Number.isFinite(v.y) ? v : { x: 0, y: 0 };
+  } catch {
+    posGuardada = { x: 0, y: 0 };
+  }
+  return posGuardada;
+}
+
+// Arrastre en curso (solo hay una ficha a la vez en pantalla, así que basta uno para todas)
+let arrastreActual = null;
+let seArrastro = false;
+
+function useArrastre() {
+  const [el, setEl] = useState(null); // la ficha (ref por callback: se mide al moverla)
+  const [pos, setPos] = useState({ x: 0, y: 0 });
+
+  // Que la ficha nunca quede por fuera de la pantalla (también al girar el celular o al
+  // cambiar de la píldora a la ficha grande, que mide distinto)
+  const ajustar = (o, actual) => {
+    if (!el) return o;
+    const r = el.getBoundingClientRect();
+    const baseX = r.left - actual.x;
+    const baseY = r.top - actual.y;
+    const m = 8;
+    return {
+      x: Math.round(Math.min(Math.max(o.x, m - baseX), Math.max(m - baseX, window.innerWidth - m - r.width - baseX))),
+      y: Math.round(Math.min(Math.max(o.y, m - baseY), Math.max(m - baseY, window.innerHeight - m - r.height - baseY))),
+    };
+  };
+  const mover = (o) => {
+    posGuardada = o;
+    setPos(o);
+  };
+
+  // Al aparecer, en cada dibujo (barato: solo mide la ficha) y al cambiar el tamaño de la pantalla
+  useEffect(() => {
+    const encajar = () => {
+      if (arrastreActual?.activo) return;
+      const o = ajustar(leerPosicion(), pos);
+      if (o.x !== pos.x || o.y !== pos.y) mover(o);
+    };
+    encajar();
+    window.addEventListener("resize", encajar);
+    return () => window.removeEventListener("resize", encajar);
+  });
+
+  const onPointerDown = (e) => {
+    if (e.button !== undefined && e.button !== 0) return;
+    arrastreActual = { id: e.pointerId, px: e.clientX, py: e.clientY, x: pos.x, y: pos.y, activo: false };
+    seArrastro = false;
+  };
+  const onPointerMove = (e) => {
+    const d = arrastreActual;
+    if (!d || d.id !== e.pointerId) return;
+    const dx = e.clientX - d.px;
+    const dy = e.clientY - d.py;
+    if (!d.activo) {
+      if (Math.hypot(dx, dy) < 6) return;
+      d.activo = true;
+      seArrastro = true;
+      try { e.currentTarget.setPointerCapture(e.pointerId); } catch { /* sin captura igual funciona */ }
+    }
+    mover(ajustar({ x: d.x + dx, y: d.y + dy }, pos));
+  };
+  const soltar = (e) => {
+    const d = arrastreActual;
+    if (!d || d.id !== e.pointerId) return;
+    arrastreActual = null;
+    if (d.activo) {
+      try { localStorage.setItem(POS_KEY, JSON.stringify(posGuardada)); } catch { /* sin espacio: no pasa nada */ }
+    }
+  };
+  // Si la ficha se arrastró, el toque al soltar no debe abrir el reloj ni tocar un botón
+  const onClickCapture = (e) => {
+    if (!seArrastro) return;
+    seArrastro = false;
+    e.preventDefault();
+    e.stopPropagation();
+  };
+
+  return {
+    medir: setEl,
+    estilo: { transform: `translate3d(${pos.x}px, ${pos.y}px, 0)` },
+    manejadores: { onPointerDown, onPointerMove, onPointerUp: soltar, onPointerCancel: soltar, onClickCapture },
+  };
+}
+
 // Píldora arriba (tipo isla del iPhone): el reloj sigue corriendo y al tocarla se abre en grande.
 // Queda debajo de la isla / muesca del iPhone gracias a env(safe-area-inset-top).
 function ClockIsland() {
   const s = useClock();
+  const { medir, estilo, manejadores } = useArrastre();
   const [now, setNow] = useState(0);
   const running = isRunning(s);
   // Mismo pulso acomodado al segundo que usa el motor: antes la píldora iba por su cuenta cada
@@ -382,9 +478,9 @@ function ClockIsland() {
   const C = 2 * Math.PI * R;
 
   return (
-    <div className="fixed inset-x-0 z-[60] flex justify-center pointer-events-none top-[calc(env(safe-area-inset-top)+0.5rem)] md:top-4 px-4">
+    <div style={estilo} className="fixed inset-x-0 z-[60] flex justify-center pointer-events-none top-[calc(env(safe-area-inset-top)+0.5rem)] md:top-4 px-4">
       {s.ringing ? (
-        <div role="alert" className="pointer-events-auto flex items-center gap-2.5 bg-danger text-app rounded-full pl-4 pr-1.5 py-1.5 shadow-[0_14px_34px_-10px_rgb(0_0_0/0.8)] animate-pulse">
+        <div ref={medir} {...manejadores} role="alert" className="pointer-events-auto touch-none select-none flex items-center gap-2.5 bg-danger text-app rounded-full pl-4 pr-1.5 py-1.5 shadow-[0_14px_34px_-10px_rgb(0_0_0/0.8)] animate-pulse">
           <span className="text-[15px] font-semibold">{tr("¡Terminado!")} · {tr(MODE_LABELS[s.mode])}</span>
           <button onClick={stopAlarm} className="flex items-center gap-1.5 bg-app/15 rounded-full px-3.5 py-1.5 text-[15px] font-semibold active:scale-95 transition-transform">
             <BellOff size={15} /> {tr("Apagar")}
@@ -395,10 +491,12 @@ function ClockIsland() {
         </div>
       ) : (
         <button
+          ref={medir}
+          {...manejadores}
           type="button"
           onClick={() => openClock()}
           aria-label={`${tr("Reloj")}: ${label} ${time}. ${tr("Toque para abrirlo")}`}
-          className="pointer-events-auto flex items-center gap-2.5 bg-black/85 backdrop-blur-xl border border-white/[0.07] rounded-full pl-2 pr-4 py-2 shadow-[0_14px_34px_-10px_rgb(0_0_0/0.85)] animate-fade-in active:scale-[0.97] transition-transform max-w-full"
+          className="pointer-events-auto touch-none select-none flex items-center gap-2.5 bg-black/90 backdrop-blur-xl border border-white/[0.07] rounded-full pl-2 pr-4 py-2 shadow-[0_14px_34px_-10px_rgb(0_0_0/0.85)] animate-fade-in active:scale-[0.97] transition-transform max-w-full"
         >
           <span className="relative w-7 h-7 shrink-0 flex items-center justify-center">
             <svg width="28" height="28" viewBox="0 0 24 24" className="absolute inset-0 -rotate-90" aria-hidden="true">
@@ -441,6 +539,7 @@ function ClockIsland() {
 // (grande y resaltado) y cuál sigue. Un solo ejercicio a la vez: la lista completa se ve en la
 // rutina ("Ver rutina" achica la píldora) o en el reloj grande ("Abrir reloj").
 function BigIsland({ s, now }) {
+  const { medir, estilo, manejadores } = useArrastre();
   const phases = clockPhases(s);
   const st = stateAt(phases, elapsedMs(s, now));
   const paused = !!s.run.pausedAt && !st.done;
@@ -476,8 +575,10 @@ function BigIsland({ s, now }) {
   const RING_C = 2 * Math.PI * RING;
 
   return (
-    <div className="fixed inset-x-0 z-[60] flex justify-center pointer-events-none top-[calc(env(safe-area-inset-top)+0.5rem)] md:top-4 px-3">
-      <div className="pointer-events-auto w-full max-w-md rounded-[28px] bg-black/80 backdrop-blur-2xl border border-white/[0.07] shadow-[0_20px_50px_-12px_rgb(0_0_0/0.9)] px-5 pt-4 pb-4 animate-fade-in">
+    <div style={estilo} className="fixed inset-x-0 z-[60] flex justify-center pointer-events-none top-[calc(env(safe-area-inset-top)+0.5rem)] md:top-4 px-3">
+      <div ref={medir} {...manejadores} className="pointer-events-auto touch-none select-none w-full max-w-md rounded-[28px] bg-black/90 backdrop-blur-2xl border border-white/[0.07] shadow-[0_20px_50px_-12px_rgb(0_0_0/0.9)] px-5 pt-2.5 pb-4 animate-fade-in">
+        {/* Rayita: indica que la ficha se puede mover con el dedo */}
+        <div className="w-9 h-1 rounded-full bg-white/25 mx-auto mb-2" aria-hidden="true" />
         {/* Fase con su punto de color, serie y ciclo, y las acciones de la tarjeta */}
         <div className="flex items-center gap-2">
           <span className="w-[7px] h-[7px] rounded-full shrink-0" style={{ background: color }} aria-hidden="true" />
