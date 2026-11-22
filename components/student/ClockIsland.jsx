@@ -10,11 +10,25 @@ import { markBlockDone } from "@/lib/clockProgress";
 import { hideNowPlaying, updateClockPosition, updateNowPlaying } from "@/lib/clockMedia";
 import { drawCard } from "@/lib/clockArtwork";
 import { REFRESCO_MS, hideClockNotification, showClockNotification } from "@/lib/clockNotification";
-import { clockPhases, elapsedMs, endAt, isRunning, openClock, pauseClock, resumeClock, ringAlarm, setIslandCompact, skipPhase, stopAlarm, useClock } from "@/lib/clockStore";
+import { clockPhases, elapsedMs, endAt, getClock, isRunning, openClock, pauseClock, resumeClock, ringAlarm, setIslandCompact, skipPhase, stopAlarm, useClock } from "@/lib/clockStore";
 import { WorkoutClock } from "@/components/student/WorkoutClock";
 
 // Hora actual (fuera de los componentes: solo se usa en efectos)
 const nowMs = () => Date.now();
+
+// Cuánto falta para que el reloj cambie de segundo. Los pulsos se acomodan a esto en vez de
+// ir cada 200 ms a ciegas: así el número baja justo cuando toca, sin quedarse pegado ni
+// saltarse uno, y de paso se trabaja menos (un dibujo por segundo en vez de cinco).
+function faltaParaElSegundo() {
+  try {
+    const s = getClock();
+    if (!s.run || s.run.pausedAt) return 1000;
+    const resto = elapsedMs(s, nowMs()) % 1000;
+    return Math.max(60, 1000 - resto);
+  } catch {
+    return 250;
+  }
+}
 
 // Cuánto tiempo suena la alarma y se ve la píldora roja al terminar
 const RING_MS = 10000;
@@ -59,15 +73,22 @@ function ClockEngine({ userId, onProgressMarked }) {
   const avisar = useRef(onProgressMarked); // en un ref: cambia en cada dibujo y no debe reiniciar el motor
   useEffect(() => { avisar.current = onProgressMarked; }, [onProgressMarked]);
 
-  // Refresca mientras corre, y apenas el alumno vuelve a la app
+  // Refresca mientras corre, y apenas el alumno vuelve a la app.
+  // El pulso se acomoda al segundo real en vez de ir cada 200 ms a ciegas: así el número
+  // cambia justo cuando toca y no se queda pegado un instante de más.
   useEffect(() => {
+    let id;
     const bump = () => setTick(nowMs());
     bump();
     const onVisible = () => { if (document.visibilityState === "visible") bump(); };
     document.addEventListener("visibilitychange", onVisible);
-    const id = running ? setInterval(bump, 200) : null;
+    const latir = () => {
+      bump();
+      id = setTimeout(latir, faltaParaElSegundo());
+    };
+    if (running) latir();
     return () => {
-      if (id) clearInterval(id);
+      if (id) clearTimeout(id);
       document.removeEventListener("visibilitychange", onVisible);
     };
   }, [running]);
@@ -253,11 +274,18 @@ function ClockIsland() {
   const s = useClock();
   const [now, setNow] = useState(0);
   const running = isRunning(s);
+  // Mismo pulso acomodado al segundo que usa el motor: antes la píldora iba por su cuenta cada
+  // 250 ms y, al no coincidir con el motor, el número se veía a tirones.
   useEffect(() => {
+    let id;
     setNow(nowMs());
     if (!running) return undefined;
-    const id = setInterval(() => setNow(nowMs()), 250);
-    return () => clearInterval(id);
+    const latir = () => {
+      setNow(nowMs());
+      id = setTimeout(latir, faltaParaElSegundo());
+    };
+    latir();
+    return () => clearTimeout(id);
   }, [running, s.run?.id]);
 
   if (!s.run || !now) return null;
