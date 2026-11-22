@@ -54,6 +54,8 @@ const securityHeaders = [
 ];
 
 const nextConfig = {
+  // Actualización de seguridad asistida de Next.js (next upgrade --agent=security)
+  experimental: { agentUpgrade: "security" },
   // Permite abrir la app en modo desarrollo desde otros dispositivos de la misma red Wi-Fi
   // (por ejemplo, el celular entrando a http://192.168.x.x:3000). No afecta la app publicada.
   allowedDevOrigins: ["192.168.*.*", "10.*.*.*", "172.*.*.*"],
