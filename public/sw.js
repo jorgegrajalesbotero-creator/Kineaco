@@ -26,6 +26,23 @@ self.addEventListener("push", (event) => {
 });
 
 self.addEventListener("notificationclick", (event) => {
+  // Botones de la ficha del reloj (AMRAP): cuentan la ronda sin abrir la app ni cerrar la ficha.
+  // La página sigue viva porque el reloj mantiene el sonido, así que le llega el aviso.
+  if (event.action === "ronda-mas" || event.action === "ronda-menos") {
+    event.waitUntil(
+      (async () => {
+        const windows = await self.clients.matchAll({ type: "window", includeUncontrolled: true });
+        for (const client of windows) client.postMessage({ type: "clock-round", delta: event.action === "ronda-mas" ? 1 : -1 });
+        if (!windows.length) {
+          // Sin la app viva no hay a quién avisarle: se abre para que no se pierda la ronda
+          event.notification.close();
+          await self.clients.openWindow(self.location.origin);
+        }
+      })(),
+    );
+    return;
+  }
+
   event.notification.close();
   const { url = "/", id = null } = event.notification.data || {};
   const target = new URL(url, self.location.origin);

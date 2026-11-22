@@ -10,7 +10,7 @@ import { markBlockDone } from "@/lib/clockProgress";
 import { hideNowPlaying, updateClockPosition, updateNowPlaying } from "@/lib/clockMedia";
 import { drawCard } from "@/lib/clockArtwork";
 import { REFRESCO_MS, hideClockNotification, showClockNotification } from "@/lib/clockNotification";
-import { clockPhases, elapsedMs, endAt, getClock, isRunning, openClock, pauseClock, resumeClock, resetClock, ringAlarm, setIslandCompact, skipPhase, stopAlarm, useClock } from "@/lib/clockStore";
+import { clockPhases, elapsedMs, endAt, getClock, isRunning, openClock, pauseClock, resumeClock, addRound, removeRound, resetClock, ringAlarm, setIslandCompact, skipPhase, stopAlarm, useClock } from "@/lib/clockStore";
 import { WorkoutClock } from "@/components/student/WorkoutClock";
 
 // Hora actual (fuera de los componentes: solo se usa en efectos)
@@ -180,9 +180,19 @@ function ClockEngine({ userId, onProgressMarked }) {
     // cada segundo, el celular borraría y recargaría la carátula y la pantalla parpadearía.
     const texto = clockCardText({ mode: s.mode, phases, st, exercises: s.exercises, tr });
     const clave = `${texto.phase}|${texto.cycle}|${texto.set}|${texto.title}`;
+    // En AMRAP, los botones de pista de la tarjeta cuentan rondas (es lo único que el
+    // celular deja añadir ahí). En los demás modos no se ponen.
+    const contarRondas = s.mode === "amrap" && !st?.done;
     const poner = (artwork) => {
       if (artwork) cardUrl.current = artwork;
-      updateNowPlaying({ ...texto, artwork: artwork || cardUrl.current, onPlay: resumeClock, onPause: pauseClock });
+      updateNowPlaying({
+        ...texto,
+        artwork: artwork || cardUrl.current,
+        onPlay: resumeClock,
+        onPause: pauseClock,
+        onAddRound: contarRondas ? () => { addRound(); vibrate(40); } : null,
+        onRemoveRound: contarRondas ? removeRound : null,
+      });
     };
     if (clave !== lastCard.current) {
       lastCard.current = clave;
@@ -220,15 +230,31 @@ function ClockEngine({ userId, onProgressMarked }) {
       const tiempo = st ? formatClock(st.remaining) : formatClock(elapsedMs(s, nowMs()) / 1000);
       const texto = clockCardText({ mode: s.mode, phases, st, exercises: s.exercises, tr });
       const pausa = s.run.pausedAt ? ` · ${tr("En pausa")}` : "";
+      const esAmrap = s.mode === "amrap";
       showClockNotification({
         title: `${tiempo} · ${texto.artist || texto.title}${pausa}`,
-        body: [texto.title !== texto.artist ? texto.title : "", texto.album].filter(Boolean).join(" · "),
+        body: [
+          esAmrap ? tr("Rondas: {p0}", { p0: s.rounds }) : texto.title !== texto.artist ? texto.title : "",
+          texto.album,
+        ].filter(Boolean).join(" · "),
+        rondas: esAmrap && !st?.done,
       });
     };
     pintar();
     const id = setInterval(pintar, REFRESCO_MS);
     return () => clearInterval(id);
   }, [s]);
+
+  // Rondas contadas desde los botones de la notificación: el service worker avisa por aquí
+  useEffect(() => {
+    if (typeof navigator === "undefined" || !("serviceWorker" in navigator)) return undefined;
+    const oir = (e) => {
+      if (e.data?.type !== "clock-round") return;
+      if (e.data.delta > 0) { addRound(); vibrate(40); } else removeRound();
+    };
+    navigator.serviceWorker.addEventListener("message", oir);
+    return () => navigator.serviceWorker.removeEventListener("message", oir);
+  }, []);
 
   // Al salir de la app del alumno, no dejar nada colgado
   useEffect(() => () => { hideNowPlaying(); hideClockNotification(); }, []);
