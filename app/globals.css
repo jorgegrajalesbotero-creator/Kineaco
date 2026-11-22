@@ -139,6 +139,14 @@ body {
   }
 }
 
+/* Tipografía redondeada del sistema: en iPhone es la misma letra de los temporizadores
+   de Apple (SF Pro Rounded). La usa el reloj para que se sienta parte del teléfono. */
+.font-rounded {
+  font-family: ui-rounded, "SF Pro Rounded", -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: "tnum";
+}
+
 /* Botón de quitar un aviso: con mouse aparece al pasar el cursor; en celular siempre se ve */
 @media (hover: hover) {
   .notice-dismiss { opacity: 0; }

@@ -270,9 +270,9 @@ function ClockIsland() {
   return (
     <div className="fixed inset-x-0 z-[60] flex justify-center pointer-events-none top-[calc(env(safe-area-inset-top)+0.5rem)] md:top-4 px-4">
       {s.ringing ? (
-        <div role="alert" className="pointer-events-auto flex items-center gap-2 bg-danger text-app rounded-full pl-4 pr-1.5 py-1.5 shadow-[0_10px_30px_-10px_rgba(0,0,0,0.8)] animate-pulse">
-          <span className="text-sm font-semibold">{tr("¡Terminado!")} · {tr(MODE_LABELS[s.mode])}</span>
-          <button onClick={stopAlarm} className="flex items-center gap-1.5 bg-app/15 rounded-full px-3 py-1.5 text-sm font-semibold">
+        <div role="alert" className="pointer-events-auto flex items-center gap-2.5 bg-danger text-app rounded-full pl-4 pr-1.5 py-1.5 shadow-[0_14px_34px_-10px_rgb(0_0_0/0.8)] animate-pulse">
+          <span className="text-[15px] font-semibold">{tr("¡Terminado!")} · {tr(MODE_LABELS[s.mode])}</span>
+          <button onClick={stopAlarm} className="flex items-center gap-1.5 bg-app/15 rounded-full px-3.5 py-1.5 text-[15px] font-semibold active:scale-95 transition-transform">
             <BellOff size={15} /> {tr("Apagar")}
           </button>
         </div>
@@ -281,7 +281,7 @@ function ClockIsland() {
           type="button"
           onClick={() => openClock()}
           aria-label={`${tr("Reloj")}: ${label} ${time}. ${tr("Toque para abrirlo")}`}
-          className="pointer-events-auto flex items-center gap-2.5 bg-black/90 border border-white/[0.08] rounded-full pl-1.5 pr-4 py-1.5 shadow-[0_10px_30px_-10px_rgba(0,0,0,0.8)] animate-fade-in active:scale-[0.97] transition-transform max-w-full"
+          className="pointer-events-auto flex items-center gap-2.5 bg-black/85 backdrop-blur-xl border border-white/[0.07] rounded-full pl-2 pr-4 py-2 shadow-[0_14px_34px_-10px_rgb(0_0_0/0.85)] animate-fade-in active:scale-[0.97] transition-transform max-w-full"
         >
           <span className="relative w-7 h-7 shrink-0 flex items-center justify-center">
             <svg width="28" height="28" viewBox="0 0 24 24" className="absolute inset-0 -rotate-90" aria-hidden="true">
@@ -290,8 +290,8 @@ function ClockIsland() {
             </svg>
             {paused && <Pause size={11} className="text-soft relative" />}
           </span>
-          <span className="text-soft text-xs truncate">{paused ? tr("En pausa") : label}</span>
-          <span className="text-ink text-[15px] font-semibold tabular-nums">{time}</span>
+          <span className="text-soft text-[13px] truncate">{paused ? tr("En pausa") : label}</span>
+          <span className="font-rounded text-ink text-[17px] font-semibold tracking-[-0.01em]">{time}</span>
           {(s.mode === "tabata" || s.mode === "amrap") && (
             <span
               role="button"
@@ -299,7 +299,7 @@ function ClockIsland() {
               aria-label={tr("Agrandar")}
               onClick={(e) => { e.stopPropagation(); setIslandCompact(false); }}
               onKeyDown={(e) => { if (e.key === "Enter") { e.stopPropagation(); setIslandCompact(false); } }}
-              className="-mr-2 w-7 h-7 rounded-full bg-white/10 flex items-center justify-center text-soft"
+              className="-mr-2.5 w-7 h-7 rounded-full bg-white/[0.12] flex items-center justify-center text-soft"
             >
               <ChevronDown size={14} />
             </span>
@@ -345,49 +345,65 @@ function BigIsland({ s, now }) {
   }
 
   const working = !st.done && type === "work";
-  const ctrl = "w-10 h-10 rounded-full bg-white/10 flex items-center justify-center text-ink active:scale-90 transition-transform";
+  // Botón redondo translúcido, como los de las tarjetas del sistema
+  const ctrl = "w-9 h-9 rounded-full bg-white/[0.12] flex items-center justify-center text-ink active:scale-90 transition-transform";
+  const RING = 29;
+  const RING_C = 2 * Math.PI * RING;
 
   return (
     <div className="fixed inset-x-0 z-[60] flex justify-center pointer-events-none top-[calc(env(safe-area-inset-top)+0.5rem)] md:top-4 px-3">
-      <div className="pointer-events-auto w-full max-w-md rounded-3xl bg-black/55 backdrop-blur-md border border-white/[0.1] shadow-[0_14px_40px_-12px_rgba(0,0,0,0.85)] px-4 pt-3 pb-3 animate-fade-in">
+      <div className="pointer-events-auto w-full max-w-md rounded-[28px] bg-black/75 backdrop-blur-2xl border border-white/[0.07] shadow-[0_20px_50px_-12px_rgb(0_0_0/0.9)] px-5 pt-4 pb-4 animate-fade-in">
+        {/* Fase, con su punto de color, y las acciones de la tarjeta */}
         <div className="flex items-center gap-2">
-          <span className={`text-[11px] font-semibold uppercase tracking-[0.14em] ${textColor}`}>{paused ? tr("En pausa") : label}</span>
-          {counter && <span className="text-soft text-[11px] truncate">· {counter}</span>}
+          <span className="w-[7px] h-[7px] rounded-full shrink-0" style={{ background: color }} aria-hidden="true" />
+          <span className={`text-[13px] font-medium ${textColor}`}>{paused ? tr("En pausa") : label}</span>
           <span className="flex-1" />
-          <button onClick={() => openClock()} aria-label={tr("Abrir el reloj completo")} className="w-8 h-8 rounded-full bg-white/10 flex items-center justify-center text-soft"><Maximize2 size={14} /></button>
-          <button onClick={() => setIslandCompact(true)} aria-label={tr("Achicar")} className="w-8 h-8 rounded-full bg-white/10 flex items-center justify-center text-soft"><ChevronUp size={16} /></button>
+          <button onClick={() => openClock()} aria-label={tr("Abrir el reloj completo")} className="w-8 h-8 rounded-full bg-white/[0.08] flex items-center justify-center text-soft active:scale-90 transition-transform"><Maximize2 size={14} /></button>
+          <button onClick={() => setIslandCompact(true)} aria-label={tr("Achicar")} className="w-8 h-8 rounded-full bg-white/[0.08] flex items-center justify-center text-soft active:scale-90 transition-transform"><ChevronUp size={16} /></button>
         </div>
 
-        <div className="flex items-center gap-3 mt-1">
-          <p className="text-ink text-5xl font-semibold tabular-nums leading-none flex-1">{st.done ? "0:00" : formatClock(st.remaining)}</p>
-          {!st.done && (
-            paused ? (
-              <button onClick={resumeClock} aria-label={tr("Seguir")} className={ctrl}><Play size={18} /></button>
-            ) : (
-              <button onClick={pauseClock} aria-label={tr("Pausar")} className={ctrl}><Pause size={18} /></button>
-            )
-          )}
+        {/* El tiempo manda; a su derecha el anillo que lo acompaña, con la pausa dentro */}
+        <div className="flex items-end gap-3 mt-2">
+          <div className="flex-1 min-w-0">
+            <p className="font-rounded text-ink text-[3.5rem] font-semibold leading-[1.02] tracking-[-0.035em]">
+              {st.done ? "0:00" : formatClock(st.remaining)}
+            </p>
+            {counter && <p className="text-soft text-[13px] leading-tight mt-1 truncate">{counter}</p>}
+          </div>
+
           {!st.done && !isAmrap && (
-            <button onClick={() => skipPhase(st.index)} aria-label={tr("Siguiente fase")} className={ctrl}><SkipForward size={18} /></button>
+            <button onClick={() => skipPhase(st.index)} aria-label={tr("Siguiente fase")} className={`${ctrl} mb-1.5`}><SkipForward size={16} /></button>
           )}
-        </div>
 
-        <div className="h-1 rounded-full bg-white/10 overflow-hidden mt-2.5">
-          <div className="h-full rounded-full" style={{ width: `${Math.max(0, Math.min(1, frac)) * 100}%`, background: color, transition: "width 0.25s linear" }} />
+          {!st.done && (
+            <button
+              onClick={paused ? resumeClock : pauseClock}
+              aria-label={paused ? tr("Seguir") : tr("Pausar")}
+              className="relative w-[68px] h-[68px] shrink-0 flex items-center justify-center text-ink active:scale-90 transition-transform"
+            >
+              <svg viewBox="0 0 68 68" className="absolute inset-0 -rotate-90" aria-hidden="true">
+                <circle cx="34" cy="34" r={RING} fill="none" stroke="rgb(255 255 255 / 0.12)" strokeWidth="4" />
+                <circle
+                  cx="34" cy="34" r={RING} fill="none" stroke={color} strokeWidth="4" strokeLinecap="round"
+                  strokeDasharray={RING_C} strokeDashoffset={RING_C * (1 - Math.max(0, Math.min(1, frac)))}
+                  style={{ transition: "stroke-dashoffset 0.25s linear" }}
+                />
+              </svg>
+              {paused ? <Play size={22} className="relative ml-0.5" /> : <Pause size={22} className="relative" />}
+            </button>
+          )}
         </div>
 
         {hasExercises && (current || next) && (
-          <div className="mt-2.5 space-y-1">
+          <div className="mt-3">
             {current && (
-              <p className="text-ink text-base font-semibold leading-snug">
-                <span className="text-accent text-[11px] font-semibold uppercase tracking-wider mr-1.5">{tr("Ahora")}</span>
-                {current.name}{current.detail && <span className="text-soft text-xs font-normal"> · {current.detail}</span>}
+              <p className="text-ink text-[17px] font-semibold leading-snug truncate">
+                {current.name}{current.detail && <span className="text-soft text-[13px] font-normal"> · {current.detail}</span>}
               </p>
             )}
             {next && (
-              <p className={current ? "text-soft text-sm leading-snug" : "text-ink text-base font-semibold leading-snug"}>
-                <span className="text-muted text-[11px] font-semibold uppercase tracking-wider mr-1.5">{tr("Sigue")}</span>
-                {next.name}{next.detail && <span className="text-muted text-xs font-normal"> · {next.detail}</span>}
+              <p className="text-soft text-[13px] leading-snug truncate mt-0.5">
+                {tr("Sigue")}: {next.name}{next.detail && <span className="text-muted"> · {next.detail}</span>}
               </p>
             )}
           </div>
@@ -395,16 +411,16 @@ function BigIsland({ s, now }) {
 
         {/* Tabata: la lista completa, contando y tachando lo que ya hizo en esta serie */}
         {progress && (
-          <ol className="mt-2.5 pt-2.5 border-t border-white/[0.08] max-h-[8.5rem] overflow-y-auto overscroll-contain space-y-0.5">
+          <ol className="mt-3 pt-3 border-t border-white/[0.06] max-h-[8.5rem] overflow-y-auto overscroll-contain space-y-1">
             {progress.items.map((e, i) => (
               <li
                 key={i}
                 aria-label={tr("{p0}: {p1} de {p2} veces", { p0: e.name, p1: e.done, p2: e.total })}
-                className={`flex items-baseline gap-2 text-sm leading-snug ${e.current ? "text-accent font-semibold" : e.complete ? "text-muted" : "text-soft"}`}
+                className={`flex items-baseline gap-2.5 text-[13px] leading-snug ${e.current ? "text-accent font-semibold" : e.complete ? "text-muted" : "text-soft"}`}
               >
-                <span className="text-muted text-xs w-3.5 shrink-0">{i + 1}</span>
+                <span className="text-muted w-3 shrink-0 tabular-nums">{i + 1}</span>
                 <span className={`flex-1 min-w-0 truncate ${e.complete ? "line-through" : ""}`}>{e.name}</span>
-                <span className="shrink-0 flex items-center gap-0.5 text-xs tabular-nums" aria-hidden="true">
+                <span className="shrink-0 flex items-center gap-1 tabular-nums" aria-hidden="true">
                   {e.done}/{e.total}
                   <Check size={12} strokeWidth={3} className={e.complete ? "text-accent" : "text-transparent"} />
                 </span>
@@ -414,11 +430,11 @@ function BigIsland({ s, now }) {
         )}
 
         {isAmrap && hasExercises && !st.done && (
-          <ol className="mt-2.5 space-y-0.5">
+          <ol className="mt-3 pt-3 border-t border-white/[0.06] space-y-1">
             {s.exercises.map((e, i) => (
-              <li key={i} className="text-ink text-sm leading-snug flex gap-2">
-                <span className="text-muted text-xs w-4 shrink-0 pt-0.5">{i + 1}</span>
-                <span className="min-w-0">{e.name}{e.detail && <span className="text-soft text-xs"> · {e.detail}</span>}</span>
+              <li key={i} className="text-soft text-[13px] leading-snug flex gap-2.5">
+                <span className="text-muted w-3 shrink-0 tabular-nums">{i + 1}</span>
+                <span className="min-w-0 truncate">{e.name}{e.detail && <span className="text-muted"> · {e.detail}</span>}</span>
               </li>
             ))}
           </ol>
