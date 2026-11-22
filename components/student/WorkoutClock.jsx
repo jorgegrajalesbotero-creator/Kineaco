@@ -1,10 +1,10 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { BellOff, ChevronDown, Flag, Minus, Pause, Play, RotateCcw, SkipForward } from "lucide-react";
+import { BellOff, Check, ChevronDown, Flag, Minus, Pause, Play, RotateCcw, SkipForward } from "lucide-react";
 import { tr } from "@/lib/i18n";
 import { beep, vibrate } from "@/lib/alarm";
-import { CLOCK_FIELDS, CLOCK_MODES, clockExercises, formatClock, formatStopwatch, stateAt, visibleFields } from "@/lib/clock";
+import { CLOCK_FIELDS, CLOCK_MODES, clockExerciseProgress, clockExercises, formatClock, formatStopwatch, stateAt, visibleFields } from "@/lib/clock";
 import {
   addLap, addRestSeconds, addRound, backToProgrammed, clockPhases, elapsedMs as elapsedOf, isRunning, minimizeClock,
   pauseClock, removeRound, resetClock, resumeClock, setClockField, setClockMode, skipPhase, startClock, stopAlarm, useClock,
@@ -96,6 +96,8 @@ export function WorkoutClock() {
   const exList = mode === "tabata" || mode === "amrap" ? s.exercises : [];
   const { current: exNow, next: exNext } = clockExercises(mode, phases, run ? st : null, exList);
   const nowIdx = exNow ? exList.indexOf(exNow) : -1;
+  // Cuenta por serie: cuántas veces lleva cada ejercicio y cuáles ya terminó (solo Tabata)
+  const progress = clockExerciseProgress(mode, phases, run ? st : null, exList);
 
   const lapRows = laps.map((t, i) => ({ n: i + 1, split: t - (laps[i - 1] || 0), total: t })).reverse();
   const secondaryBtn = "h-12 rounded-2xl bg-field text-ink text-sm font-medium flex items-center justify-center gap-1.5 active:scale-[0.97] transition-transform disabled:opacity-40";
@@ -226,12 +228,25 @@ export function WorkoutClock() {
 
           {exList.length > 0 && (
             <div className="mt-4">
-              <p className="text-muted text-xs mb-1.5">{mode === "tabata" ? tr("Un ejercicio por ciclo, en este orden:") : tr("Ejercicios de cada ronda:")}</p>
+              <p className="text-muted text-xs mb-1.5">
+                {mode === "tabata" ? tr("Un ejercicio por ciclo, en este orden:") : tr("Ejercicios de cada ronda:")}
+                {progress && progress.sets > 1 && ` · ${tr("Serie {p0} de {p1}", { p0: progress.set, p1: progress.sets })}`}
+              </p>
               <ol className="bg-card rounded-xl divide-y divide-white/[0.05]">
-                {exList.map((e, i) => (
-                  <li key={i} className={`flex items-baseline gap-2 px-4 py-2 text-sm ${i === nowIdx ? "text-accent font-semibold" : "text-soft"}`}>
+                {(progress ? progress.items : exList).map((e, i) => (
+                  <li
+                    key={i}
+                    aria-label={progress ? tr("{p0}: {p1} de {p2} veces", { p0: e.name, p1: e.done, p2: e.total }) : undefined}
+                    className={`flex items-baseline gap-2 px-4 py-2 text-sm ${e.current || (!progress && i === nowIdx) ? "text-accent font-semibold" : e.complete ? "text-muted" : "text-soft"}`}
+                  >
                     <span className="text-muted text-xs w-4 shrink-0">{i + 1}</span>
-                    <span className="flex-1 min-w-0">{e.name}{e.detail && <span className="text-muted text-xs font-normal"> · {e.detail}</span>}</span>
+                    <span className={`flex-1 min-w-0 ${e.complete ? "line-through" : ""}`}>{e.name}{e.detail && <span className="text-muted text-xs font-normal"> · {e.detail}</span>}</span>
+                    {progress && (
+                      <span className="shrink-0 flex items-center gap-1 text-xs tabular-nums" aria-hidden="true">
+                        {e.done}/{e.total}
+                        <Check size={13} strokeWidth={3} className={e.complete ? "text-accent" : "text-transparent"} />
+                      </span>
+                    )}
                   </li>
                 ))}
               </ol>

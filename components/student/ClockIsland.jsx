@@ -1,11 +1,11 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { BellOff, ChevronDown, ChevronUp, Maximize2, Pause, Play, SkipForward } from "lucide-react";
+import { BellOff, Check, ChevronDown, ChevronUp, Maximize2, Pause, Play, SkipForward } from "lucide-react";
 import { supabase } from "@/lib/supabaseClient";
 import { tr } from "@/lib/i18n";
 import { beep, vibrate } from "@/lib/alarm";
-import { clockExercises, formatClock, stateAt } from "@/lib/clock";
+import { clockExerciseProgress, clockExercises, formatClock, stateAt } from "@/lib/clock";
 import { clockPhases, elapsedMs, endAt, isRunning, openClock, pauseClock, resumeClock, ringAlarm, setIslandCompact, skipPhase, stopAlarm, useClock } from "@/lib/clockStore";
 import { WorkoutClock } from "@/components/student/WorkoutClock";
 
@@ -259,6 +259,8 @@ function BigIsland({ s, now }) {
   const isAmrap = s.mode === "amrap";
   const { current, next } = clockExercises(s.mode, phases, st, s.exercises);
   const hasExercises = s.exercises.length > 0;
+  // Cuenta por serie: cuántas veces lleva cada ejercicio y cuáles ya terminó (solo Tabata)
+  const progress = clockExerciseProgress(s.mode, phases, st, s.exercises);
 
   const tone = type === "rest" || type === "setrest" || type === "cooldown" ? "calm" : type === "prep" ? "warning" : "accent";
   const color = { accent: "var(--color-accent)", calm: "var(--color-calm)", warning: "var(--color-warning)" }[tone];
@@ -327,6 +329,26 @@ function BigIsland({ s, now }) {
               </p>
             )}
           </div>
+        )}
+
+        {/* Tabata: la lista completa, contando y tachando lo que ya hizo en esta serie */}
+        {progress && (
+          <ol className="mt-2.5 pt-2.5 border-t border-white/[0.08] max-h-[8.5rem] overflow-y-auto overscroll-contain space-y-0.5">
+            {progress.items.map((e, i) => (
+              <li
+                key={i}
+                aria-label={tr("{p0}: {p1} de {p2} veces", { p0: e.name, p1: e.done, p2: e.total })}
+                className={`flex items-baseline gap-2 text-sm leading-snug ${e.current ? "text-accent font-semibold" : e.complete ? "text-muted" : "text-soft"}`}
+              >
+                <span className="text-muted text-xs w-3.5 shrink-0">{i + 1}</span>
+                <span className={`flex-1 min-w-0 truncate ${e.complete ? "line-through" : ""}`}>{e.name}</span>
+                <span className="shrink-0 flex items-center gap-0.5 text-xs tabular-nums" aria-hidden="true">
+                  {e.done}/{e.total}
+                  <Check size={12} strokeWidth={3} className={e.complete ? "text-accent" : "text-transparent"} />
+                </span>
+              </li>
+            ))}
+          </ol>
         )}
 
         {isAmrap && hasExercises && !st.done && (
