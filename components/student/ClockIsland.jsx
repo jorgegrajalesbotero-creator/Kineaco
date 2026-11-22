@@ -156,6 +156,7 @@ function ClockEngine({ userId, onProgressMarked }) {
       const dibujada = drawCard({
         phase: texto.phase,
         label: texto.artist.split(" · ")[0] || texto.title,
+        time: duration ? formatClock(duration) : "",
         cycle: texto.cycle,
         cycles: texto.cycles,
         set: texto.set,
