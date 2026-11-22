@@ -28,7 +28,7 @@ const firstNumber = (text) => {
 // coachEdit = (solo con preview) el coach puede corregir peso y reps de las series que el alumno ya hizo (semana actual).
 //             El coach nunca marca ni desmarca series ni ejercicios.
 // liveTick = (solo con preview) cambia cada vez que el alumno marca algo: se recargan las series al instante
-export function RoutineScreen({ routine, userId, pet = null, onClose, onToggle, onProgressChange, preview = false, onEditNote = null, onEditTimer = null, coachEdit = false, liveTick = 0 }) {
+export function RoutineScreen({ routine, userId, pet = null, onClose, onToggle, onProgressChange, preview = false, onEditNote = null, onEditRoutineNote = null, onEditTimer = null, coachEdit = false, liveTick = 0 }) {
   const [unit] = useWeightUnit();
   const [detailIndex, setDetailIndex] = useState(null);
   const [playing, setPlaying] = useState(false); // el video solo se carga cuando el alumno toca "Ver video"
@@ -326,6 +326,40 @@ export function RoutineScreen({ routine, userId, pet = null, onClose, onToggle, 
       targetReps: ex.targetReps,
     }));
 
+  // Indicaciones del coach: las de un bloque, o las del día entero (b === part).
+  // El alumno las lee; el coach, mirando la rutina del alumno, las puede escribir con un toque.
+  const noteBox = (part, b, texto) => {
+    const editable = preview && onEditRoutineNote;
+    if (!texto && !editable) return null;
+    const esDelDia = b === part;
+    const caja = "rounded-xl px-3.5 py-3 mb-3 text-left w-full";
+    if (!editable) {
+      return (
+        <div className={`${caja} bg-accent/10 border border-accent/30`}>
+          <p className="text-accent text-xs font-semibold flex items-center gap-1.5 mb-1">
+            <MessageSquareText size={14} /> {esDelDia ? tr("Comentario de su coach") : tr("Indicaciones de su coach")}
+          </p>
+          <p className="text-ink text-sm whitespace-pre-wrap break-words">{texto}</p>
+        </div>
+      );
+    }
+    return (
+      <button
+        onClick={() => onEditRoutineNote(part, b)}
+        className={`${caja} transition-colors ${texto ? "bg-accent/10 border border-accent/30" : "bg-field text-soft hover:text-ink"}`}
+      >
+        <span className={`text-xs font-semibold flex items-center gap-1.5 ${texto ? "text-accent" : "text-soft"}`}>
+          <MessageSquareText size={14} />
+          {texto
+            ? `${esDelDia ? "Comentario del día" : "Indicaciones del bloque"}${b.notesCustom ? " (solo para este alumno)" : " (de la rutina)"}`
+            : `Escribir ${esDelDia ? "un comentario del día" : "indicaciones"} para este alumno`}
+          <Pencil size={12} className="ml-auto shrink-0" />
+        </span>
+        {texto && <span className="block text-ink text-sm whitespace-pre-wrap break-words mt-1">{texto}</span>}
+      </button>
+    );
+  };
+
   const timerChip = (part, b) => {
     if (preview && onEditTimer) {
       return (
@@ -416,6 +450,8 @@ export function RoutineScreen({ routine, userId, pet = null, onClose, onToggle, 
                     </div>
                   </div>
                 )}
+                {/* Comentario del día: lo primero que lee el alumno al abrir su rutina */}
+                {noteBox(part, part, part.dayNote)}
                 {part.blocks?.length > 0 ? (
                   <div className="space-y-5">
                     {part.blocks.map((b) => {
@@ -442,14 +478,7 @@ export function RoutineScreen({ routine, userId, pet = null, onClose, onToggle, 
                               {items.length > 0 && <p className="text-muted text-[11px]">{doneCount}/{items.length} {tr("hechos")}</p>}
                             </div>
                           </div>
-                          {b.notes && (
-                            <div className="bg-accent/10 border border-accent/30 rounded-xl px-3.5 py-3 mb-3">
-                              <p className="text-accent text-xs font-semibold flex items-center gap-1.5 mb-1">
-                                <MessageSquareText size={14} /> {tr("Indicaciones de su coach")}
-                              </p>
-                              <p className="text-ink text-sm whitespace-pre-wrap break-words">{b.notes}</p>
-                            </div>
-                          )}
+                          {noteBox(part, b, b.notes)}
                           {timerChip(part, b)}
                           <div className="space-y-2">
                             {items.map(({ ex, i }) => exerciseRow(ex, i, [ex.rowLabel, formatWeight(ex.targetWeight, unit)].filter(Boolean).join(" · ")))}

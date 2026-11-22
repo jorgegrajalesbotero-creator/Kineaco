@@ -14,6 +14,8 @@ import { PanelLayout } from "./PanelLayout";
 import { ExerciseNoteEditor } from "./ExerciseNoteEditor";
 import { TimerOverrideEditor } from "./TimerOverrideEditor";
 import { saveStudentTimer } from "@/lib/routineTimers";
+import { RoutineNoteEditor } from "./RoutineNoteEditor";
+import { ROUTINE_NOTE_INDEX, saveStudentNote } from "@/lib/routineNotes";
 import { blockTypeLabel } from "@/lib/blocks";
 
 const DAY_SHORT = ["L", "M", "X", "J", "V", "S", "D"];
@@ -32,6 +34,7 @@ export function RoutinePreviewPanel({ student, onClose, onOpenPanel }) {
   const [loading, setLoading] = useState(true);
   const [editing, setEditing] = useState(null); // ejercicio al que se le escribe la observación
   const [editingTimer, setEditingTimer] = useState(null); // { part, block } reloj solo para este alumno
+  const [editingNote, setEditingNote] = useState(null); // { part, block } comentario solo para este alumno (block === part: el del día)
   const [session, setSession] = useState(null); // ¿el alumno ya finalizó este día?
   const [sessionBusy, setSessionBusy] = useState(false);
   // En vivo: cuando el alumno marca una serie, un ejercicio o finaliza, la vista se actualiza sola
@@ -159,6 +162,19 @@ export function RoutinePreviewPanel({ student, onClose, onOpenPanel }) {
     return true;
   };
 
+  // Comentario de un bloque, o del día entero, solo para este alumno
+  const saveRoutineNote = async (text) => {
+    const { part, block } = editingNote;
+    const index = block === part ? ROUTINE_NOTE_INDEX : block.blockIndex;
+    const error = await saveStudentNote(supabase, student.id, part.id, index, text);
+    if (error) {
+      alert("No se pudo guardar el comentario. Si es la primera vez, revisá que el SQL de comentarios de rutina esté aplicado en Supabase.");
+      return false;
+    }
+    loadRoutine(schedule, day, weekOffset);
+    return true;
+  };
+
   const saveTimer = async (timer) => {
     const { part, block } = editingTimer;
     const error = await saveStudentTimer(supabase, student.id, part.id, block.blockIndex, timer);
@@ -265,6 +281,7 @@ export function RoutinePreviewPanel({ student, onClose, onOpenPanel }) {
               userId={student.id}
               preview
               onEditNote={setEditing}
+              onEditRoutineNote={(part, block) => setEditingNote({ part, block })}
               onEditTimer={(part, block) => setEditingTimer({ part, block })}
               coachEdit={weekOffset === 0}
               liveTick={liveTick}
@@ -285,6 +302,19 @@ export function RoutinePreviewPanel({ student, onClose, onOpenPanel }) {
           isCustom={editingTimer.block.timerCustom}
           onSave={saveTimer}
           onClose={() => setEditingTimer(null)}
+        />
+      )}
+      {editingNote && (
+        <RoutineNoteEditor
+          title={editingNote.block === editingNote.part
+            ? "Comentario del día"
+            : editingNote.block.title || blockTypeLabel(editingNote.block.block_type)}
+          routineTitle={editingNote.part.title}
+          initial={editingNote.block === editingNote.part ? editingNote.part.dayNote || "" : (editingNote.block.notesCustom ? editingNote.block.notes : "")}
+          base={editingNote.block === editingNote.part ? "" : editingNote.block.notesBase || ""}
+          isCustom={editingNote.block === editingNote.part ? !!editingNote.part.dayNote : !!editingNote.block.notesCustom}
+          onSave={saveRoutineNote}
+          onClose={() => setEditingNote(null)}
         />
       )}
       {editing && (

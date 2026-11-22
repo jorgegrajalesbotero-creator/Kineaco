@@ -1,6 +1,7 @@
 import { blockTypeLabel } from "@/lib/blocks";
 import { supabase } from "@/lib/supabaseClient";
 import { LIST_TIMER_INDEX, loadTimers, saveRoutineTimers, timersFor } from "@/lib/routineTimers";
+import { reindexStudentNotes } from "@/lib/routineNotes";
 
 export const catalogOptions = (catalog) => catalog.map((c) => ({ value: c.id, label: c.name, sub: c.muscle_group || "" }));
 
@@ -58,6 +59,10 @@ export async function writeRoutineContent(routineId, mode, list, blocks, { timer
   // Relojes programados de cada bloque (si falla, el contenido igual quedó guardado)
   const timerError = await saveRoutineTimers(supabase, routineId, { mode: mode === "bloques" ? "bloques" : "lista", blocks, listTimer: timer });
   if (timerError) console.warn("No se pudo guardar el reloj de la rutina", timerError);
+  // Los comentarios que el coach le escribió a cada alumno siguen a su bloque si se movió, y se
+  // van con él si se quitó: van por posición, igual que los relojes.
+  const noteError = await reindexStudentNotes(supabase, routineId, { mode: mode === "bloques" ? "bloques" : "lista", blocks });
+  if (noteError) console.warn("No se pudieron acomodar los comentarios de los alumnos", noteError);
   return null;
 }
 
