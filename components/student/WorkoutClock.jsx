@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { BellOff, Check, ChevronDown, Flag, Minus, Pause, Play, RotateCcw, SkipForward } from "lucide-react";
+import { BellOff, Check, ChevronDown, Flag, Flame, Hourglass, Minus, Pause, Play, Repeat, RotateCcw, SkipForward, SlidersHorizontal, Timer } from "lucide-react";
 import { tr } from "@/lib/i18n";
 import { vibrate } from "@/lib/alarm";
 import { CLOCK_FIELDS, CLOCK_MODES, clockExerciseProgress, clockExercises, formatClock, formatStopwatch, stateAt, visibleFields } from "@/lib/clock";
@@ -12,12 +12,7 @@ import {
 import { ClockField } from "@/components/ui/ClockField";
 
 const MODE_LABELS = { rest: "Descanso", tabata: "Tabata", amrap: "AMRAP", stopwatch: "Cronómetro" };
-const MODE_HINTS = {
-  rest: "Cuenta regresiva entre series.",
-  tabata: "Trabajo y descanso por ciclos: Tabata clásico (20 s / 10 s × 8) o intermitentes con los tiempos que usted quiera.",
-  amrap: "Tantas rondas como pueda en el tiempo. Cuente cada ronda con «+1 ronda».",
-  stopwatch: "Cuenta hacia arriba. Marque vueltas cuando quiera.",
-};
+const MODE_ICONS = { rest: Hourglass, tabata: Flame, amrap: Repeat, stopwatch: Timer };
 
 // Hora actual (fuera del componente: solo se usa en efectos, nunca al dibujar)
 const nowMs = () => Date.now();
@@ -30,6 +25,7 @@ export function WorkoutClock() {
   const programmed = s.preset;
   const cfg = s.configs[mode];
   const [now, setNow] = useState(0);
+  const [picker, setPicker] = useState(false); // hoja de abajo para elegir el modo
   const running = isRunning(s);
   useEffect(() => {
     setNow(nowMs());
@@ -85,8 +81,6 @@ export function WorkoutClock() {
     if (run && !finished) sub += ` · ${tr("Total")} ${formatClock(st.totalRemaining)}`;
   } else if (mode === "amrap") {
     sub = tr("Rondas: {p0}", { p0: rounds });
-  } else if (mode === "rest" && run && !finished) {
-    sub = tr("Toque +15 s si necesita más tiempo");
   }
 
   // Ejercicios del bloque (Tabata / AMRAP): cuál toca ahora y cuál sigue
@@ -101,29 +95,22 @@ export function WorkoutClock() {
 
   return (
     <div className="fixed inset-0 z-[70] bg-app flex flex-col animate-fade-in" role="dialog" aria-modal="true" aria-label={tr("Reloj")}>
-      <div className="flex items-center justify-between px-4 pt-[calc(0.75rem+env(safe-area-inset-top))] pb-2">
-        <h2 className="text-ink text-lg font-semibold">{tr("Reloj")}</h2>
-        <button onClick={minimizeClock} aria-label={run ? tr("Minimizar (el reloj sigue corriendo)") : tr("Cerrar")} className="w-10 h-10 rounded-full bg-card flex items-center justify-center text-soft">
+      {/* Arriba solo el modo actual; los modos se eligen en una hoja que sale de abajo */}
+      <div className="flex items-center gap-2 px-4 pt-[calc(0.75rem+env(safe-area-inset-top))] pb-2">
+        <h2 className="flex-1 min-w-0 text-ink text-lg font-semibold truncate">{tr(MODE_LABELS[mode])}</h2>
+        <button onClick={() => setPicker(true)} aria-haspopup="dialog" className="h-10 shrink-0 flex items-center gap-1.5 rounded-full bg-card px-3.5 text-accent text-sm font-medium active:scale-95 transition-transform">
+          <SlidersHorizontal size={16} /> {tr("Modo")}
+        </button>
+        <button onClick={minimizeClock} aria-label={run ? tr("Minimizar (el reloj sigue corriendo)") : tr("Cerrar")} className="w-10 h-10 shrink-0 rounded-full bg-card flex items-center justify-center text-soft">
           <ChevronDown size={20} />
         </button>
       </div>
 
       <div className="flex-1 min-h-0 overflow-y-auto overscroll-contain px-4 pb-[calc(1rem+env(safe-area-inset-bottom))]">
         <div className="max-w-md mx-auto">
-          {/* Modos */}
-          <div className="flex gap-1.5 overflow-x-auto -mx-1 px-1 pb-1 mb-3" role="tablist">
-            {CLOCK_MODES.map((m) => (
-              <button key={m} role="tab" aria-selected={m === mode} onClick={() => changeMode(m)}
-                className={`shrink-0 text-sm rounded-full px-3.5 py-2 transition-colors ${m === mode ? "bg-accent text-app font-semibold" : "bg-card text-soft hover:text-ink"}`}>
-                {tr(MODE_LABELS[m])}
-              </button>
-            ))}
-          </div>
-          <p className="text-muted text-xs mb-4">{tr(MODE_HINTS[mode])}</p>
-
           {programmed && (
             <div className={`flex items-center gap-2 rounded-xl px-3 py-2 mb-4 text-xs ${isProgrammed ? "bg-accent/15 text-accent" : "bg-card text-soft"}`}>
-              <span className="flex-1">{isProgrammed ? tr("Programado por su coach. Puede ajustarlo si lo necesita.") : tr("Usted cambió lo que programó su coach.")}</span>
+              <span className="flex-1">{isProgrammed ? tr("Programado por su coach") : tr("Modificado")}</span>
               {!isProgrammed && !run && (
                 <button onClick={backToProgrammed} className="text-accent font-semibold shrink-0">{tr("Volver a lo programado")}</button>
               )}
@@ -136,9 +123,6 @@ export function WorkoutClock() {
               {visibleFields(mode, cfg).map((f) => (
                 <ClockField key={`${mode}-${f.key}`} field={f} value={cfg[f.key]} onChange={(v) => setField(f, v)} t={tr} />
               ))}
-              {CLOCK_FIELDS[mode].some((f) => f.unit === "time") && (
-                <p className="text-muted text-[11px] px-1">{tr("Toque el tiempo para escribirlo exacto (por ejemplo 7 o 1:30). Mantenga − o + para ir más rápido.")}</p>
-              )}
             </div>
           )}
 
@@ -226,7 +210,7 @@ export function WorkoutClock() {
           {exList.length > 0 && (
             <div className="mt-4">
               <p className="text-muted text-xs mb-1.5">
-                {mode === "tabata" ? tr("Un ejercicio por ciclo, en este orden:") : tr("Ejercicios de cada ronda:")}
+                {tr("Ejercicios")}
                 {progress && progress.sets > 1 && ` · ${tr("Serie {p0} de {p1}", { p0: progress.set, p1: progress.sets })}`}
               </p>
               <ol className="bg-card rounded-xl divide-y divide-white/[0.05]">
@@ -266,9 +250,29 @@ export function WorkoutClock() {
             </div>
           )}
 
-          <p className="text-muted text-[11px] text-center mt-5">{tr("Puede cerrar el reloj o salir de la app: sigue corriendo en la píldora de arriba.")} {tr("Suena y vibra en cada cambio; al final la alarma sigue hasta que la apague. Suba el volumen del celular.")}</p>
         </div>
       </div>
+
+      {picker && (
+        <div className="absolute inset-0 z-10 flex flex-col justify-end animate-fade-in">
+          <button onClick={() => setPicker(false)} aria-label={tr("Cerrar")} className="absolute inset-0 bg-black/60" />
+          <div role="dialog" aria-label={tr("Elija el modo")} className="relative bg-panel border-t border-field rounded-t-3xl px-4 pt-3 pb-[calc(1.25rem+env(safe-area-inset-bottom))]">
+            <div className="w-10 h-1 rounded-full bg-field-strong mx-auto mb-4" aria-hidden="true" />
+            <div className="grid grid-cols-2 gap-2 max-w-md mx-auto">
+              {CLOCK_MODES.map((m) => {
+                const Icon = MODE_ICONS[m];
+                const on = m === mode;
+                return (
+                  <button key={m} aria-pressed={on} onClick={() => { changeMode(m); setPicker(false); }}
+                    className={`rounded-2xl py-4 flex flex-col items-center gap-1.5 text-sm border transition-colors active:scale-[0.97] ${on ? "bg-accent/15 border-accent/40 text-accent font-semibold" : "bg-card border-transparent text-soft"}`}>
+                    <Icon size={22} /> {tr(MODE_LABELS[m])}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
