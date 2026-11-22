@@ -178,8 +178,10 @@ function ClockEngine({ userId, onProgressMarked }) {
 
     // 2) Los textos y la carátula: solo cuando cambian de ciclo o de fase. Si esto se hiciera
     // cada segundo, el celular borraría y recargaría la carátula y la pantalla parpadearía.
-    const texto = clockCardText({ mode: s.mode, phases, st, exercises: s.exercises, tr });
-    const clave = `${texto.phase}|${texto.cycle}|${texto.set}|${texto.title}`;
+    const texto = clockCardText({ mode: s.mode, phases, st, exercises: s.exercises, rounds: s.rounds, tr });
+    // Las rondas entran en la clave: al contar una, la ficha se vuelve a dibujar y el alumno
+    // confirma desde afuera que quedó.
+    const clave = `${texto.phase}|${texto.cycle}|${texto.set}|${texto.title}|${texto.artist}`;
     // En AMRAP, los botones de pista de la tarjeta cuentan rondas (es lo único que el
     // celular deja añadir ahí). En los demás modos no se ponen.
     const contarRondas = s.mode === "amrap" && !st?.done;
@@ -204,6 +206,7 @@ function ClockEngine({ userId, onProgressMarked }) {
         cycles: texto.cycles,
         set: texto.set,
         sets: texto.sets,
+        rounds: s.mode === "amrap" ? s.rounds : null,
         onReady: poner, // la imagen tarda un instante en estar lista
       });
       poner(dibujada);

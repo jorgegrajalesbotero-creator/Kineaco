@@ -58,3 +58,33 @@ describe("clockCardText", () => {
     expect(c).toMatchObject({ phase: "work", cycle: 1, cycles: 4, set: 1, sets: 2 });
   });
 });
+
+// En AMRAP el alumno cuenta rondas, también desde la pantalla de bloqueo: el número tiene que
+// verse en la ficha, o no hay forma de confirmar que la ronda que acaba de sumar quedó.
+describe("clockCardText en AMRAP", () => {
+  const amrap = buildPhases("amrap", { minutes: 12 });
+  const card = (ms, rounds) => clockCardText({ mode: "amrap", phases: amrap, st: stateAt(amrap, ms), rounds });
+
+  it("muestra las rondas contadas", () => {
+    expect(card(60000, 3).artist).toContain("Rondas: 3");
+    expect(card(60000, 0).artist).toContain("Rondas: 0");
+  });
+
+  it("el texto cambia al contar una ronda, para que la ficha se vuelva a dibujar", () => {
+    expect(card(60000, 3)).not.toEqual(card(60000, 4));
+  });
+
+  it("en la preparación todavía no cuenta rondas", () => {
+    expect(card(2000, 0).artist).not.toContain("Rondas");
+  });
+
+  it("al terminar deja a la vista cuántas rondas hizo", () => {
+    expect(card(10_000_000, 7).artist).toContain("Rondas: 7");
+  });
+
+  it("en Tabata no aparecen las rondas: ahí se cuentan ciclos", () => {
+    const t = clockCardText({ mode: "tabata", phases, st: stateAt(phases, 12000), exercises: ex, rounds: 5 });
+    expect(t.artist).not.toContain("Rondas");
+    expect(t.album).toContain("Ciclo");
+  });
+});
