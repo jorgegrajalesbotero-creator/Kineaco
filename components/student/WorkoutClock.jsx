@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { BellOff, Check, ChevronDown, Flag, Minus, Pause, Play, RotateCcw, SkipForward } from "lucide-react";
 import { tr } from "@/lib/i18n";
-import { audioState, vibrate } from "@/lib/alarm";
+import { vibrate } from "@/lib/alarm";
 import { CLOCK_FIELDS, CLOCK_MODES, clockExerciseProgress, clockExercises, formatClock, formatStopwatch, stateAt, visibleFields } from "@/lib/clock";
 import {
   addLap, addRestSeconds, addRound, backToProgrammed, clockPhases, elapsedMs as elapsedOf, isRunning, minimizeClock,
@@ -267,35 +267,8 @@ export function WorkoutClock() {
           )}
 
           <p className="text-muted text-[11px] text-center mt-5">{tr("Puede cerrar el reloj o salir de la app: sigue corriendo en la píldora de arriba.")} {tr("Suena y vibra en cada cambio; al final la alarma sigue hasta que la apague. Suba el volumen del celular.")}</p>
-
-          {/* Estado del sonido: sirve para revisar por qué no suena o por qué no sale la tarjeta
-              en la pantalla de bloqueo. Se puede quitar cuando el reloj esté afinado. */}
-          <AudioStatus running={running} />
         </div>
       </div>
     </div>
-  );
-}
-
-// Estado del sonido en pequeñito, para no andar adivinando por qué no suena en el celular.
-// "Sonido" es el motor de audio (debe decir running), "Fondo" es el audio que mantiene viva la
-// sesión y "Tarjeta" es la de la pantalla de bloqueo.
-function AudioStatus({ running }) {
-  const [info, setInfo] = useState(null);
-  useEffect(() => {
-    const leer = () => setInfo(audioState());
-    leer();
-    const id = setInterval(leer, 1000);
-    return () => clearInterval(id);
-  }, [running]);
-  if (!info) return null;
-  const ok = info.contexto === "running";
-  return (
-    <p className="text-muted text-[10px] text-center mt-2 tabular-nums">
-      {tr("Sonido")}: <span className={ok ? "text-accent" : "text-warning"}>{info.contexto}</span>
-      {" · "}{tr("Fondo")}: <span className={info.sonando ? "text-accent" : "text-warning"}>{info.sonando ? tr("sí") : tr("no")}</span>
-      {" · "}{tr("Tarjeta")}: <span className={info.tarjeta ? "text-accent" : "text-warning"}>{info.tarjeta ? tr("sí") : tr("no")}</span>
-      {" · "}{info.sesion}
-    </p>
   );
 }
