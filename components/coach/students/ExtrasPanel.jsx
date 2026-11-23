@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { BookOpen, Eye, Pencil, Plus, Timer, Trash2, Wrench } from "lucide-react";
+import { ActionCard } from "@/components/ui/ActionCard";
 import { supabase } from "@/lib/supabaseClient";
 import { libraryRoutines } from "@/lib/libraryRoutines";
 import { WEEK_DAYS, localDateString } from "@/lib/dates";
@@ -301,7 +302,9 @@ export function ExtrasPanel({ student, onClose, onOpenPanel }) {
             const tmap = timersFor(timers, x.routine_id, student.id);
             const timerTexts = Object.values(tmap).map((t) => timerLabel(t.timer));
             return (
-              <div key={x.id} className="bg-card rounded-xl px-4 py-3">
+              <ActionCard key={x.id} onOpen={() => startEdit(x)} ariaLabel="Abrir extra" className="bg-card rounded-xl px-4 py-3"
+                actions={[{ label: "Abrir y editar", icon: Pencil, onClick: () => startEdit(x) }, { label: "Eliminar", icon: Trash2, danger: true, onClick: () => remove(x) }]}
+                swipe={[{ label: "Eliminar", icon: Trash2, danger: true, onClick: () => remove(x) }]}>
                 <div className="flex items-start gap-3">
                   <div className="min-w-0 flex-1">
                     <p className="text-ink text-sm font-medium truncate">{x.routines?.title || "Extra"}</p>
@@ -318,7 +321,7 @@ export function ExtrasPanel({ student, onClose, onOpenPanel }) {
                   <span className={`text-xs ml-auto ${st.cls}`}>{st.label}</span>
                 </div>
                 {timerTexts.length > 0 && <p className="text-accent text-[11px] mt-1.5 flex items-center gap-1"><Timer size={12} /> {timerTexts.join(" · ")}</p>}
-              </div>
+              </ActionCard>
             );
           })}
         </div>

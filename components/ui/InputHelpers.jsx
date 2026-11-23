@@ -9,6 +9,7 @@ import { useEffect } from "react";
 //    (← → solo cuando el cursor está al inicio o al final del texto).
 //  · Esc: primero sale del campo; si no hay campo activo, cierra el panel o ventana de arriba (su botón «Cerrar»).
 //  · Arrastrar con el mouse (clic sostenido) mueve de lado las zonas que se desplazan a lo ancho.
+//  · Celular: deslizar el dedo desde el borde izquierdo hacia la derecha es "atrás" (cierra el panel abierto).
 const FIELD = 'input:not([type="hidden"]):not([type="checkbox"]):not([type="radio"]):not([type="button"]):not([type="submit"]):not([type="file"]):not([type="range"]):not([disabled]):not([readonly]), select:not([disabled]), textarea:not([disabled])';
 const TEXTLIKE = new Set(["", "text", "number", "email", "tel", "url", "decimal", "date", "time"]);
 const visible = (el) => !!(el.offsetParent || el.getClientRects().length) && getComputedStyle(el).visibility !== "hidden";
@@ -82,6 +83,24 @@ function onEscape(e) {
   if (last) { e.preventDefault(); last.click(); }
 }
 
+function shortcut(e) {
+  if (document.querySelector('[role="dialog"]')) return false;
+  if (e.key === "/") {
+    const box = document.querySelector("#coach-scroll, main") || document.body;
+    const s = [...box.querySelectorAll('input[type="search"], input[placeholder^="Buscar"]')].find(visible);
+    if (!s) return false;
+    e.preventDefault();
+    focusField(s);
+    return true;
+  }
+  const btn = [...document.querySelectorAll('[data-shortcut="new"]')].find(visible);
+  if (!btn) return false;
+  e.preventDefault();
+  if (btn.tagName === "INPUT") focusField(btn);
+  else btn.click();
+  return true;
+}
+
 function scrollerOf(el) {
   for (let n = el; n && n !== document.body; n = n.parentElement) {
     const ox = getComputedStyle(n).overflowX;
@@ -94,6 +113,10 @@ export function InputHelpers() {
   useEffect(() => {
     const onKey = (e) => {
       if (e.defaultPrevented || e.isComposing || e.altKey || e.ctrlKey || e.metaKey) return;
+      // Atajos (solo si no está escribiendo): "/" busca en la pantalla, "N" crea uno nuevo
+      if (!isTyping(document.activeElement) && !e.shiftKey && (e.key === "/" || e.key === "n" || e.key === "N")) {
+        if (shortcut(e)) return;
+      }
       if (e.key === "Enter" && !e.shiftKey) onEnter(e);
       else if (e.key.startsWith("Arrow") && !e.shiftKey) onGridArrow(e);
       // Esc se resuelve al final: si otra parte ya lo usó (un menú, el visor de PDF...), no se cierra nada más
@@ -134,13 +157,35 @@ export function InputHelpers() {
       drag = null;
     };
 
+    // Deslizar desde el borde izquierdo = atrás (solo si hay algo abierto dentro de la app)
+    let edge = null;
+    const onTouchStart = (e) => {
+      const t = e.touches[0];
+      edge = t && t.clientX < 24 && e.touches.length === 1 ? { x: t.clientX, y: t.clientY, done: false } : null;
+    };
+    const onTouchMove = (e) => {
+      if (!edge || edge.done) return;
+      const t = e.touches[0];
+      const dx = t.clientX - edge.x;
+      const dy = Math.abs(t.clientY - edge.y);
+      if (dy > 50) { edge = null; return; }
+      if (dx > 80 && history.state?.kinBack) { edge.done = true; history.back(); }
+    };
+    const onTouchEnd = () => { edge = null; };
+
     document.addEventListener("keydown", onKey);
     document.addEventListener("mousedown", onDown);
+    document.addEventListener("touchstart", onTouchStart, { passive: true });
+    document.addEventListener("touchmove", onTouchMove, { passive: true });
+    document.addEventListener("touchend", onTouchEnd, { passive: true });
     window.addEventListener("mousemove", onMove);
     window.addEventListener("mouseup", onUp);
     return () => {
       document.removeEventListener("keydown", onKey);
       document.removeEventListener("mousedown", onDown);
+      document.removeEventListener("touchstart", onTouchStart);
+      document.removeEventListener("touchmove", onTouchMove);
+      document.removeEventListener("touchend", onTouchEnd);
       window.removeEventListener("mousemove", onMove);
       window.removeEventListener("mouseup", onUp);
     };

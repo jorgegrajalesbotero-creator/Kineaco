@@ -1,7 +1,8 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { Check, Megaphone, Trash2 } from "lucide-react";
+import { Check, Eye, Megaphone, Trash2 } from "lucide-react";
+import { ActionCard } from "@/components/ui/ActionCard";
 import { supabase } from "@/lib/supabaseClient";
 import { matchesSearch } from "@/lib/search";
 import { SearchInput } from "@/components/ui/Search";
@@ -212,7 +213,9 @@ export function AnnouncementsView() {
                   const pct = rec.length ? Math.round((read.length / rec.length) * 100) : 0;
                   const open = openId === a.id;
                   return (
-                    <div key={a.id} className="bg-card rounded-2xl p-4">
+                    <ActionCard key={a.id} onOpen={() => setOpenId(open ? null : a.id)} ariaLabel="Ver quiénes lo leyeron" outerClassName="rounded-2xl" className="bg-card rounded-2xl p-4"
+                      actions={[{ label: open ? "Ocultar quiénes lo leyeron" : "Ver quiénes lo leyeron", icon: Eye, onClick: () => setOpenId(open ? null : a.id) }, { label: "Borrar anuncio", icon: Trash2, danger: true, onClick: () => remove(a) }]}
+                      swipe={[{ label: "Borrar", icon: Trash2, danger: true, onClick: () => remove(a) }]}>
                       <div className="flex items-start justify-between gap-3">
                         <div className="min-w-0">
                           <p className="text-ink text-sm font-medium">{a.title}</p>
@@ -242,7 +245,7 @@ export function AnnouncementsView() {
                           </div>
                         </div>
                       )}
-                    </div>
+                    </ActionCard>
                   );
                 })}
               </div>

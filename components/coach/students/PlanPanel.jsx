@@ -3,6 +3,8 @@
 import { useEffect, useRef, useState } from "react";
 import { useScrollMemory } from "@/lib/useScrollMemory";
 import { CalendarDays, Copy, CopyPlus, Download, Eye, Layers, Minus, Pencil, Plus, Trash2 } from "lucide-react";
+import { ActionCard } from "@/components/ui/ActionCard";
+import { useBackClose } from "@/lib/backStack";
 import { WEEK_DAYS, localDateString } from "@/lib/dates";
 import { supabase } from "@/lib/supabaseClient";
 import { libraryRoutines } from "@/lib/libraryRoutines";
@@ -82,6 +84,7 @@ export function PlanPanel({ student, onClose, onOpenPanel }) {
   const [saving, setSaving] = useState(false);
   // Foto del plan al abrir el editor, para saber si hay cambios sin guardar
   const editBase = useRef(null);
+  const savingRef = useRef(false);
   useEffect(() => {
     if (!editing) editBase.current = null;
     else if (editBase.current == null) editBase.current = JSON.stringify(editing);
@@ -343,17 +346,22 @@ export function PlanPanel({ student, onClose, onOpenPanel }) {
     return out;
   };
 
-  const save = async () => {
-    if (saving) return;
+  // silent = guardado automático: no pregunta ni cierra el editor; los errores se muestran como estado
+  const save = async ({ silent = false } = {}) => {
+    if (saving || savingRef.current) return;
+    const fail = (msg) => { if (silent) setPlanAuto("error"); else alert(msg); };
+    const snapAtStart = JSON.stringify(editing);
     const candidate = { start_date: startMonday, weeks: editing.weeks };
     const clash = plans.find((p) => p.id !== editing.id && plansOverlap(p, candidate));
-    if (clash) return alert(`Las fechas se cruzan con otro plan (${fmtDay(planStart(clash))} – ${fmtDay(planLastDay(clash), true)}). Cambiá la fecha de inicio o la cantidad de semanas.`);
+    if (clash) return fail(`Las fechas se cruzan con otro plan (${fmtDay(planStart(clash))} – ${fmtDay(planLastDay(clash), true)}). Cambiá la fecha de inicio o la cantidad de semanas.`);
     const total = editing.data.reduce((s, w) => s + Object.values(w).reduce((x, l) => x + l.length, 0), 0);
-    if (total === 0 && !confirm("El plan no tiene ninguna rutina. ¿Guardarlo igual?")) return;
+    if (total === 0 && (silent || !confirm("El plan no tiene ninguna rutina. ¿Guardarlo igual?"))) return;
 
     const why = (err) => (err?.message ? `\n\nDetalle: ${err.message}` : "");
     const keep = "\n\nSus cambios siguen en pantalla: puede intentar Guardar de nuevo.";
     setSaving(true);
+    savingRef.current = true;
+    if (silent) setPlanAuto("guardando");
     try {
       const model = editing.model || "atr";
       const goals = model === "ondulante_diaria" ? Object.fromEntries(Object.entries(editing.dayGoals || {}).filter(([, g]) => g)) : null;
@@ -361,10 +369,10 @@ export function PlanPanel({ student, onClose, onOpenPanel }) {
       let planId = editing.id;
       if (planId) {
         const { error } = await supabase.from("training_plans").update(row).eq("id", planId);
-        if (error) return alert(`No se pudo guardar el plan.${why(error)}${keep}`);
+        if (error) return fail(`No se pudo guardar el plan.${why(error)}${keep}`);
       } else {
         const { data, error } = await supabase.from("training_plans").insert(row).select("id").single();
-        if (error || !data) return alert(`No se pudo crear el plan.${why(error)}${keep}`);
+        if (error || !data) return fail(`No se pudo crear el plan.${why(error)}${keep}`);
         planId = data.id;
         setEditing((e) => (e ? { ...e, id: planId } : e)); // si algo falla después, el reintento no duplica el plan
       }
@@ -422,24 +430,51 @@ export function PlanPanel({ student, onClose, onOpenPanel }) {
       ];
       for (const [table, rows, label, optional] of steps) {
         const { error } = await replaceRows(table, planId, rows, { optional });
-        if (error) return alert(`El plan se guardó, pero no se pudieron guardar ${label}.${why(error)}${keep}`);
+        if (error) return fail(`El plan se guardó, pero no se pudieron guardar ${label}.${why(error)}${keep}`);
       }
-      setEditing(null);
-      load();
+      if (silent) {
+        editBase.current = snapAtStart;
+        setPlanAuto("guardado");
+      } else {
+        setEditing(null);
+        load();
+      }
     } catch (err) {
-      alert(`Se cortó la conexión mientras se guardaba.${why(err)}${keep}`);
+      fail(`Se cortó la conexión mientras se guardaba.${why(err)}${keep}`);
     } finally {
       setSaving(false);
+      savingRef.current = false;
+      if (silent) setAutoTick((n) => n + 1); // por si cambió algo mientras se guardaba
     }
   };
 
   // Salir del editor: si hay cambios sin guardar, avisa antes de perderlos
   const closeEditor = () => {
-    if (saving) return;
+    if (saving) return false;
     const dirty = editing && editBase.current != null && editBase.current !== JSON.stringify(editing);
-    if (dirty && !confirm("Tiene cambios sin guardar en este plan. ¿Salir sin guardar?")) return;
+    // Plan ya creado: lo pendiente se guarda solo al salir
+    if (dirty && editing.id) {
+      save({ silent: true }).then(load);
+      setEditing(null);
+      return true;
+    }
+    if (dirty && !confirm("Tiene cambios sin guardar en este plan. ¿Salir sin guardar?")) return false;
     setEditing(null);
+    return true;
   };
+
+  // Guardado automático de un plan ya creado: 2 segundos después del último cambio
+  const [planAuto, setPlanAuto] = useState(""); // "" | "pendiente" | "guardando" | "guardado" | "error"
+  const [autoTick, setAutoTick] = useState(0);
+  const planSnap = editing ? JSON.stringify(editing) : "";
+  useEffect(() => {
+    if (!editing) { setPlanAuto(""); return undefined; }
+    if (!editing.id || editBase.current == null || planSnap === editBase.current) return undefined;
+    setPlanAuto("pendiente");
+    const timer = setTimeout(() => save({ silent: true }), 2000);
+    return () => clearTimeout(timer);
+  }, [planSnap, autoTick]);
+  useBackClose(!!editing, closeEditor); // "atrás" del celular sale del editor (avisa si hay cambios sin guardar)
 
   // Ejercicio nuevo creado desde Cargas y ejercicios: entra al catálogo general
   const createExercise = async (name, group) => {
@@ -487,6 +522,13 @@ export function PlanPanel({ student, onClose, onOpenPanel }) {
     };
     return (
       <PanelLayout title={editing.id ? "Editar plan" : "Nuevo plan"} subtitle={student.name} onClose={closeEditor} width="max-w-4xl">
+        <p className={`text-xs -mt-4 mb-4 ${planAuto === "error" ? "text-danger" : planAuto === "guardado" ? "text-accent" : "text-muted"}`}>
+          {!editing.id ? "Plan nuevo: se guarda con «Guardar plan». Después, los cambios se guardan solos."
+            : planAuto === "pendiente" || planAuto === "guardando" ? "Guardando…"
+            : planAuto === "guardado" ? "Guardado ✓"
+            : planAuto === "error" ? "No se pudo guardar solo (revise las fechas o la conexión). Use «Guardar plan»."
+            : "Los cambios se guardan solos."}
+        </p>
         <div className="bg-card rounded-xl p-4 mb-4 grid grid-cols-1 sm:grid-cols-2 gap-3">
           <label className="block sm:col-span-2">
             <span className="text-muted text-xs">Nombre del plan (opcional)</span>
@@ -641,7 +683,7 @@ export function PlanPanel({ student, onClose, onOpenPanel }) {
         </button>
       )}
       <div className="flex flex-wrap items-center gap-2 mb-5">
-        <button onClick={startNew} className="bg-accent text-app font-semibold px-4 py-2.5 rounded-lg text-sm flex items-center gap-2">
+        <button data-shortcut="new" title="Nuevo plan (N)" onClick={startNew} className="bg-accent text-app font-semibold px-4 py-2.5 rounded-lg text-sm flex items-center gap-2">
           <Plus size={16} /> Nuevo plan
         </button>
         {templates.length > 0 && (
@@ -662,7 +704,14 @@ export function PlanPanel({ student, onClose, onOpenPanel }) {
             const st = planStatus(p);
             const count = (p.training_plan_days || []).length;
             return (
-              <div key={p.id} className="bg-card rounded-xl p-4">
+              <ActionCard key={p.id} onOpen={() => startEdit(p)} ariaLabel="Abrir plan" className="bg-card rounded-xl p-4"
+                actions={[
+                  { label: "Abrir y editar", icon: Pencil, onClick: () => startEdit(p) },
+                  { label: "PDF", icon: Download, onClick: () => pdf(p) },
+                  { label: "Guardar como plantilla", icon: Copy, onClick: () => saveAsTemplate(p) },
+                  { label: "Eliminar", icon: Trash2, danger: true, onClick: () => remove(p) },
+                ]}
+                swipe={[{ label: "PDF", icon: Download, onClick: () => pdf(p) }, { label: "Eliminar", icon: Trash2, danger: true, onClick: () => remove(p) }]}>
                 <div className="flex items-start justify-between gap-3">
                   <div className="min-w-0">
                     <p className="text-ink text-sm font-medium truncate">{p.name || `Plan de ${p.weeks} semanas`}</p>
@@ -679,7 +728,7 @@ export function PlanPanel({ student, onClose, onOpenPanel }) {
                   <button onClick={() => saveAsTemplate(p)} className={chip}><Copy size={13} /> Guardar como plantilla</button>
                   <button onClick={() => remove(p)} className={`${chip} hover:text-danger`}><Trash2 size={13} /> Eliminar</button>
                 </div>
-              </div>
+              </ActionCard>
             );
           })}
         </div>
@@ -693,7 +742,9 @@ export function PlanPanel({ student, onClose, onOpenPanel }) {
               const weeksN = ph.reduce((x, p) => x + (p.weeks || 0), 0);
               const routinesN = (tpl.plan_template_days || []).length;
               return (
-                <div key={tpl.id} className="px-4 py-3 border-b border-field last:border-0 flex items-center gap-3">
+                <ActionCard key={tpl.id} onOpen={() => startFromTemplate(tpl)} ariaLabel={`Usar plantilla ${tpl.name}`} outerClassName="border-b border-field last:border-0" className="px-4 py-3 flex items-center gap-3"
+                  actions={[{ label: "Usar esta plantilla", icon: Plus, onClick: () => startFromTemplate(tpl) }, { label: "Eliminar plantilla", icon: Trash2, danger: true, onClick: () => deleteTemplate(tpl) }]}
+                  swipe={[{ label: "Eliminar", icon: Trash2, danger: true, onClick: () => deleteTemplate(tpl) }]}>
                   <div className="min-w-0 flex-1">
                     <p className="text-ink text-sm truncate">{tpl.name}</p>
                     <div className="flex h-1.5 rounded-full overflow-hidden mt-1.5 max-w-xs bg-field">
@@ -703,7 +754,7 @@ export function PlanPanel({ student, onClose, onOpenPanel }) {
                   </div>
                   <button onClick={() => startFromTemplate(tpl)} className={chip}><Plus size={13} /> Usar</button>
                   <button onClick={() => deleteTemplate(tpl)} aria-label="Eliminar plantilla" className={`${chip} hover:text-danger`}><Trash2 size={13} /></button>
-                </div>
+                </ActionCard>
               );
             })}
           </div>

@@ -2,9 +2,9 @@
 
 import Link from "next/link";
 import { BrandMark } from "@/components/ui/BrandMark";
-import { Calendar, ClipboardList, Dumbbell, HeartHandshake, LayoutDashboard, Megaphone, MessageCircle, User, UserCog, Users } from "lucide-react";
+import { Calendar, ClipboardList, Dumbbell, HeartHandshake, LayoutDashboard, Megaphone, MessageCircle, Search, User, UserCog, Users } from "lucide-react";
 
-export function Sidebar({ active, onSelect, email, fullName, onLogout, bell, isAdmin, unreadMessages = 0 }) {
+export function Sidebar({ active, onSelect, email, fullName, onLogout, bell, isAdmin, unreadMessages = 0, onSearch }) {
   // Menú agrupado por niveles: primero el día a día con los alumnos, luego la biblioteca
   const groups = [
     {
@@ -49,6 +49,13 @@ export function Sidebar({ active, onSelect, email, fullName, onLogout, bell, isA
         {bell}
       </div>
       <nav className="flex-1 min-h-0 overflow-y-auto overscroll-contain px-3 py-3">
+        {onSearch && (
+          <button onClick={onSearch} className="w-full flex items-center gap-2.5 px-3 py-2 mb-2 rounded-xl text-sm text-muted bg-card/60 hover:text-ink border border-field">
+            <Search size={15} />
+            <span className="flex-1 text-left">Buscar</span>
+            <kbd className="text-[10px] border border-field rounded px-1.5 py-0.5">Ctrl K</kbd>
+          </button>
+        )}
         {groups.map((g) => (
           <div key={g.title} className="mb-3 last:mb-0">
             <p className="px-3 pt-2 pb-1.5 text-[10px] font-semibold uppercase tracking-[0.14em] text-muted">{g.title}</p>

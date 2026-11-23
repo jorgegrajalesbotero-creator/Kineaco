@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useScrollMemory } from "@/lib/useScrollMemory";
+import { useBackClose } from "@/lib/backStack";
 import Link from "next/link";
 import { Activity, ArrowLeft, Calendar, Camera, ChevronDown, ChevronRight, ClipboardCheck, Download, Dumbbell, Eye, TrendingUp, Lock, MessageCircle, PlusCircle, Ruler, UserCog, Utensils } from "lucide-react";
 import { supabase } from "@/lib/supabaseClient";
@@ -53,6 +54,7 @@ const GROUPS = [
 // Ficha de un alumno, por niveles: camaleón (check-in) → ver su rutina → Mensajes y PDF → grupos desplegables
 export function StudentDetail({ student, onClose, onChanged, initialPanel = null }) {
   const [panel, setPanel] = useState(initialPanel);
+  useBackClose(!!panel && panel !== initialPanel, () => setPanel(initialPanel)); // "atrás" vuelve a la ficha
   const [pdfBusy, setPdfBusy] = useState(false);
   const [showPdf, pdfPreview] = usePdfPreview();
   // Camaleón del alumno: su estado de hoy sale del check-in diario

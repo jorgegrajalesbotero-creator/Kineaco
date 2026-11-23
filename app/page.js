@@ -31,6 +31,7 @@ import { LEGAL_VERSION } from "@/lib/legal";
 import { RoutineScreen } from "@/components/student/RoutineScreen";
 import { CalendarScreen } from "@/components/student/CalendarScreen";
 import { ClockHost } from "@/components/student/ClockIsland";
+import { useBackClose, useBackTabs } from "@/lib/backStack";
 
 export default function App() {
   const [lang, setLangState] = useState("es");
@@ -550,6 +551,14 @@ export default function App() {
     setTab(key);
     if (key === "progress" && userId) loadBodyWeight(userId); // el peso pudo cambiar en Nutrición, Medidas o Check-in
   };
+
+  // Botón "atrás" del celular: cierra la pantalla abierta (rutina, check-in, calendario...) o vuelve a la pestaña anterior
+  useBackTabs(tab, handleSelectTab);
+  useBackClose(showRoutine, () => setShowRoutine(false));
+  useBackClose(showCheckin, () => { setShowCheckin(false); setNotifKey((k) => k + 1); });
+  useBackClose(showCalendar, () => setShowCalendar(false));
+  useBackClose(showMeasure, () => setShowMeasure(false));
+  useBackClose(showAnnouncements, () => { setShowAnnouncements(false); setNotifKey((k) => k + 1); });
 
   const signOutNow = async () => {
     await removePushOnLogout(supabase); // este celular deja de recibir los avisos de esta cuenta
