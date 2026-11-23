@@ -16,7 +16,8 @@ const TAIL_DOWN = "M60 100 C36 110 20 98 22 84 C24 72 38 70 42 78 C45 84 38 88 3
 // Camaleón compañero (de lado, sobre su rama). mood: 1 Estresado · 2 Cansado · 3 Normal · 4 Bien · 5 Con toda.
 // El color sale del estado. sleeping = todavía no hizo el check-in (gris, dormido).
 // animate: el ojo mira por su cuenta y parpadea, respira, mueve la cola; con "Con toda" saca la lengua.
-export function Chameleon({ mood = 3, sleeping = false, animate = true, size = 160, className = "", title }) {
+// level (logros de la comunidad): 0 rama · 1 con hojas · 2 en flor · 3 rama dorada
+export function Chameleon({ mood = 3, sleeping = false, animate = true, size = 160, className = "", title, level = 0 }) {
   const k = sleeping ? 2 : PET_STATES[mood] ? mood : 3;
   const c = sleeping ? "#7D8580" : PET_STATES[k].color;
   const d = shade(c, -0.35);
@@ -72,9 +73,28 @@ export function Chameleon({ mood = 3, sleeping = false, animate = true, size = 1
   return (
     <svg viewBox="0 0 210 150" width={size} role="img" className={`block ${className}`} style={{ maxWidth: "100%" }}>
       <title>{title || (sleeping ? "Camaleón dormido" : `Camaleón: ${PET_STATES[k].name}`)}</title>
-      <path d="M4 132 Q100 124 206 134" stroke="#6B4F2A" strokeWidth="8" fill="none" strokeLinecap="round" />
+      <path d="M4 132 Q100 124 206 134" stroke={level >= 3 ? "#C9A227" : "#6B4F2A"} strokeWidth="8" fill="none" strokeLinecap="round" />
+      {level >= 3 && <path d="M10 130 Q100 123 200 131" stroke="#F2D16B" strokeWidth="2" fill="none" strokeLinecap="round" opacity="0.8" />}
       <path d="M150 128 q10-16 22-14" stroke="#3B6D11" strokeWidth="4" fill="none" />
       <ellipse cx="174" cy="112" rx="8" ry="4" fill="#639922" />
+      {level >= 1 && (
+        <g>
+          <path d="M30 129 q-6-14 -18-15" stroke="#3B6D11" strokeWidth="3" fill="none" />
+          <ellipse cx="12" cy="114" rx="7" ry="3.5" fill="#639922" transform="rotate(-20 12 114)" />
+          <path d="M190 132 q4 8 12 8" stroke="#3B6D11" strokeWidth="3" fill="none" />
+          <ellipse cx="203" cy="141" rx="6" ry="3" fill="#639922" />
+        </g>
+      )}
+      {level >= 2 && (
+        <g>
+          {[[22, 118], [182, 108], [200, 139]].map(([x, y], i) => (
+            <g key={i} transform={`translate(${x} ${y})`}>
+              {[0, 72, 144, 216, 288].map((r) => <ellipse key={r} cx="0" cy="-3.5" rx="2.4" ry="3.5" fill={level >= 3 ? "#FFE38A" : "#F4A6C9"} transform={`rotate(${r})`} />)}
+              <circle r="1.8" fill="#F2D16B" />
+            </g>
+          ))}
+        </g>
+      )}
       <g transform={`translate(0 ${down})`}>
         <g className={a && !sleeping ? (k === 5 ? "cham-tail cham-tail-fast" : "cham-tail") : ""}>
           <path d={k >= 4 ? TAIL_UP : TAIL_DOWN} stroke={c} strokeWidth="11" fill="none" strokeLinecap="round" />

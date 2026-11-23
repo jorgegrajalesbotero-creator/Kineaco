@@ -16,7 +16,7 @@ import { localDateString } from "@/lib/dates";
 import { Skeleton } from "@/components/ui/Skeleton";
 
 // Nombres que usan las notificaciones para abrir directamente una sección de la ficha
-const ACTION_TO_PANEL = { messages: "messages", progress: "compare", nutrition: "nutrition", access: "access", photos: "photos", progression: "plan", checkin: "checkin", measurements: "measurements", routine: "routine" };
+const ACTION_TO_PANEL = { messages: "messages", progress: "exercises", nutrition: "nutrition", access: "access", photos: "photos", progression: "plan", checkin: "checkin", measurements: "measurements", routine: "routine" };
 
 const STUDENT_FACETS = [
   { id: "acceso", label: "Tiempo de acceso", getValues: (s) => s.accessBucket, options: ACCESS_OPTIONS },

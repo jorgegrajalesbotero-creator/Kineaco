@@ -22,6 +22,7 @@ import { MeasurementWizard } from "@/components/measurements/MeasurementWizard";
 import { AnnouncementsScreen } from "@/components/student/Announcements";
 import { MessagesScreen } from "@/components/student/MessagesScreen";
 import { BottomNav, SideNav } from "@/components/student/Navigation";
+import { CommunityScreen } from "@/components/student/CommunityScreen";
 import { NutritionScreen } from "@/components/student/nutrition/NutritionScreen";
 import { ProfileScreen } from "@/components/student/ProfileScreen";
 import { ProgressScreen } from "@/components/student/progress/ProgressScreen";
@@ -633,6 +634,8 @@ export default function App() {
     );
   } else if (tab === "messages") {
     content = <MessagesScreen userId={userId} onMessagesRead={() => { setUnreadMessageCount(0); setNotifKey((k) => k + 1); }} />;
+  } else if (tab === "community") {
+    content = <CommunityScreen userId={userId} />;
   } else if (tab === "progress") {
     content = <ProgressScreen healthConsent={healthConsent} onOpenCheckin={() => setShowCheckin(true)} onOpenMeasure={() => setShowMeasure(true)} streak={streak} bestStreak={bestStreak} totalCompleted={totalCompleted} weekStats={weekStats} recentActivity={recentActivity} bodyWeightLogs={bodyWeightLogs} onAddWeight={addBodyWeight} onUpdateWeight={updateBodyWeight} onDeleteWeight={deleteBodyWeight} userId={userId} fullName={fullName} />;
   } else {

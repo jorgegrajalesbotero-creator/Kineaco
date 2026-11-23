@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { BrandMark } from "@/components/ui/BrandMark";
-import { Calendar, ClipboardList, Dumbbell, LayoutDashboard, Megaphone, MessageCircle, User, UserCog, Users } from "lucide-react";
+import { Calendar, ClipboardList, Dumbbell, HeartHandshake, LayoutDashboard, Megaphone, MessageCircle, User, UserCog, Users } from "lucide-react";
 
 export function Sidebar({ active, onSelect, email, fullName, onLogout, bell, isAdmin, unreadMessages = 0 }) {
   // Menú agrupado por niveles: primero el día a día con los alumnos, luego la biblioteca
@@ -25,7 +25,7 @@ export function Sidebar({ active, onSelect, email, fullName, onLogout, bell, isA
     },
     {
       title: "Comunicación",
-      items: [{ key: "anuncios", label: "Anuncios", icon: Megaphone }],
+      items: [{ key: "anuncios", label: "Anuncios", icon: Megaphone }, { key: "comunidad", label: "Comunidad", icon: HeartHandshake }],
     },
     {
       title: "Cuenta",

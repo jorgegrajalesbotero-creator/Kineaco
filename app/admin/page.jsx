@@ -6,6 +6,7 @@ import { removePushOnLogout, syncPush, useOpenNotification } from "@/lib/push";
 import { PushPromptCard } from "@/components/ui/PushNotifications";
 import { supabase } from "@/lib/supabaseClient";
 import { AnnouncementsView } from "@/components/coach/AnnouncementsView";
+import { CommunityView } from "@/components/coach/CommunityView";
 import { MessagesInbox } from "@/components/coach/MessagesInbox";
 import { ExercisesView } from "@/components/coach/ExercisesView";
 import { ProfileView } from "@/components/coach/ProfileView";
@@ -132,7 +133,7 @@ export default function AdminPanel() {
     <NotificationBell supabase={supabase} userId={coachId} onNavigate={openFromNotification} refreshKey={notifKey} />
   ) : null;
 
-  const tabLabels = { mensajes: "Mensajes", rutinas: "Rutinas", ejercicios: "Ejercicios", alumnos: "Alumnos", reporte: "Reporte semanal", anuncios: "Anuncios", programas: "Programas", usuarios: "Usuarios", perfil: "Mi perfil" };
+  const tabLabels = { mensajes: "Mensajes", rutinas: "Rutinas", ejercicios: "Ejercicios", alumnos: "Alumnos", reporte: "Reporte semanal", anuncios: "Anuncios", comunidad: "Comunidad", programas: "Programas", usuarios: "Usuarios", perfil: "Mi perfil" };
   const sidebarProps = {
     unreadMessages,
     active: tab,
@@ -197,6 +198,7 @@ export default function AdminPanel() {
             />
           )}
           {tab === "anuncios" && <AnnouncementsView />}
+          {tab === "comunidad" && coachId && <CommunityView userId={coachId} />}
           {tab === "programas" && <ProgramsView />}
           {tab === "usuarios" && isAdmin && <UsersView />}
           {tab === "perfil" && <ProfileView onProfileUpdate={setFullName} />}
