@@ -95,7 +95,7 @@ export function BodyWeightSection({ logs, onAdd, onUpdate, onDelete }) {
             placeholder={tr("Peso corporal")}
             valueKg={draft}
             onChangeKg={setDraft}
-            onKeyDown={(e) => e.key === "Enter" && add()}
+            onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); add(); } }}
             wrapperClassName="flex-1"
             className="w-full bg-field text-ink text-sm rounded-lg px-3 py-2 outline-none"
             autoFocus
@@ -140,7 +140,7 @@ export function BodyWeightSection({ logs, onAdd, onUpdate, onDelete }) {
                       <WeightInput
                         valueKg={editDraft}
                         onChangeKg={setEditDraft}
-                        onKeyDown={(e) => e.key === "Enter" && saveEdit(w)}
+                        onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); saveEdit(w); } }}
                         wrapperClassName="w-28"
                         className="w-full bg-field text-ink text-sm text-right rounded-lg px-2 py-1 outline-none"
                         autoFocus

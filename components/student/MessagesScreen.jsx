@@ -109,7 +109,7 @@ export function MessagesScreen({ userId, onMessagesRead }) {
         <input
           value={newMessage}
           onChange={(e) => setNewMessage(e.target.value)}
-          onKeyDown={(e) => { if (e.key === "Enter") sendMessage(); }}
+          onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); sendMessage(); } }}
           placeholder={tr("Escriba un mensaje...")}
           className="flex-1 bg-field text-ink text-sm rounded-lg px-3 py-2 outline-none"
         />

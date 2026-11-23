@@ -551,8 +551,9 @@ export function PlanLoadsEditor({ userId, model = "atr", dayGoals = {}, startDat
 
   const noPct = weeks.every((w) => w.pct == null);
 
+  // data-grid: las flechas del teclado se mueven entre casillas como en Excel
   return (
-    <div>
+    <div data-grid>
       <div className="bg-card rounded-xl p-4 mb-4">
         <p className="text-ink text-sm font-medium mb-1">{showRir ? "%, reps, series y RIR de cada semana" : hidePct ? "Reps y series de cada semana" : "%, reps y series de cada semana"}</p>
         <p className="text-muted text-xs mb-3">

@@ -44,10 +44,18 @@ export function SearchSelect({ options, value, onChange, placeholder = "Buscar..
   const inputRef = useRef(null);
   const selected = options.find((o) => o.value === value) || (topOption && topOption.value === value ? topOption : null);
   const filtered = options.filter((o) => matchesSearch(text, o.label, o.sub));
+  // Flechas ↑ ↓ recorren la lista (incluida la opción de arriba) y Enter elige la marcada
+  const [active, setActive] = useState(-1);
+  const choices = [...(topOption ? [topOption] : []), ...filtered];
   const pick = (v) => {
     onChange(v, text);
     setText("");
     setOpen(false);
+    setActive(-1);
+  };
+  const markAt = (i) => {
+    setActive(i);
+    requestAnimationFrame(() => document.querySelector(`[data-search-opt="${i}"]`)?.scrollIntoView({ block: "nearest" }));
   };
 
   // Computador: debajo del campo, o arriba si abajo no entra
@@ -99,24 +107,26 @@ export function SearchSelect({ options, value, onChange, placeholder = "Buscar..
   const items = (
     <>
       {topOption && (
-        <button type="button" onMouseDown={(e) => e.preventDefault()} onClick={() => pick(topOption.value)} className="w-full text-left px-2.5 py-2.5 mb-1 text-sm text-accent rounded-lg hover:bg-card border-b border-white/[0.05] break-words">
+        <button type="button" data-search-opt={0} onMouseDown={(e) => e.preventDefault()} onClick={() => pick(topOption.value)} className={`w-full text-left px-2.5 py-2.5 mb-1 text-sm text-accent rounded-lg hover:bg-card border-b border-white/[0.05] break-words ${active === 0 ? "bg-card" : ""}`}>
           {topOption.label}{text ? `: "${text}"` : ""}
         </button>
       )}
       {filtered.length === 0 ? (
         <p className="px-2.5 py-2 text-xs text-soft break-words">Sin resultados para &quot;{text}&quot;</p>
       ) : (
-        filtered.map((o) => {
+        filtered.map((o, idx) => {
           const isSelected = o.value === value;
+          const n = idx + (topOption ? 1 : 0);
           return (
             <button
               key={o.value}
               type="button"
               role="option"
+              data-search-opt={n}
               aria-selected={isSelected}
               onMouseDown={(e) => e.preventDefault()}
               onClick={() => pick(o.value)}
-              className={`w-full text-left px-2.5 py-2.5 text-sm rounded-lg flex items-center gap-2 hover:bg-card ${isSelected ? "text-accent" : "text-ink"}`}
+              className={`w-full text-left px-2.5 py-2.5 text-sm rounded-lg flex items-center gap-2 hover:bg-card ${active === n ? "bg-card ring-1 ring-accent/40" : ""} ${isSelected ? "text-accent" : "text-ink"}`}
             >
               <span className="flex-1 min-w-0 break-words">
                 {o.label}
@@ -149,12 +159,24 @@ export function SearchSelect({ options, value, onChange, placeholder = "Buscar..
         <input
           ref={inputRef}
           value={open ? text : keepEmpty ? "" : selected?.label || ""}
-          onChange={(e) => { setText(e.target.value); setOpen(true); }}
-          onFocus={() => { setTouch(isTouch()); setText(""); setOpen(true); }}
+          onChange={(e) => { setText(e.target.value); setOpen(true); setActive(-1); }}
+          onFocus={() => { setTouch(isTouch()); setText(""); setOpen(true); setActive(-1); }}
           onBlur={() => setTimeout(() => setOpen(false), 150)}
           onKeyDown={(e) => {
-            if (e.key === "Enter") { e.preventDefault(); if (filtered[0]) pick(filtered[0].value); else if (topOption) pick(topOption.value); }
-            if (e.key === "Escape") { setOpen(false); e.currentTarget.blur(); }
+            if (e.key === "ArrowDown" || e.key === "ArrowUp") {
+              e.preventDefault();
+              if (!open) { setOpen(true); return; }
+              if (!choices.length) return;
+              const next = e.key === "ArrowDown" ? (active + 1) % choices.length : active <= 0 ? choices.length - 1 : active - 1;
+              markAt(next);
+            }
+            if (e.key === "Enter") {
+              e.preventDefault();
+              if (active >= 0 && choices[active]) pick(choices[active].value);
+              else if (filtered[0]) pick(filtered[0].value);
+              else if (topOption) pick(topOption.value);
+            }
+            if (e.key === "Escape") { e.preventDefault(); setOpen(false); e.currentTarget.blur(); }
           }}
           placeholder={placeholder}
           disabled={disabled}
