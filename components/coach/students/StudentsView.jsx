@@ -8,7 +8,9 @@ import { intakeHasAlert } from "@/lib/intake";
 import { matchesSearch } from "@/lib/search";
 import { ACCESS_OPTIONS, SENIORITY_OPTIONS, accessBucket, durationSince, filterItems, seniorityBucket, sortItems } from "@/lib/filters";
 import { useFilterState } from "@/lib/useFilterState";
-import { ChevronRight, Dumbbell, MessageCircle } from "lucide-react";
+import { Calendar, ChevronRight, Dumbbell, Eye, MessageCircle, TrendingUp, User } from "lucide-react";
+import { ActionCard } from "@/components/ui/ActionCard";
+import { useBackClose } from "@/lib/backStack";
 import { FilterBar } from "@/components/ui/FilterBar";
 import { StudentDetail } from "./StudentDetail";
 import { planWeekOf } from "@/lib/trainingPlan";
@@ -60,6 +62,7 @@ export function StudentsView({ initialAction, onInitialActionDone }) {
   const [students, setStudents] = useState([]);
   const [loading, setLoading] = useState(true);
   const [open, setOpen] = useState(null); // { student, initialPanel }
+  useBackClose(!!open, () => setOpen(null)); // "atrás" del celular cierra la ficha
   const filters = useFilterState("kineaco:filtros:alumnos", "nombre");
 
   async function loadData() {
@@ -190,10 +193,19 @@ export function StudentsView({ initialAction, onInitialActionDone }) {
         <>
           <div className="grid grid-cols-1 lg:grid-cols-2 2xl:grid-cols-3 gap-3">
             {filtered.map((s) => (
-              <div
+              <ActionCard
                 key={s.id}
-                onClick={() => setOpen({ student: s, initialPanel: null })}
-                className="bg-card rounded-xl p-4 cursor-pointer active:scale-[0.99] transition-transform"
+                onOpen={() => setOpen({ student: s, initialPanel: null })}
+                ariaLabel={`Abrir ficha de ${s.name}`}
+                className="bg-card rounded-xl p-4 active:scale-[0.99] transition-transform"
+                actions={[
+                  { label: "Abrir ficha", icon: User, onClick: () => setOpen({ student: s, initialPanel: null }) },
+                  { label: "Ver su rutina", icon: Eye, onClick: () => setOpen({ student: s, initialPanel: "routine" }) },
+                  { label: "Planeación", icon: Calendar, onClick: () => setOpen({ student: s, initialPanel: "plan" }) },
+                  { label: "Progreso por ejercicio", icon: TrendingUp, onClick: () => setOpen({ student: s, initialPanel: "exercises" }) },
+                  { label: "Mensajes", icon: MessageCircle, onClick: () => setOpen({ student: s, initialPanel: "messages" }) },
+                ]}
+                swipe={[{ label: "Rutina", icon: Eye, onClick: () => setOpen({ student: s, initialPanel: "routine" }) }, { label: "Mensajes", icon: MessageCircle, onClick: () => setOpen({ student: s, initialPanel: "messages" }) }]}
               >
                 <div className="flex items-start justify-between gap-3">
                   <div className="min-w-0">
@@ -232,7 +244,7 @@ export function StudentsView({ initialAction, onInitialActionDone }) {
                     Abrir ficha
                   </button>
                 </div>
-              </div>
+              </ActionCard>
             ))}
             {filtered.length === 0 && (
               <p className="text-muted text-sm">

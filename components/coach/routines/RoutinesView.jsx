@@ -1,8 +1,8 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useScrollMemory } from "@/lib/useScrollMemory";
-import { Check, ChevronRight, Clock, Copy, Download, GitMerge, Plus, Trash2, UserPlus, X } from "lucide-react";
+import { Check, ChevronDown, ChevronRight, Clock, Copy, Download, GitMerge, Pencil, Plus, Trash2, UserPlus, X } from "lucide-react";
 import { matchesSearch } from "@/lib/search";
 import { filterItems, sortItems } from "@/lib/filters";
 import { useFilterState } from "@/lib/useFilterState";
@@ -20,6 +20,8 @@ import { RoutineTimerField } from "@/components/coach/routines/RoutineTimerField
 import { SearchSelect } from "@/components/ui/Search";
 import { DragHandle, SortableList, SortableRow, arrayMove, keyOf } from "@/components/ui/Sortable";
 import { useUndo } from "@/components/ui/UndoToast";
+import { ActionCard, InlineRename } from "@/components/ui/ActionCard";
+import { useBackClose } from "@/lib/backStack";
 import { FilterBar } from "@/components/ui/FilterBar";
 import { Select } from "@/components/ui/Select";
 import { WeightInput } from "@/components/ui/WeightInput";
@@ -128,7 +130,7 @@ function ListItems({ items, setItems, catalog }) {
   );
 }
 
-export function RoutinesView() {
+export function RoutinesView({ initialOpenId = null, onInitialOpenDone } = {}) {
   const [routines, setRoutines] = useState([]);
   const [loading, setLoading] = useState(true);
   const [catalog, setCatalog] = useState([]);
@@ -164,10 +166,19 @@ export function RoutinesView() {
   const [selectMode, setSelectMode] = useState(false); // modo "marcar varias"
   const [selected, setSelected] = useState([]); // ids marcados
   const [bulkDeleting, setBulkDeleting] = useState(false);
+  const [peek, setPeek] = useState(() => new Set()); // tarjetas con la vista rápida de ejercicios abierta
+  const [renameKey, setRenameKey] = useState({}); // { rutina: n } para abrir el cambio de nombre desde el menú
+  const togglePeek = (id) => setPeek((s) => { const n = new Set(s); if (n.has(id)) n.delete(id); else n.add(id); return n; });
+  const renameRoutine = async (r, title) => {
+    const { error } = await supabase.from("routines").update({ title }).eq("id", r.id);
+    if (error) { alert("No se pudo cambiar el nombre."); return false; }
+    setRoutines((list) => list.map((x) => (x.id === r.id ? { ...x, title } : x)));
+    return true;
+  };
 
   async function loadRoutines() {
     setLoading(true);
-    const { data: routinesData } = await libraryRoutines(supabase, "*, routine_exercises(id, exercises(name)), routine_blocks(id)", (q) =>
+    const { data: routinesData } = await libraryRoutines(supabase, "*, routine_exercises(id, order_index, exercises(name)), routine_blocks(id)", (q) =>
       q.order("created_at", { ascending: false }));
     setRoutines(routinesData || []);
     setLoading(false);
@@ -200,6 +211,14 @@ export function RoutinesView() {
   }
 
   useEffect(() => { loadRoutines(); loadCatalog(); loadAssigned(); }, []);
+
+  // Llegó desde el buscador general: abre esa rutina apenas cargue la lista
+  useEffect(() => {
+    if (!initialOpenId || loading) return;
+    const r = routines.find((x) => x.id === initialOpenId);
+    if (r) openDetail(r);
+    onInitialOpenDone?.();
+  }, [initialOpenId, loading]);
 
   const createExercise = async (name, group) => {
     const { data, error } = await supabase
@@ -295,9 +314,13 @@ export function RoutinesView() {
     setEditBlocks(content.blocks);
     setEditExercises(content.list);
     setEditTimer(content.timer || null);
+    setAutoState("");
+    setBaseline((n) => n + 1); // lo que se acaba de cargar es el punto de partida del guardado automático
   };
 
   const closeDetail = () => {
+    setBase(null);
+    setAutoState("");
     setViewingId(null);
     setEditExercises([]);
     setEditBlocks([]);
@@ -309,6 +332,61 @@ export function RoutinesView() {
     setMergedFrom([]);
     setDeleteMerged(false);
   };
+
+  // ---- Guardado automático (rutinas que no tiene ningún alumno) ----
+  // Si la rutina ya la tienen alumnos, se sigue guardando con el botón: hay que elegir si el cambio es para ellos.
+  const [autoState, setAutoState] = useState(""); // "" | "pendiente" | "guardando" | "guardado" | "error" | "manual"
+  const [baseline, setBaseline] = useState(0);
+  const [recheck, setRecheck] = useState(0);
+  const [base, setBase] = useState(null); // cómo estaba la rutina la última vez que se guardó
+  const autoBusy = useRef(false);
+  const editSnap = viewingId ? JSON.stringify({ d: editDraft, m: editMode, l: editExercises, b: editBlocks, t: editTimer }) : "";
+  const editShared = !!viewingId && (usersByRoutine[viewingId]?.size || 0) > 0;
+  const editDirty = !!viewingId && base != null && editSnap !== base;
+  const autoOn = !editShared && mergedFrom.length === 0;
+  useEffect(() => { if (viewingId) setBase(editSnap); }, [baseline]);
+  useEffect(() => {
+    if (!viewingId || base == null || editSnap === base) return undefined;
+    if (editShared || mergedFrom.length > 0) { setAutoState("manual"); return undefined; }
+    setAutoState("pendiente");
+    const timer = setTimeout(autoSave, 1500);
+    return () => clearTimeout(timer);
+  }, [editSnap, recheck]);
+
+  async function autoSave() {
+    if (autoBusy.current || !viewingId) return;
+    autoBusy.current = true;
+    setAutoState("guardando");
+    // Los ejercicios nuevos reciben su clave fija aquí, así no cambia en cada guardado
+    const key = (arr) => (arr || []).map((e) => (e.itemKey ? e : { ...e, itemKey: crypto.randomUUID() }));
+    const needs = editExercises.some((e) => !e.itemKey) || editBlocks.some((b) => (b.exercises || []).some((e) => !e.itemKey));
+    const list = needs ? key(editExercises) : editExercises;
+    const blocks = needs ? editBlocks.map((b) => ({ ...b, exercises: key(b.exercises) })) : editBlocks;
+    const draft = editDraft;
+    const snap = JSON.stringify({ d: draft, m: editMode, l: list, b: blocks, t: editTimer });
+    const row = { title: draft.title.trim() || autoRoutineTitle(), level: draft.level.toLowerCase(), goal: draft.goal, duration_minutes: Number(draft.duration) || 0 };
+    const { error } = await supabase.from("routines").update(row).eq("id", viewingId);
+    const contentError = error ? null : await writeRoutineContent(viewingId, editMode, list, blocks, { timer: editTimer });
+    autoBusy.current = false;
+    if (error || contentError) { setAutoState("error"); return; }
+    if (needs) { setEditExercises(list); setEditBlocks(blocks); }
+    setBase(snap);
+    setAutoState("guardado");
+    setRoutines((rs) => rs.map((r) => (r.id === viewingId ? { ...r, ...row } : r)));
+    setRecheck((n) => n + 1); // por si cambió algo mientras se guardaba
+  }
+
+  // Salir de la rutina: si hay algo pendiente se guarda antes; si se guarda con botón y hay cambios, avisa
+  const finishDetail = () => {
+    if (editDirty && !autoOn && !confirm("Tiene cambios sin guardar en esta rutina. ¿Salir sin guardar?")) return false;
+    const pending = editDirty && autoOn;
+    const go = () => { closeDetail(); loadRoutines(); };
+    if (pending) autoSave().then(go);
+    else go();
+    return true;
+  };
+  useBackClose(!!viewingId, finishDetail); // "atrás" del celular
+  useBackClose(creating, () => setCreating(false));
 
   // Trae los ejercicios de otra rutina al final de esta (queda en pantalla; se guarda con "Guardar cambios")
   const mergeRoutine = async () => {
@@ -625,8 +703,11 @@ export function RoutinesView() {
     return (
       <div className="p-4 md:p-8 max-w-2xl w-full mx-auto">
         <div className="flex items-center justify-between mb-6">
-          <h2 className="text-ink text-xl font-semibold">Editar rutina</h2>
-          <button onClick={closeDetail} className="text-muted"><X size={20} /></button>
+          <div className="min-w-0">
+            <h2 className="text-ink text-xl font-semibold">Editar rutina</h2>
+            <AutoSaveStatus state={editShared ? "manual" : mergedFrom.length > 0 ? "fusion" : autoState} />
+          </div>
+          <button onClick={finishDetail} aria-label="Cerrar" className="text-muted"><X size={20} /></button>
         </div>
 
         <div className="bg-card rounded-xl p-5 mb-4 space-y-3">
@@ -751,9 +832,13 @@ export function RoutinesView() {
         )}
 
         <div className="flex items-center justify-between">
-          <button onClick={saveEdit} disabled={savingEdit} className="bg-accent text-app font-semibold px-6 py-2.5 rounded-lg text-sm disabled:opacity-60">
-            {savingEdit ? "Guardando..." : "Guardar cambios"}
-          </button>
+          {editShared || mergedFrom.length > 0 || autoState === "error" ? (
+            <button onClick={saveEdit} disabled={savingEdit} className="bg-accent text-app font-semibold px-6 py-2.5 rounded-lg text-sm disabled:opacity-60">
+              {savingEdit ? "Guardando..." : "Guardar cambios"}
+            </button>
+          ) : (
+            <button onClick={finishDetail} className="bg-accent text-app font-semibold px-6 py-2.5 rounded-lg text-sm">Listo</button>
+          )}
           <button onClick={deleteRoutine} disabled={deleting} className="text-danger text-sm flex items-center gap-1.5 disabled:opacity-60">
             <Trash2 size={15} /> {deleting ? "Eliminando..." : "Eliminar rutina"}
           </button>
@@ -787,7 +872,7 @@ export function RoutinesView() {
               <button onClick={() => setSelectMode(true)} className="bg-field text-soft text-sm font-medium px-3 py-2 rounded-lg">Seleccionar</button>
             )
           )}
-          <button onClick={() => setCreating(true)} className="bg-accent text-app font-semibold px-4 py-2 rounded-lg text-sm flex items-center gap-2"><Plus size={16} /> Nueva rutina</button>
+          <button data-shortcut="new" title="Nueva rutina (N)" onClick={() => setCreating(true)} className="bg-accent text-app font-semibold px-4 py-2 rounded-lg text-sm flex items-center gap-2"><Plus size={16} /> Nueva rutina</button>
         </div>
       </div>
 
@@ -820,10 +905,20 @@ export function RoutinesView() {
           const busy = busyId === r.id;
           const checked = selected.includes(r.id);
           return (
-            <div
+            <ActionCard
               key={r.id}
-              className={`bg-card rounded-xl p-4 ${selectMode ? "cursor-pointer" : ""} ${checked ? "ring-1 ring-accent" : ""}`}
-              onClick={selectMode ? () => toggleSelected(r.id) : undefined}
+              onOpen={() => (selectMode ? toggleSelected(r.id) : openDetail(r))}
+              ariaLabel={`Abrir ${r.title}`}
+              actions={selectMode || busy ? [] : [
+                { label: "Abrir", icon: ChevronRight, onClick: () => openDetail(r) },
+                { label: "Asignar a un alumno", icon: UserPlus, onClick: () => setAssignRoutine(r) },
+                { label: "Cambiar nombre", icon: Pencil, onClick: () => setRenameKey((k) => ({ ...k, [r.id]: (k[r.id] || 0) + 1 })) },
+                { label: "Duplicar", icon: Copy, onClick: () => duplicateRoutine(r) },
+                { label: "PDF", icon: Download, onClick: () => pdfFromList(r) },
+                { label: "Eliminar", icon: Trash2, danger: true, onClick: () => deleteFromList(r) },
+              ]}
+              swipe={selectMode || busy ? [] : [{ label: "Duplicar", icon: Copy, onClick: () => duplicateRoutine(r) }, { label: "Eliminar", icon: Trash2, danger: true, onClick: () => deleteFromList(r) }]}
+              className={`bg-card rounded-xl p-4 ${checked ? "ring-1 ring-accent" : ""}`}
             >
               <div className="flex items-start gap-3 mb-3">
                 {selectMode && (
@@ -832,16 +927,33 @@ export function RoutinesView() {
                   </span>
                 )}
                 <div className="flex-1 min-w-0">
-                  <h3 className="text-ink font-medium truncate">{r.title}</h3>
+                  <h3 className="text-ink font-medium truncate">
+                    {selectMode ? r.title : <InlineRename value={r.title} startKey={renameKey[r.id] || 0} onSave={(v) => renameRoutine(r, v)} />}
+                  </h3>
                   <p className="text-muted text-xs mt-0.5">{r.level}{r.goal ? ` · ${r.goal}` : ""}</p>
                 </div>
                 <span className="flex items-center gap-1 text-muted text-xs shrink-0"><Clock size={12} /> {r.duration_minutes} min</span>
               </div>
 
               <div className="flex items-center justify-between gap-2 mb-3">
-                <span className="text-muted text-xs">{r.routine_blocks?.length ? `${r.routine_blocks.length} bloques · ` : ""}{r.routine_exercises?.length || 0} ejercicios</span>
-                {!selectMode && <button onClick={() => openDetail(r)} className="text-accent text-xs flex items-center gap-0.5 shrink-0">Ver detalle <ChevronRight size={13} /></button>}
+                {(r.routine_exercises?.length || 0) > 0 && !selectMode ? (
+                  <button type="button" onClick={() => togglePeek(r.id)} aria-expanded={peek.has(r.id)} className="text-muted text-xs flex items-center gap-1 hover:text-ink">
+                    {r.routine_blocks?.length ? `${r.routine_blocks.length} bloques · ` : ""}{r.routine_exercises.length} ejercicios
+                    <ChevronDown size={13} className={`transition-transform ${peek.has(r.id) ? "rotate-180" : ""}`} />
+                  </button>
+                ) : (
+                  <span className="text-muted text-xs">{r.routine_blocks?.length ? `${r.routine_blocks.length} bloques · ` : ""}{r.routine_exercises?.length || 0} ejercicios</span>
+                )}
+                {!selectMode && <span className="text-accent text-xs flex items-center gap-0.5 shrink-0">Abrir <ChevronRight size={13} /></span>}
               </div>
+
+              {peek.has(r.id) && !selectMode && (
+                <ol className="mb-3 bg-field/40 rounded-lg px-3 py-2 space-y-0.5 list-decimal list-inside" data-no-open>
+                  {[...(r.routine_exercises || [])].sort((a, b) => (a.order_index ?? 0) - (b.order_index ?? 0)).map((x) => (
+                    <li key={x.id} className="text-soft text-xs truncate">{x.exercises?.name || "Ejercicio"}</li>
+                  ))}
+                </ol>
+              )}
 
               {!selectMode && (
                 <div className="flex items-center gap-1.5 flex-wrap pt-3 border-t border-white/[0.05]">
@@ -851,7 +963,7 @@ export function RoutinesView() {
                   <button onClick={() => deleteFromList(r)} disabled={busy} className={`${quickBtn} hover:text-danger ml-auto`}><Trash2 size={13} /> Eliminar</button>
                 </div>
               )}
-            </div>
+            </ActionCard>
           );
         })}
       </div>
@@ -860,4 +972,14 @@ export function RoutinesView() {
       {pdfPreview}
     </div>
   );
+}
+
+// Estado del guardado automático de la rutina
+function AutoSaveStatus({ state }) {
+  if (state === "fusion") return <p className="text-warning text-xs mt-0.5">Fusionó otra rutina: revise y toque «Guardar cambios».</p>;
+  if (state === "manual") return <p className="text-warning text-xs mt-0.5">Esta rutina la tienen alumnos: tus cambios se guardan con «Guardar cambios».</p>;
+  if (state === "pendiente" || state === "guardando") return <p className="text-muted text-xs mt-0.5">Guardando…</p>;
+  if (state === "guardado") return <p className="text-accent text-xs mt-0.5">Guardado ✓</p>;
+  if (state === "error") return <p className="text-danger text-xs mt-0.5">No se pudo guardar solo. Use «Guardar cambios».</p>;
+  return <p className="text-muted text-xs mt-0.5">Los cambios se guardan solos.</p>;
 }

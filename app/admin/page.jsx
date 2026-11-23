@@ -5,6 +5,8 @@ import { NotificationBell, addNotifications } from "@/lib/notifications";
 import { removePushOnLogout, syncPush, useOpenNotification } from "@/lib/push";
 import { PushPromptCard } from "@/components/ui/PushNotifications";
 import { supabase } from "@/lib/supabaseClient";
+import { useBackTabs } from "@/lib/backStack";
+import { CommandPalette } from "@/components/coach/CommandPalette";
 import { AnnouncementsView } from "@/components/coach/AnnouncementsView";
 import { CommunityView } from "@/components/coach/CommunityView";
 import { MessagesInbox } from "@/components/coach/MessagesInbox";
@@ -20,6 +22,17 @@ import { BrandMark } from "@/components/ui/BrandMark";
 
 export default function AdminPanel() {
   const [tab, setTab] = useState("alumnos");
+  useBackTabs(tab, setTab); // "atrás" del celular vuelve a la sección anterior
+  // Buscador general (Ctrl + K) y lo que hay que abrir al llegar a una sección
+  const [paletteOpen, setPaletteOpen] = useState(false);
+  const [pendingOpen, setPendingOpen] = useState(null); // { kind: "routine" | "exercise", id }
+  useEffect(() => {
+    const onKey = (e) => {
+      if ((e.ctrlKey || e.metaKey) && (e.key === "k" || e.key === "K")) { e.preventDefault(); setPaletteOpen(true); }
+    };
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+  }, []);
   const [pendingStudentAction, setPendingStudentAction] = useState(null);
   const [menuOpen, setMenuOpen] = useState(false);
   const [coachId, setCoachId] = useState(null);
@@ -139,6 +152,7 @@ export default function AdminPanel() {
 
   const tabLabels = { mensajes: "Mensajes", rutinas: "Rutinas", ejercicios: "Ejercicios", alumnos: "Alumnos", reporte: "Reporte semanal", anuncios: "Anuncios", comunidad: "Comunidad", programas: "Programas", usuarios: "Usuarios", perfil: "Mi perfil" };
   const sidebarProps = {
+    onSearch: () => { setMenuOpen(false); setPaletteOpen(true); },
     unreadMessages,
     active: tab,
     email: userEmail,
@@ -165,6 +179,9 @@ export default function AdminPanel() {
             <p className="text-muted text-[11px] leading-none">{isAdmin ? "Panel Admin" : "Panel Coach"}</p>
             <p className="text-ink text-base font-semibold truncate">{tabLabels[tab]}</p>
           </div>
+          <button onClick={() => setPaletteOpen(true)} aria-label="Buscar en el panel" className="w-10 h-10 flex items-center justify-center text-soft">
+            <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><circle cx="11" cy="11" r="7" /><path d="m20 20-3.5-3.5" /></svg>
+          </button>
           {bell}
         </div>
 
@@ -188,8 +205,8 @@ export default function AdminPanel() {
           {tab === "mensajes" && (
             <MessagesInbox onUnreadChange={setUnreadMessages} initialStudentId={inboxStudent} onInitialDone={clearInboxStudent} />
           )}
-          {tab === "rutinas" && <RoutinesView />}
-          {tab === "ejercicios" && <ExercisesView />}
+          {tab === "rutinas" && <RoutinesView initialOpenId={pendingOpen?.kind === "routine" ? pendingOpen.id : null} onInitialOpenDone={() => setPendingOpen(null)} />}
+          {tab === "ejercicios" && <ExercisesView initialOpenId={pendingOpen?.kind === "exercise" ? pendingOpen.id : null} onInitialOpenDone={() => setPendingOpen(null)} />}
           {tab === "alumnos" && (
             <StudentsView initialAction={pendingStudentAction} onInitialActionDone={() => setPendingStudentAction(null)} />
           )}
@@ -208,6 +225,17 @@ export default function AdminPanel() {
           {tab === "perfil" && <ProfileView onProfileUpdate={setFullName} />}
         </div>
       </div>
+      <CommandPalette
+        open={paletteOpen}
+        onClose={() => setPaletteOpen(false)}
+        sections={Object.entries(tabLabels).filter(([k]) => k !== "usuarios" || isAdmin).map(([key, label]) => ({ key, label }))}
+        onGo={(kind, id) => {
+          if (kind === "tab") return setTab(id);
+          if (kind === "student") { setPendingStudentAction({ id, action: null }); setTab("alumnos"); return; }
+          setPendingOpen({ kind, id });
+          setTab(kind === "routine" ? "rutinas" : "ejercicios");
+        }}
+      />
     </div>
   );
 }

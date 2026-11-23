@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { Copy, Pencil, Play, Plus, Trash2 } from "lucide-react";
+import { ActionCard, InlineRename } from "@/components/ui/ActionCard";
 import { matchesSearch } from "@/lib/search";
 import { filterItems, sortItems } from "@/lib/filters";
 import { useFilterState } from "@/lib/useFilterState";
@@ -32,7 +33,7 @@ const FACETS = [
   },
 ];
 
-export function ExercisesView() {
+export function ExercisesView({ initialOpenId = null, onInitialOpenDone } = {}) {
   const [exercises, setExercises] = useState([]);
   const [loading, setLoading] = useState(true);
   const [form, setForm] = useState({ name: "", group: "", videoUrl: "" });
@@ -55,6 +56,14 @@ export function ExercisesView() {
   }
 
   useEffect(() => { loadExercises(); }, []);
+
+  // Llegó desde el buscador general: abre ese ejercicio para editarlo
+  useEffect(() => {
+    if (!initialOpenId || loading) return;
+    const ex = exercises.find((x) => x.id === initialOpenId);
+    if (ex) startEdit(ex);
+    onInitialOpenDone?.();
+  }, [initialOpenId, loading]);
 
   const saveExercise = async () => {
     if (!form.name.trim()) return alert("Escribí el nombre del ejercicio.");
@@ -83,6 +92,14 @@ export function ExercisesView() {
     setEditingId(ex.id);
     setForm({ name: ex.name, group: ex.muscle_group || "", videoUrl: ex.video_url || "" });
     try { (document.getElementById("coach-scroll") || window).scrollTo({ top: 0, behavior: "smooth" }); } catch { }
+  };
+
+  // Doble clic en el nombre para cambiarlo ahí mismo
+  const renameExercise = async (ex, name) => {
+    const { error } = await supabase.from("exercises").update({ name }).eq("id", ex.id);
+    if (error) { alert("No se pudo cambiar el nombre."); return false; }
+    setExercises((list) => list.map((x) => (x.id === ex.id ? { ...x, name } : x)));
+    return true;
   };
 
   const duplicateExercise = async (ex) => {
@@ -130,7 +147,7 @@ export function ExercisesView() {
       <p className="text-muted text-sm mb-6">Estos ejercicios se reutilizan al armar cualquier rutina.</p>
 
       <div className="bg-card rounded-xl p-4 mb-6 flex flex-col md:flex-row gap-2">
-        <input placeholder="Nombre del ejercicio" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} className="flex-1 bg-field text-ink text-sm rounded-lg px-3 py-2 outline-none" />
+        <input data-shortcut="new" title="Nuevo ejercicio (N)" placeholder="Nombre del ejercicio" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} className="flex-1 bg-field text-ink text-sm rounded-lg px-3 py-2 outline-none" />
         <input placeholder="Grupo muscular" value={form.group} onChange={(e) => setForm({ ...form, group: e.target.value })} className="md:w-40 bg-field text-ink text-sm rounded-lg px-3 py-2 outline-none" />
         <input placeholder="Link del video" value={form.videoUrl} onChange={(e) => setForm({ ...form, videoUrl: e.target.value })} className="flex-1 bg-field text-ink text-sm rounded-lg px-3 py-2 outline-none" />
         <button onClick={saveExercise} className="bg-accent text-app px-4 py-2 rounded-lg text-sm font-medium flex items-center justify-center gap-1 shrink-0">
@@ -159,9 +176,16 @@ export function ExercisesView() {
         ) : visible.length === 0 ? (
           <p className="text-muted text-sm px-4 py-4">{exercises.length > 0 ? "No hay ejercicios que coincidan con la búsqueda o los filtros." : "Todavía no hay ejercicios."}</p>
         ) : visible.map((ex) => (
-          <div key={ex.id} className="grid grid-cols-[1fr_auto] md:grid-cols-[1fr_140px_1fr_104px] gap-2 px-4 py-3 items-center border-b border-field last:border-0">
+          <ActionCard key={ex.id} onOpen={() => startEdit(ex)} ariaLabel={`Editar ${ex.name}`}
+            outerClassName="border-b border-field last:border-0"
+            className="grid grid-cols-[1fr_auto] md:grid-cols-[1fr_140px_1fr_104px] gap-2 px-4 py-3 items-center"
+            actions={[
+              { label: "Editar", icon: Pencil, onClick: () => startEdit(ex) },
+              { label: "Duplicar", icon: Copy, onClick: () => duplicateExercise(ex) },
+              { label: "Eliminar", icon: Trash2, danger: true, onClick: () => deleteExercise(ex) },
+            ]}>
             <span className="text-ink text-sm min-w-0">
-              {ex.name}
+              <InlineRename value={ex.name} onSave={(v) => renameExercise(ex, v)} />
               <span className="md:hidden block text-muted text-xs">{ex.muscle_group || "Sin grupo"} · {ex.video_url ? "Con video" : "Sin video"}</span>
               {ex._uses > 0 && <span className="block text-muted text-[11px]">En {ex._uses} {ex._uses === 1 ? "rutina" : "rutinas"}</span>}
             </span>
@@ -172,7 +196,7 @@ export function ExercisesView() {
               <button onClick={() => duplicateExercise(ex)} aria-label="Duplicar" className="text-muted hover:text-ink p-2 md:p-1"><Copy size={14} /></button>
               <button onClick={() => deleteExercise(ex)} aria-label="Eliminar" className="text-muted hover:text-danger p-2 md:p-1"><Trash2 size={14} /></button>
             </div>
-          </div>
+          </ActionCard>
         ))}
       </div>
     </div>
