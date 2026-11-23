@@ -9,6 +9,7 @@ import { cleanDecimal, cleanInt, toNumber } from "@/lib/numbers";
 import { UnitToggle, WeightInput } from "@/components/ui/WeightInput";
 import { formatWeight, useWeightUnit } from "@/lib/weightUnits";
 import { Chameleon } from "@/components/ui/Chameleon";
+import { ExerciseCommentBox } from "./ExerciseCommentBox";
 
 // Primer número de las reps sugeridas ("8-10" → 8) para "Marcar todas como sugeridas"
 const firstNumber = (text) => {
@@ -29,7 +30,7 @@ const inputCls =
 // readOnly = el entrenamiento ya se finalizó: solo se ven las series, no se cambian
 // coachMode = lo abre el coach: NO puede marcar ni desmarcar series (eso solo lo hace el alumno);
 //             solo corrige el peso y las reps de las series que el alumno ya registró.
-export function SetLogger({ exercise, routine, userId, onClose, onComplete, onUncomplete, onStartRest, readOnly = false, pet = null, coachMode = false, onCorrected = null }) {
+export function SetLogger({ exercise, routine, userId, onClose, onComplete, onUncomplete, onStartRest, readOnly = false, pet = null, coachMode = false, onCorrected = null, comment = "", onCommentSaved = null }) {
   const [rows, setRows] = useState([]);
   const [dirty, setDirty] = useState(() => new Set()); // series corregidas por el coach sin guardar
   const [savedMsg, setSavedMsg] = useState("");
@@ -217,6 +218,15 @@ export function SetLogger({ exercise, routine, userId, onClose, onComplete, onUn
               <MessageSquareText size={13} /> {tr("Observación de su coach")}
             </p>
             <p className="text-ink text-sm whitespace-pre-wrap break-words">{exercise.note}</p>
+          </div>
+        )}
+        {!coachMode && onCommentSaved && (
+          <ExerciseCommentBox exercise={exercise} routineId={routineId} dayLabel={routine.day_label} userId={userId} value={comment} onSaved={onCommentSaved} />
+        )}
+        {coachMode && comment && (
+          <div className="bg-warning/10 border border-warning/30 rounded-xl px-3 py-2.5 mb-4">
+            <p className="text-warning text-[11px] font-semibold mb-0.5">Comentario del alumno</p>
+            <p className="text-ink text-sm whitespace-pre-wrap break-words">{comment}</p>
           </div>
         )}
 
