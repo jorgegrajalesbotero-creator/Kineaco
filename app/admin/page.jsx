@@ -87,6 +87,10 @@ export default function AdminPanel() {
       setTab("mensajes");
       return;
     }
+    if (n.link === "community") {
+      setTab("comunidad");
+      return;
+    }
     if (n.student_id && ["messages", "nutrition", "access", "photos", "progress", "checkin", "measurements", "routine"].includes(n.link)) {
       setPendingStudentAction({ id: n.student_id, action: n.link });
     }

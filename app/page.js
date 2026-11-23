@@ -250,7 +250,7 @@ export default function App() {
       setShowCheckin(true);
       return;
     }
-    const target = { messages: "messages", progress: "progress", photos: "progress", measurements: "progress", nutrition: "nutrition", profile: "profile" }[n.link] || "home";
+    const target = { messages: "messages", progress: "progress", photos: "progress", measurements: "progress", nutrition: "nutrition", profile: "profile", community: "community" }[n.link] || "home";
     handleSelectTab(target);
   };
 
@@ -635,7 +635,7 @@ export default function App() {
   } else if (tab === "messages") {
     content = <MessagesScreen userId={userId} onMessagesRead={() => { setUnreadMessageCount(0); setNotifKey((k) => k + 1); }} />;
   } else if (tab === "community") {
-    content = <CommunityScreen userId={userId} />;
+    content = <CommunityScreen userId={userId} isStaff={isCoach} />;
   } else if (tab === "progress") {
     content = <ProgressScreen healthConsent={healthConsent} onOpenCheckin={() => setShowCheckin(true)} onOpenMeasure={() => setShowMeasure(true)} streak={streak} bestStreak={bestStreak} totalCompleted={totalCompleted} weekStats={weekStats} recentActivity={recentActivity} bodyWeightLogs={bodyWeightLogs} onAddWeight={addBodyWeight} onUpdateWeight={updateBodyWeight} onDeleteWeight={deleteBodyWeight} userId={userId} fullName={fullName} />;
   } else {

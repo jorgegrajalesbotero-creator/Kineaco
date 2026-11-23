@@ -1,17 +1,21 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Award, Flame, Lock, Sparkles, Trophy, User, Users } from "lucide-react";
+import { Award, Flame, Lock, Megaphone, Sparkles, Trash2, Trophy, User, Users } from "lucide-react";
 import { supabase } from "@/lib/supabaseClient";
 import { tr } from "@/lib/i18n";
 import { PET_STATES } from "@/lib/chameleon";
 import { Chameleon } from "@/components/ui/Chameleon";
 import { Skeleton } from "@/components/ui/Skeleton";
-import { HIGHLIGHT_LABEL, PET_LEVELS, REACTIONS, challengePct, loadChallenges, loadFeed, loadMembership, react, setHighlight, setMembership, todayExercises } from "@/lib/community";
+import { HIGHLIGHT_LABEL, PET_LEVELS, REACTIONS, challengePct, createPost, deletePost, loadChallenges, loadFeed, loadMembership, loadPosts, react, setHighlight, setMembership, todayExercises } from "@/lib/community";
+import { ChallengeManager } from "@/components/coach/ChallengeManager";
 
 // Comunidad de su coach: mascotas, ejercicio destacado, constancia, retos y reacciones con un toque.
-// coachMode = la ve el coach desde su panel (siempre puede verla, no necesita "entrar").
-export function CommunityScreen({ userId, coachMode = false, header = null }) {
+// coachMode = la ve el coach desde su panel. isStaff = coach o admin en su vista de alumno.
+// El coach/admin siempre está dentro (no tiene que "entrar"), aparece con su mascota y puede publicar avisos y crear retos.
+export function CommunityScreen({ userId, coachMode = false, isStaff = false, header = null }) {
+  const staff = coachMode || isStaff;
+  const [posts, setPosts] = useState([]);
   const [membership, setMembershipState] = useState(null); // { missing, member }
   const [feed, setFeed] = useState(null);
   const [challenges, setChallenges] = useState([]);
@@ -19,13 +23,19 @@ export function CommunityScreen({ userId, coachMode = false, header = null }) {
   const [todayList, setTodayList] = useState([]);
 
   async function load() {
-    const m = coachMode ? { missing: false, member: { visible: true } } : await loadMembership(supabase, userId);
+    const m = await loadMembership(supabase, userId);
+    // El coach queda dentro automáticamente: así suma en los retos y le llegan los avisos de los otros coaches
+    if (staff && !m.missing && !m.member?.visible) {
+      const { error } = await setMembership(supabase, userId, true);
+      if (!error) m.member = { ...(m.member || {}), visible: true };
+    }
     setMembershipState(m);
-    if (m.missing || !m.member?.visible) { setFeed([]); return; }
-    const [f, c, t] = await Promise.all([loadFeed(supabase), loadChallenges(supabase), coachMode ? [] : todayExercises(supabase, userId)]);
+    if (m.missing || (!m.member?.visible && !staff)) { setFeed([]); return; }
+    const [f, c, t, p] = await Promise.all([loadFeed(supabase), loadChallenges(supabase), todayExercises(supabase, userId), loadPosts(supabase)]);
     setFeed(f.members);
     setChallenges(c);
     setTodayList(t);
+    setPosts(p);
   }
   useEffect(() => { load(); }, [userId]);
 
@@ -63,7 +73,7 @@ export function CommunityScreen({ userId, coachMode = false, header = null }) {
   }
 
   // Todavía no entró: se explica qué se comparte y qué no
-  if (!membership.member?.visible) {
+  if (!membership.member?.visible && !staff) {
     return (
       <div className="p-4 md:p-8 max-w-xl mx-auto">
         {header}
@@ -98,9 +108,13 @@ export function CommunityScreen({ userId, coachMode = false, header = null }) {
       {!coachMode && (
         <div className="flex items-center justify-between gap-2 mb-4">
           <h1 className="text-ink text-xl font-semibold flex items-center gap-2"><Users size={20} className="text-accent" /> {tr("Comunidad")}</h1>
-          <button onClick={() => join(false)} className="text-muted text-xs">{tr("Salir")}</button>
+          {!staff && <button onClick={() => join(false)} className="text-muted text-xs">{tr("Salir")}</button>}
         </div>
       )}
+
+      {isStaff && !coachMode && <div className="mb-4"><ChallengeManager onChange={load} /></div>}
+
+      <PostsBox posts={posts} feed={feed} userId={userId} staff={staff} onChange={load} />
 
       {challenges.length > 0 && (
         <div className="space-y-2 mb-5">
@@ -117,7 +131,7 @@ export function CommunityScreen({ userId, coachMode = false, header = null }) {
                 <p className="text-muted text-[11px] mt-1.5">
                   {tr("{p0} de {p1} {p2}", { p0: c.progress, p1: c.target, p2: c.kind === "series" ? tr("series") : tr("entrenamientos") })}
                   {" · "}{tr("{p0} en la comunidad", { p0: c.members })}
-                  {!coachMode && Number(c.mine) > 0 ? ` · ${tr("usted aportó {p0}", { p0: c.mine })}` : ""}
+                  {Number(c.mine) > 0 ? ` · ${tr("usted aportó {p0}", { p0: c.mine })}` : ""}
                 </p>
               </div>
             );
@@ -125,7 +139,7 @@ export function CommunityScreen({ userId, coachMode = false, header = null }) {
         </div>
       )}
 
-      {me && !coachMode && (
+      {me && (
         <div className="mb-5">
           <MemberCard m={me} mine />
           {todayList.length > 0 && (
@@ -148,6 +162,70 @@ export function CommunityScreen({ userId, coachMode = false, header = null }) {
       ) : (
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           {others.map((m) => <MemberCard key={m.user_id} m={m} onReact={(k) => toggleReaction(m, k)} />)}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// Avisos del coach: arriba del muro. El coach (o admin) escribe; los alumnos solo leen.
+function PostsBox({ posts, feed, userId, staff, onChange }) {
+  const [text, setText] = useState("");
+  const [saving, setSaving] = useState(false);
+  const byId = new Map((feed || []).map((m) => [m.user_id, m]));
+
+  const publish = async () => {
+    if (!text.trim()) return;
+    setSaving(true);
+    const { error } = await createPost(supabase, userId, text);
+    setSaving(false);
+    if (error) return alert("No se pudo publicar el aviso. ¿Ya se corrió el SQL de avisos en Supabase?");
+    setText("");
+    onChange?.();
+  };
+
+  const remove = async (p) => {
+    if (!confirm("¿Borrar este aviso?")) return;
+    const { error } = await deletePost(supabase, p.id);
+    if (error) return alert("No se pudo borrar.");
+    onChange?.();
+  };
+
+  if (!staff && posts.length === 0) return null;
+
+  return (
+    <div className="bg-card rounded-2xl p-4 mb-5">
+      <p className="text-ink text-sm font-medium flex items-center gap-1.5 mb-3"><Megaphone size={15} className="text-accent" /> {tr("Avisos del coach")}</p>
+      {staff && (
+        <div className="mb-3">
+          <textarea value={text} maxLength={500} rows={2} onChange={(e) => setText(e.target.value)} placeholder="Escriba un aviso para la comunidad (ej: «Esta semana vamos por el reto, ¡no se queden!»). Les llega una notificación."
+            className="w-full bg-field text-ink text-sm rounded-xl px-3 py-2 outline-none focus:ring-1 focus:ring-accent resize-none" />
+          <div className="flex justify-end mt-1.5">
+            <button onClick={publish} disabled={saving || !text.trim()} className="bg-accent text-app text-xs font-semibold rounded-lg px-4 py-2 disabled:opacity-50">{saving ? "Publicando..." : "Publicar aviso"}</button>
+          </div>
+        </div>
+      )}
+      {posts.length === 0 ? (
+        <p className="text-muted text-xs">Todavía no ha publicado avisos.</p>
+      ) : (
+        <div className="space-y-2">
+          {posts.map((p) => {
+            const a = byId.get(p.coach_id);
+            return (
+              <div key={p.id} className="bg-white/[0.03] rounded-xl px-3 py-2.5">
+                <div className="flex items-center gap-2">
+                  <div className="w-6 h-6 rounded-full bg-field overflow-hidden flex items-center justify-center shrink-0">
+                    {a?.avatar_url ? <img src={a.avatar_url} alt="" loading="lazy" decoding="async" className="w-full h-full object-cover" /> : <User size={12} className="text-muted" />}
+                  </div>
+                  <p className="text-ink text-xs font-medium flex-1 truncate">{a?.first_name || tr("Coach")} <span className="text-muted font-normal">· {new Date(p.created_at).toLocaleDateString(undefined, { day: "numeric", month: "short" })}</span></p>
+                  {staff && p.coach_id === userId && (
+                    <button onClick={() => remove(p)} aria-label="Borrar aviso" className="text-soft hover:text-danger"><Trash2 size={13} /></button>
+                  )}
+                </div>
+                <p className="text-soft text-sm mt-1.5 whitespace-pre-line break-words">{p.body}</p>
+              </div>
+            );
+          })}
         </div>
       )}
     </div>
