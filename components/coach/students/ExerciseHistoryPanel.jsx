@@ -1,7 +1,8 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { Minus, Pencil, Plus, Trash2 } from "lucide-react";
+import { ChevronLeft, ChevronRight, Minus, Pencil, Plus, Trash2 } from "lucide-react";
+import { makeSuggestedResolver } from "@/lib/suggestedWeights";
 import { supabase } from "@/lib/supabaseClient";
 import { localDateString } from "@/lib/dates";
 import { cleanDecimal, cleanInt, toNumber } from "@/lib/numbers";
@@ -60,10 +61,47 @@ export function ExerciseHistoryPanel({ student, onClose }) {
   }, [student.id]);
 
   const options = useMemo(() => exerciseOptionsFrom(entries || []), [entries]);
-  const activeKey = exerciseKey && options.some((o) => o.key === exerciseKey) ? exerciseKey : options[0]?.key;
+  // Sin ejercicio elegido se ve el resumen de las últimas 2 semanas (uno por ejercicio)
+  const activeKey = exerciseKey && options.some((o) => o.key === exerciseKey) ? exerciseKey : null;
   const active = options.find((o) => o.key === activeKey);
   const exEntries = useMemo(() => (entries || []).filter((e) => e.exerciseKey === activeKey), [entries, activeKey]);
   const points = useMemo(() => buildPoints(exEntries, "day"), [exEntries]);
+
+  // Resumen: la última sesión de cada ejercicio de las últimas 2 semanas
+  const recent = useMemo(() => {
+    const since = new Date();
+    since.setDate(since.getDate() - 14);
+    since.setHours(0, 0, 0, 0);
+    const last = new Map();
+    (entries || []).forEach((e) => {
+      if (e.source !== "app" || e.date < since) return;
+      const prev = last.get(e.exerciseKey);
+      if (!prev || e.date >= prev.date) last.set(e.exerciseKey, e);
+    });
+    return [...last.values()].sort((a, b) => b.date - a.date || a.exerciseName.localeCompare(b.exerciseName, "es"));
+  }, [entries]);
+
+  // Peso sugerido de cada sesión registrada en la app (lo que el alumno vio ese día)
+  const resolver = useMemo(() => makeSuggestedResolver(supabase, student.id), [student.id]);
+  const [suggested, setSuggested] = useState({});
+  useEffect(() => {
+    const todo = [...recent, ...exEntries].filter((e) => e.source === "app" && !(e.uid in suggested));
+    if (!todo.length) return;
+    let cancel = false;
+    (async () => {
+      const out = {};
+      for (const e of todo) {
+        try { out[e.uid] = await resolver({ date: e.dateStr, exerciseId: e.exerciseId, routineId: e.routineId, itemKey: e.itemKey }); } catch { out[e.uid] = null; }
+      }
+      if (!cancel) setSuggested((s) => ({ ...s, ...out }));
+    })();
+    return () => { cancel = true; };
+  }, [recent, exEntries, resolver]);
+  const tone = (e) => {
+    const t = suggested[e.uid];
+    if (t == null || e.weight == null) return "text-ink";
+    return Number(e.weight) >= Number(t) ? "text-accent" : "text-danger";
+  };
 
   const set = (patch) => {
     setError("");
@@ -258,6 +296,36 @@ export function ExerciseHistoryPanel({ student, onClose }) {
             )}
           </div>
 
+          {!active ? (
+            <>
+              <p className="text-muted text-[11px] font-medium uppercase tracking-[0.14em] mb-2">Últimas 2 semanas · peso sugerido vs. real</p>
+              {recent.length === 0 ? (
+                <p className="text-muted text-sm bg-card rounded-2xl p-4">No registró ejercicios en las últimas 2 semanas. Busque un ejercicio arriba para ver todo su historial.</p>
+              ) : (
+                <div className="bg-card rounded-2xl divide-y divide-field">
+                  {recent.map((e) => {
+                    const t = suggested[e.uid];
+                    return (
+                      <button key={e.uid} type="button" onClick={() => setExerciseKey(e.exerciseKey)} className="w-full flex items-center gap-3 px-4 py-2.5 text-left hover:bg-field/40">
+                        <div className="flex-1 min-w-0">
+                          <p className="text-ink text-sm truncate">{e.exerciseName}</p>
+                          <p className="text-muted text-[11px]">{formatEntryDate(e.date, "day")}{e.dayLabel ? ` · ${e.dayLabel}` : ""}</p>
+                        </div>
+                        <div className="text-right shrink-0">
+                          <p className={`text-sm font-medium tabular-nums ${tone(e)}`}>{formatWeight(e.weight, unit) || (e.reps != null ? `${e.reps} reps` : "—")}</p>
+                          <p className="text-muted text-[11px] tabular-nums">{t != null ? `sugerido ${formatWeight(t, unit)}` : e.uid in suggested ? "sin sugerido" : "…"}</p>
+                        </div>
+                        <ChevronRight size={15} className="text-muted shrink-0" />
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
+              <p className="text-muted text-[11px] mt-2">Verde: hizo el sugerido o más · rojo: menos. Toque un ejercicio para ver su gráfico y cada sesión.</p>
+            </>
+          ) : (
+          <>
+          <button type="button" onClick={() => setExerciseKey(null)} className="text-soft text-xs flex items-center gap-1 mb-3 hover:text-ink"><ChevronLeft size={14} /> Resumen de las últimas 2 semanas</button>
           <div className="bg-card rounded-2xl p-4 mb-5">
             <p className="text-muted text-[11px] mb-3">Vista día a día. El alumno ve lo mismo resumido por mes.</p>
             <ExerciseProgressView points={points} showSource />
@@ -268,9 +336,17 @@ export function ExerciseHistoryPanel({ student, onClose }) {
             {[...exEntries].reverse().map((e) => (
               <div key={e.uid} className="flex items-center gap-3 px-4 py-3">
                 <div className="flex-1 min-w-0">
-                  <p className="text-ink text-sm">
+                  <p className={`text-sm ${e.source === "app" ? tone(e) : "text-ink"}`}>
                     {[e.weight != null && formatWeight(e.weight, unit), e.reps != null && `${e.reps} reps`, e.sets != null && `${e.sets} ${e.sets === 1 ? "serie" : "series"}`].filter(Boolean).join(" × ")}
+                    {e.source === "app" && suggested[e.uid] != null && <span className="text-muted text-xs"> · sugerido {formatWeight(suggested[e.uid], unit)}</span>}
                   </p>
+                  {e.setList?.length > 0 && (
+                    <div className="flex flex-wrap gap-1 mt-1">
+                      {[...e.setList].sort((a, b) => a.n - b.n).map((s, i) => (
+                        <span key={i} className="text-[10px] text-soft bg-field rounded-md px-1.5 py-0.5 tabular-nums">{formatWeight(s.weight, unit) || "—"} × {s.reps ?? "—"}</span>
+                      ))}
+                    </div>
+                  )}
                   <p className="text-muted text-xs truncate">
                     {formatEntryDate(e.date, e.precision)}
                     {e.precision !== "day" && <span> · fecha aproximada</span>}
@@ -289,7 +365,9 @@ export function ExerciseHistoryPanel({ student, onClose }) {
               </div>
             ))}
           </div>
-          <p className="text-muted text-[11px] mt-2">Los registros &quot;App&quot; los cargó el alumno al entrenar; se corrigen desde su entreno. Los de &quot;Historial&quot; los podés corregir o borrar acá.</p>
+          <p className="text-muted text-[11px] mt-2">Los registros &quot;App&quot; los cargó el alumno al entrenar (verde: hizo el sugerido o más; rojo: menos); se corrigen desde su entreno. Los de &quot;Historial&quot; los podés corregir o borrar acá.</p>
+          </>
+          )}
         </>
       )}
     </PanelLayout>

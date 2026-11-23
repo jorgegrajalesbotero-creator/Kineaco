@@ -45,7 +45,7 @@ const PANELS = {
 // "Ver su rutina", Mensajes, PDF y el check-in (camaleón) van arriba, así que no se repiten aquí.
 const GROUPS = [
   { title: "Entrenamiento", icon: Calendar, items: [["Planeación (fases, rutinas y cargas)", "plan", Calendar], ["Extras: remates, intermitentes y entrenos adicionales", "extras", PlusCircle], ["Semana base (días fijos)", "days", Activity]] },
-  { title: "Progreso", icon: TrendingUp, items: [["Progreso por ejercicio (gráficos e historial)", "exercises", Dumbbell], ["Peso sugerido vs. real y logros", "compare", TrendingUp], ["Medidas", "measurements", Ruler], ["Fotos", "photos", Camera]] },
+  { title: "Progreso", icon: TrendingUp, items: [["Progreso por ejercicio (sugerido vs. real, gráficos e historial)", "exercises", Dumbbell], ["Logros e informe PDF", "compare", TrendingUp], ["Medidas", "measurements", Ruler], ["Fotos", "photos", Camera]] },
   { title: "Nutrición", icon: Utensils, items: [["Nutrición y comidas registradas", "nutrition", Utensils]] },
   { title: "Cuenta", icon: Lock, items: [["Acceso y ficha de ingreso", "access", Lock], ["Nombre, correo y eliminar cuenta", "account", UserCog]] },
 ];

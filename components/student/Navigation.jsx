@@ -1,6 +1,6 @@
 "use client";
 
-import { Home, MessageCircle, TrendingUp, User, Utensils } from "lucide-react";
+import { Home, MessageCircle, TrendingUp, User, Users, Utensils } from "lucide-react";
 import { tr } from "@/lib/i18n";
 
 export const STUDENT_NAV_ITEMS = [
@@ -8,6 +8,7 @@ export const STUDENT_NAV_ITEMS = [
   { key: "messages", get label() { return tr("Mensajes"); }, icon: MessageCircle },
   { key: "nutrition", get label() { return tr("Nutrición"); }, icon: Utensils },
   { key: "progress", get label() { return tr("Progreso"); }, icon: TrendingUp },
+  { key: "community", get label() { return tr("Comunidad"); }, icon: Users },
   { key: "profile", get label() { return tr("Perfil"); }, icon: User },
 ];
 
