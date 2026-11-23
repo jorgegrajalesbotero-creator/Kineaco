@@ -13,6 +13,8 @@ import { Skeleton } from "@/components/ui/Skeleton";
 import { PanelLayout } from "./PanelLayout";
 import { ExerciseNoteEditor } from "./ExerciseNoteEditor";
 import { ExerciseEditSheet } from "./ExerciseEditSheet";
+import { CheckoutSummary } from "./CheckoutSummary";
+import { loadCheckout } from "@/lib/checkout";
 import { TimerOverrideEditor } from "./TimerOverrideEditor";
 import { saveStudentTimer } from "@/lib/routineTimers";
 import { RoutineNoteEditor } from "./RoutineNoteEditor";
@@ -38,6 +40,7 @@ export function RoutinePreviewPanel({ student, onClose, onOpenPanel }) {
   const [editingTimer, setEditingTimer] = useState(null); // { part, block } reloj solo para este alumno
   const [editingNote, setEditingNote] = useState(null); // { part, block } comentario solo para este alumno (block === part: el del día)
   const [session, setSession] = useState(null); // ¿el alumno ya finalizó este día?
+  const [checkout, setCheckout] = useState(null); // check-out del alumno ese día (molestias, esfuerzo, comentario)
   const [sessionBusy, setSessionBusy] = useState(false);
   // En vivo: cuando el alumno marca una serie, un ejercicio o finaliza, la vista se actualiza sola
   const [liveTick, setLiveTick] = useState(0);
@@ -55,15 +58,18 @@ export function RoutinePreviewPanel({ student, onClose, onOpenPanel }) {
   async function loadRoutine(sched, d, offset) {
     setLoading(true);
     try {
-      const [r, s] = await Promise.all([
+      const [r, s, co] = await Promise.all([
         buildDay(supabase, student.id, d, { weekOffset: offset, schedule: sched }),
         loadSession(supabase, student.id, weekStartISO(offset), d),
+        loadCheckout(supabase, student.id, weekStartISO(offset), d),
       ]);
       setRoutine(r);
       setSession(s);
+      setCheckout(co.data);
     } catch {
       setRoutine(null);
       setSession(null);
+      setCheckout(null);
     }
     setLoading(false);
   }
@@ -73,12 +79,14 @@ export function RoutinePreviewPanel({ student, onClose, onOpenPanel }) {
     const { schedule: sched, day: d, weekOffset: offset } = view.current;
     if (!sched) return;
     try {
-      const [r, s] = await Promise.all([
+      const [r, s, co] = await Promise.all([
         buildDay(supabase, student.id, d, { weekOffset: offset, schedule: sched }),
         loadSession(supabase, student.id, weekStartISO(offset), d),
+        loadCheckout(supabase, student.id, weekStartISO(offset), d),
       ]);
       setRoutine(r);
       setSession(s);
+      setCheckout(co.data);
       setLiveTick((t) => t + 1);
     } catch {
       // sin conexión: se intenta en el próximo cambio
@@ -105,6 +113,10 @@ export function RoutinePreviewPanel({ student, onClose, onOpenPanel }) {
       .on("postgres_changes", { event: "INSERT", table: "progress", ...mine }, own)
       .on("postgres_changes", { event: "INSERT", table: "workout_sessions", ...mine }, own)
       .on("postgres_changes", { event: "UPDATE", table: "workout_sessions", ...mine }, own)
+      .on("postgres_changes", { event: "INSERT", table: "workout_checkouts", ...mine }, own)
+      .on("postgres_changes", { event: "UPDATE", table: "workout_checkouts", ...mine }, own)
+      .on("postgres_changes", { event: "INSERT", table: "student_exercise_comments", ...mine }, own)
+      .on("postgres_changes", { event: "UPDATE", table: "student_exercise_comments", ...mine }, own)
       // Los borrados (desmarcar) no se pueden filtrar por alumno: se recarga y listo
       .on("postgres_changes", { event: "DELETE", schema: "public", table: "progress_sets" }, own)
       .on("postgres_changes", { event: "DELETE", schema: "public", table: "progress" }, own)
@@ -275,6 +287,7 @@ export function RoutinePreviewPanel({ student, onClose, onOpenPanel }) {
             </div>
           )}
           {weekOffset === 0 && <p className="text-muted text-[11px] mb-2">Las series y ejercicios los marca solo el alumno; vos ves cada uno apenas lo marca. Para corregir un peso o unas reps de una serie ya hecha: abrí el ejercicio → «Corregir peso y reps de cada serie».</p>}
+          {checkout && <div className="mb-3"><CheckoutSummary checkout={checkout} title="Check-out de este día" /></div>}
           {noteCount > 0 && <p className="text-accent text-xs mb-2">{noteCount} ejercicio{noteCount > 1 ? "s" : ""} con observación este día</p>}
           <div className="rounded-2xl border border-white/[0.06] overflow-hidden">
             <RoutineScreen

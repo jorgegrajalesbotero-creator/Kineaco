@@ -7,6 +7,7 @@ import { Skeleton } from "@/components/ui/Skeleton";
 import { Chameleon } from "@/components/ui/Chameleon";
 import { PET_STATES, petMood } from "@/lib/chameleon";
 import { PanelLayout } from "./PanelLayout";
+import { CheckoutSummary } from "./CheckoutSummary";
 import { useWeightUnit, weightLabel } from "@/lib/weightUnits";
 
 // Color según el valor: en estrés y hambre, alto es malo
@@ -25,6 +26,35 @@ const dayTitle = (d) => {
 
 // ¿Llegó mal? (mismo criterio que el aviso al coach)
 const dailyAlert = (c) => (c.pain && c.pain_level >= 7) || c.energy === 1 || c.sleep === 1 || c.soreness === 5;
+
+// Check-outs (después de entrenar): esfuerzo, molestias por ejercicio y comentario
+function CheckoutList({ student }) {
+  const [items, setItems] = useState(null);
+  const [missing, setMissing] = useState(false);
+  useEffect(() => {
+    supabase
+      .from("workout_checkouts")
+      .select("*")
+      .eq("user_id", student.id)
+      .order("created_at", { ascending: false })
+      .limit(40)
+      .then(({ data, error }) => { setMissing(!!error); setItems(data || []); });
+  }, [student.id]);
+  if (items == null) return <Skeleton rows={3} height="h-20" />;
+  if (missing) return <p className="text-muted text-sm bg-card rounded-xl p-4">Falta aplicar el SQL del check-out en Supabase.</p>;
+  if (items.length === 0) return <p className="text-muted text-sm bg-card rounded-xl p-4">Todavía no hizo ningún check-out. Se le ofrece al finalizar el entrenamiento (es opcional).</p>;
+  const withIssues = items.filter((c) => c.had_issue).length;
+  return (
+    <div className="space-y-2">
+      {withIssues > 0 && <p className="text-danger text-xs">{withIssues} de {items.length} con molestias</p>}
+      {items.map((c) => {
+        const date = new Date(`${c.week_start}T12:00:00`);
+        const label = `${c.day_label} · semana del ${date.toLocaleDateString("es-CO", { day: "numeric", month: "short" })}`;
+        return <CheckoutSummary key={c.id} checkout={c} title={label} />;
+      })}
+    </div>
+  );
+}
 
 // Check-ins diarios (antes de entrenar) del alumno
 function DailyList({ student }) {
@@ -168,12 +198,14 @@ export function CheckinPanel({ student, onClose }) {
   return (
     <PanelLayout title="Check-ins" subtitle={student.name} onClose={onClose} width="max-w-2xl">
       <div className="flex gap-2 mb-4">
-        {[["diario", "Diario"], ["semanal", "Semanal (domingos)"]].map(([k, l]) => (
+        {[["diario", "Diario"], ["checkout", "Check-out"], ["semanal", "Semanal (domingos)"]].map(([k, l]) => (
           <button key={k} onClick={() => setTab(k)} className={`flex-1 py-2 rounded-lg text-sm ${tab === k ? "bg-accent text-app font-medium" : "bg-card text-soft"}`}>{l}</button>
         ))}
       </div>
       {tab === "diario" ? (
         <DailyList student={student} />
+      ) : tab === "checkout" ? (
+        <CheckoutList student={student} />
       ) : loading ? (
         <Skeleton rows={3} height="h-32" />
       ) : items.length === 0 ? (

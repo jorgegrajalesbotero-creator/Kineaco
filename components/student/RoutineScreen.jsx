@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Check, ChevronLeft, ChevronRight, Download, Lock, MessageSquarePlus, MessageSquareText, Pencil, Play, Plus, SlidersHorizontal, SquarePen, Timer, X } from "lucide-react";
+import { Check, ChevronLeft, ChevronRight, Download, Lock, MessageCircle, MessageSquarePlus, MessageSquareText, Pencil, Play, Plus, SlidersHorizontal, SquarePen, Timer, X } from "lucide-react";
 import { blockTypeLabel } from "@/lib/blocks";
 import { currentWeekStartISO } from "@/lib/dates";
 import { appLocale, tr } from "@/lib/i18n";
@@ -18,6 +18,9 @@ import { useClockExercise } from "@/lib/useClockExercise";
 import { SetLogger } from "@/components/student/SetLogger";
 import { Chameleon } from "@/components/ui/Chameleon";
 import { finishSession, fmtFinished, isLocked, loadSession, weekStartISO } from "@/lib/workoutSession";
+import { loadCheckout } from "@/lib/checkout";
+import { CheckoutSheet } from "./CheckoutSheet";
+import { ExerciseCommentBox } from "./ExerciseCommentBox";
 
 // Primer número de las reps sugeridas ("8-10" → 8)
 const firstNumber = (text) => {
@@ -153,9 +156,23 @@ export function RoutineScreen({ routine, userId, pet = null, onClose, onToggle, 
   const [finishing, setFinishing] = useState(false);
   async function loadDaySession() {
     if (preview) return;
-    setSession(await loadSession(supabase, userId, weekStartISO(), routine.day_label));
+    const [s, co] = await Promise.all([
+      loadSession(supabase, userId, weekStartISO(), routine.day_label),
+      loadCheckout(supabase, userId, weekStartISO(), routine.day_label),
+    ]);
+    setSession(s);
+    setCheckout(co.data);
+    setCheckoutOn(!co.missing);
   }
   useEffect(() => { loadDaySession(); }, [routine.day_label, userId]);
+  // ---------- Check-out opcional al terminar y comentarios del alumno en cada ejercicio ----------
+  const [checkout, setCheckout] = useState(null);
+  const [checkoutOn, setCheckoutOn] = useState(false); // false si la tabla todavía no existe
+  const [showCheckout, setShowCheckout] = useState(false);
+  const [myComments, setMyComments] = useState({});
+  const cKey = (ex) => `${ex.routineId || routine.id}|${ex.itemKey || ""}|${ex.exerciseId}`;
+  const commentOf = (ex) => (myComments[cKey(ex)] !== undefined ? myComments[cKey(ex)] : ex.studentComment || "");
+  const setCommentOf = (ex, text) => setMyComments((m) => ({ ...m, [cKey(ex)]: text }));
   const locked = !preview && isLocked(session);
 
   const total = routine.exercises.length;
@@ -236,6 +253,8 @@ export function RoutineScreen({ routine, userId, pet = null, onClose, onToggle, 
     setSession(data);
     stopRest();
     navigator.vibrate?.([20, 60, 30]);
+    // Check-out opcional: se ofrece apenas termina (se puede cerrar con «Ahora no»)
+    if (checkoutOn && !checkout) setTimeout(() => setShowCheckout(true), 900);
   };
 
   // Puntos de series (rutinas por bloques): tocar el siguiente marca esa serie; tocar el último hecho lo desmarca
@@ -297,6 +316,12 @@ export function RoutineScreen({ routine, userId, pet = null, onClose, onToggle, 
           {ex.note && (
             <p className="inline-flex items-center gap-1 text-accent text-[11px] font-medium mt-0.5">
               <MessageSquareText size={12} /> {tr("Tiene observación de su coach")}
+            </p>
+          )}
+          {commentOf(ex) && (
+            <p className={`flex items-start gap-1 text-[11px] mt-0.5 ${preview ? "text-warning" : "text-soft"}`}>
+              <MessageCircle size={12} className="shrink-0 mt-0.5" />
+              <span className="line-clamp-2 break-words">{preview ? `Comentario del alumno: ${commentOf(ex)}` : tr("Le dejó un comentario a su coach")}</span>
             </p>
           )}
         </div>
@@ -401,6 +426,17 @@ export function RoutineScreen({ routine, userId, pet = null, onClose, onToggle, 
 
   return (
     <div className="flex-1 overflow-y-auto pb-4">
+      {showCheckout && !preview && (
+        <CheckoutSheet
+          userId={userId}
+          weekStart={weekStartISO()}
+          dayLabel={routine.day_label}
+          exercises={routine.exercises}
+          initial={checkout}
+          onClose={() => setShowCheckout(false)}
+          onSaved={(row) => setCheckout(row)}
+        />
+      )}
       {celebrate && <Confetti onDone={() => setTimeout(() => setCelebrate(false), 1200)} />}
       {celebrate && (
         <div className="fixed inset-x-0 top-1/3 z-[61] flex justify-center px-6 pointer-events-none">
@@ -528,6 +564,11 @@ export function RoutineScreen({ routine, userId, pet = null, onClose, onToggle, 
             <p className="text-accent text-sm font-semibold flex items-center justify-center gap-1.5"><Check size={16} strokeWidth={3} /> {tr("Entrenamiento finalizado")}</p>
             <p className="text-muted text-xs mt-1">{fmtFinished(session.finished_at, appLocale())}</p>
             <p className="text-soft text-xs mt-2">{tr("Ya no se pueden cambiar las series ni los pesos. Si necesita corregir algo, pídale a su coach que habilite la edición.")}</p>
+            {checkoutOn && (
+              <button onClick={() => setShowCheckout(true)} className={`block w-full text-sm py-3 rounded-xl mt-3 ${checkout ? "bg-white/[0.04] text-soft" : "bg-accent/15 border border-accent/30 text-accent font-semibold"}`}>
+                {checkout ? (checkout.had_issue ? tr("Check-out enviado (con molestias) · Editar") : tr("Check-out enviado · Editar")) : tr("Hacer check-out: ¿le molestó algo?")}
+              </button>
+            )}
             <button onClick={onClose} className="block w-full bg-field text-ink font-medium text-sm py-3 rounded-xl mt-3">{tr("Volver al inicio")}</button>
           </div>
         ) : (
@@ -553,6 +594,16 @@ export function RoutineScreen({ routine, userId, pet = null, onClose, onToggle, 
                   <MessageSquareText size={14} /> {tr("Observación de su coach")}
                 </p>
                 <p className="text-ink text-sm whitespace-pre-wrap break-words">{detail.note}</p>
+              </div>
+            )}
+            {!preview && (
+              <ExerciseCommentBox key={cKey(detail)} exercise={detail} routineId={detail.routineId || routine.id} dayLabel={routine.day_label} userId={userId}
+                value={commentOf(detail)} onSaved={(text) => setCommentOf(detail, text)} />
+            )}
+            {preview && commentOf(detail) && (
+              <div className="bg-warning/10 border border-warning/30 rounded-xl px-3.5 py-3 mb-4">
+                <p className="text-warning text-xs font-semibold flex items-center gap-1.5 mb-1"><MessageCircle size={14} /> Comentario del alumno</p>
+                <p className="text-ink text-sm whitespace-pre-wrap break-words">{commentOf(detail)}</p>
               </div>
             )}
             {preview && onEditExercise && (
@@ -628,6 +679,8 @@ export function RoutineScreen({ routine, userId, pet = null, onClose, onToggle, 
           onComplete={(w) => completeExercise(loggerIndex, w)}
           onUncomplete={() => uncompleteExercise(loggerIndex)}
           onStartRest={startRest}
+          comment={commentOf(routine.exercises[loggerIndex])}
+          onCommentSaved={(text) => setCommentOf(routine.exercises[loggerIndex], text)}
         />
       )}
       {pdfPreview}
