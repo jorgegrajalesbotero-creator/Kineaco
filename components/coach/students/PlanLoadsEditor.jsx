@@ -303,7 +303,7 @@ export function PlanLoadsEditor({ userId, model = "atr", dayGoals = {}, startDat
               </p>
             )}
           </div>
-          <div className="flex items-center gap-2 shrink-0">
+          <div className="flex flex-wrap items-center gap-2 min-w-0">
             {userId && noteItemKey && (
               <button onClick={() => setNoteTarget({ itemKey: noteItemKey, exId, name })} title="Observación para el alumno (no cambia el plan)"
                 className={`text-xs rounded-lg px-2.5 py-1.5 flex items-center gap-1 ${note ? "bg-accent/15 text-accent" : "bg-field text-soft hover:text-ink"}`}>
@@ -611,7 +611,7 @@ export function PlanLoadsEditor({ userId, model = "atr", dayGoals = {}, startDat
       ) : (
         <>
           <div className="flex flex-wrap items-center justify-between gap-2 mb-3">
-            <div className="flex gap-1.5 overflow-x-auto pb-1">
+            <div className="flex gap-1.5 overflow-x-auto pb-1 min-w-0 max-w-full">
               {routines.map((r) => {
                 const n = (changes || []).filter((c) => String(c.routine_id) === String(r.id)).length;
                 return (

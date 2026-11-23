@@ -631,7 +631,7 @@ export function PlanPanel({ student, onClose, onOpenPanel }) {
         ) : (
         <>
 
-        <div className="flex gap-1.5 overflow-x-auto pb-2 mb-2">
+        <div className="flex gap-1.5 overflow-x-auto pb-2 mb-2 min-w-0 max-w-full">
           {editing.data.map((w, i) => {
             const info = weeksInfo[i];
             const color = info?.phase ? phaseType(info.phase.phase_type).color : null;
