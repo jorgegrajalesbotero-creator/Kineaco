@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { Eye } from "lucide-react";
 import { supabase } from "@/lib/supabaseClient";
 import { libraryRoutines } from "@/lib/libraryRoutines";
 import { matchesSearch } from "@/lib/search";
@@ -12,7 +13,7 @@ import { formatWeight, kgToText, toKg, useWeightUnit } from "@/lib/weightUnits";
 import { currentOrNextPlan, planLastDay, planStart, planWeekOf } from "@/lib/trainingPlan";
 
 // Rutinas asignadas por día + pesos personalizados del alumno
-export function DaysPanel({ student, onClose, onChanged }) {
+export function DaysPanel({ student, onClose, onChanged, onOpenPanel }) {
   const [unit] = useWeightUnit();
   const [routines, setRoutines] = useState([]);
   const [dayAssignments, setDayAssignments] = useState({});
@@ -97,6 +98,11 @@ export function DaysPanel({ student, onClose, onChanged }) {
 
   return (
     <PanelLayout title="Rutinas por día" subtitle={student.name} onClose={onClose}>
+      {onOpenPanel && (
+        <button onClick={() => onOpenPanel("routine")} className="w-full mb-4 bg-card border border-accent/30 text-accent text-sm font-medium rounded-xl py-2.5 flex items-center justify-center gap-1.5">
+          <Eye size={15} /> Ver y editar como el alumno (peso, series, ejercicios, observaciones, comentarios y reloj)
+        </button>
+      )}
       {activePlan && (
         <p className="text-xs bg-accent/10 border border-accent/20 text-soft rounded-lg px-3 py-2 mb-3">
           {planWeekOf(activePlan, new Date()) ? "Tiene un plan activo" : "Tiene un plan que empieza pronto"} ({planStart(activePlan).toLocaleDateString("es-CO", { day: "numeric", month: "short" })} – {planLastDay(activePlan).toLocaleDateString("es-CO", { day: "numeric", month: "short" })}). Mientras dure el plan, el alumno ve las rutinas del plan en vez de estos días fijos.

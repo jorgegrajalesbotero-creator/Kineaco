@@ -26,8 +26,10 @@ export const ATR_PRESET = () => modelPhases("atr");
 
 // Fases del plan: tipo, nombre, semanas, % de inicio y fin, reps y series de inicio y fin
 // showRir = planeación autorregulada (o alguna fase ya tiene RIR): muestra RIR de inicio y fin.
-export function PlanPhasesEditor({ phases, onChange, showRir = false }) {
-  const rirOn = showRir || phases.some(hasRir);
+// types = tipos de fase del tipo de planeación (solo esos se ofrecen) · hidePct = sin % (progresión doble)
+export function PlanPhasesEditor({ phases, onChange, showRir = false, types = null, hidePct = false }) {
+  const rirOn = showRir;
+  const allowed = types && types.length ? types : PHASE_TYPES.map((t) => t.key);
   const set = (i, patch) => onChange(phases.map((p, j) => (j === i ? { ...p, ...patch } : p)));
   const changeType = (i, type) => {
     const p = phases[i];
@@ -85,7 +87,7 @@ export function PlanPhasesEditor({ phases, onChange, showRir = false }) {
               <label className="block">
                 <span className={label}>Fase</span>
                 <Select value={p.phase_type} onChange={(e) => changeType(i, e.target.value)} className="w-full">
-                  {PHASE_TYPES.map((pt) => <option key={pt.key} value={pt.key}>{pt.label}</option>)}
+                  {PHASE_TYPES.filter((pt) => allowed.includes(pt.key) || pt.key === p.phase_type).map((pt) => <option key={pt.key} value={pt.key}>{pt.label}</option>)}
                 </Select>
               </label>
               <label className="block">
@@ -97,6 +99,7 @@ export function PlanPhasesEditor({ phases, onChange, showRir = false }) {
                 <input inputMode="numeric" value={p.weeks} onChange={(e) => set(i, { weeks: cleanInt(e.target.value).slice(0, 2) })} className={field} />
               </label>
               <div />
+              {!hidePct && <>
               <label className="block">
                 <span className={label}>% inicio</span>
                 <input inputMode="decimal" value={p.pct_start} onChange={(e) => set(i, { pct_start: cleanDecimal(e.target.value, 1) })} placeholder={hasRir(p) ? "Del RIR" : "—"} className={field} />
@@ -105,6 +108,7 @@ export function PlanPhasesEditor({ phases, onChange, showRir = false }) {
                 <span className={label}>% fin</span>
                 <input inputMode="decimal" value={p.pct_end} onChange={(e) => set(i, { pct_end: cleanDecimal(e.target.value, 1) })} placeholder={hasRir(p) ? "Del RIR" : "—"} className={field} />
               </label>
+              </>}
               <label className="block">
                 <span className={label}>Reps inicio</span>
                 <input value={p.reps_start} maxLength={20} onChange={(e) => set(i, { reps_start: e.target.value })} placeholder="10-12" className={field} />
@@ -137,7 +141,7 @@ export function PlanPhasesEditor({ phases, onChange, showRir = false }) {
           </div>
         );
       })}
-      <button onClick={() => onChange([...phases, newPhase(phases.length === 0 ? "acumulacion" : "otro", 1)])} className="bg-field text-soft text-xs rounded-lg px-3 py-2 flex items-center gap-1.5 hover:text-ink">
+      <button onClick={() => onChange([...phases, newPhase(phases.length === 0 ? allowed[0] : allowed.includes(phases[phases.length - 1].phase_type) ? phases[phases.length - 1].phase_type : allowed[0], 1)])} className="bg-field text-soft text-xs rounded-lg px-3 py-2 flex items-center gap-1.5 hover:text-ink">
         <Plus size={13} /> Agregar fase
       </button>
     </div>

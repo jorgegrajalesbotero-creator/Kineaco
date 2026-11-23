@@ -1,14 +1,20 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { AlertTriangle, ArrowLeftRight, MessageSquarePlus, MessageSquareText, Pencil, Plus, RotateCcw, Trash2, Undo2, X } from "lucide-react";
+import { AlertTriangle, ArrowLeftRight, MessageSquarePlus, MessageSquareText, Pencil, Plus, RotateCcw, Timer, Trash2, Undo2, X } from "lucide-react";
 import { EPLEY_MAX_REPS, cellKey, dayGoal, fmtNum, loadFor, phaseType, rmOf } from "@/lib/loadCalc";
 import { WEEK_DAYS, localDateString } from "@/lib/dates";
 import { fetchAllRows } from "@/lib/fetchAll";
+import { modeLabel, planModel } from "@/lib/planModels";
 import { applyPlanChanges } from "@/lib/planChanges";
 import { loadExerciseNotes, noteFor, noteKey, saveExerciseNote } from "@/lib/exerciseNotes";
 import { supabase } from "@/lib/supabaseClient";
 import { ExerciseNoteEditor } from "./ExerciseNoteEditor";
+import { RoutineNoteEditor } from "./RoutineNoteEditor";
+import { TimerOverrideEditor } from "./TimerOverrideEditor";
+import { ROUTINE_NOTE_INDEX, loadRoutineNotes, notesFor, saveStudentNote } from "@/lib/routineNotes";
+import { LIST_TIMER_INDEX, loadTimers, saveStudentTimer, timersFor } from "@/lib/routineTimers";
+import { timerLabel } from "@/lib/clock";
 import { blockTypeLabel } from "@/lib/blocks";
 import { cleanDecimal, cleanInt } from "@/lib/numbers";
 import { Select } from "@/components/ui/Select";
@@ -25,7 +31,6 @@ const modeOf = (exLoads) => {
   if (exLoads.some((l) => l.base_type === "rir")) return "rir";
   return "kg";
 };
-const MODES = [["kg", "RM o peso"], ["double", "Progresión doble"], ["rir", "Por esfuerzo (RIR)"], ["reps", "Solo series y reps"]];
 const newKey = () => (typeof crypto !== "undefined" && crypto.randomUUID ? crypto.randomUUID() : `${Date.now()}-${Math.random().toString(16).slice(2)}`);
 
 // Cargas del plan, por rutina y por bloque, con los cambios de ejercicios del alumno.
@@ -74,7 +79,10 @@ export function PlanLoadsEditor({ userId, model = "atr", dayGoals = {}, startDat
   const [dayView, setDayView] = useState(null);
   const viewDay = model === "ondulante_diaria" && goalDays.length ? (goalDays.includes(dayView) ? dayView : goalDays[0]) : null;
   const goal = viewDay ? dayGoals[viewDay] : null;
-  const showRir = model === "rir" || weeks.some((w) => w.rir != null);
+  const pm = planModel(model);
+  const showRir = !!pm.showRir;
+  const hidePct = !!pm.hidePct;
+  const allowedModes = pm.modes || ["kg", "reps"];
 
   // ---------- Observaciones del alumno (aparte del plan) ----------
   const [notes, setNotes] = useState({});
@@ -97,6 +105,37 @@ export function PlanLoadsEditor({ userId, model = "atr", dayGoals = {}, startDat
       else delete copy[k];
       return copy;
     });
+    return true;
+  };
+
+  // ---------- Comentarios y reloj de cada bloque, solo para este alumno (aparte del plan) ----------
+  const [routineNotes, setRoutineNotes] = useState([]);
+  const [timerRows, setTimerRows] = useState([]);
+  const [blockEdit, setBlockEdit] = useState(null); // { kind: "note" | "timer", index, title }
+  const routineIdsKey = routines.map((r) => r.id).join(",");
+  async function loadBlockExtras() {
+    const ids = routineIdsKey ? routineIdsKey.split(",") : [];
+    const [n, t] = await Promise.all([loadRoutineNotes(supabase, ids, userId), loadTimers(supabase, ids, userId)]);
+    setRoutineNotes(n);
+    setTimerRows(t);
+  }
+  useEffect(() => { if (userId) loadBlockExtras(); }, [userId, routineIdsKey]);
+  const saveBlockNote = async (text) => {
+    const error = await saveStudentNote(supabase, userId, routineId, blockEdit.index, text);
+    if (error) {
+      alert("No se pudo guardar el comentario. Si es la primera vez, revisá que el SQL de comentarios de rutina esté aplicado en Supabase.");
+      return false;
+    }
+    await loadBlockExtras();
+    return true;
+  };
+  const saveBlockTimer = async (timer) => {
+    const error = await saveStudentTimer(supabase, userId, routineId, blockEdit.index, timer);
+    if (error) {
+      alert("No se pudo guardar el reloj. Si es la primera vez, revisá que el SQL del reloj programado esté aplicado en Supabase.");
+      return false;
+    }
+    await loadBlockExtras();
     return true;
   };
 
@@ -157,8 +196,8 @@ export function PlanLoadsEditor({ userId, model = "atr", dayGoals = {}, startDat
   }, [routine, rChanges]);
   const blocksOrder = useMemo(() => routine?.blocks || [], [routine]);
   const groups = useMemo(() => {
-    const out = blocksOrder.map((b) => ({ key: b.id, label: b.title || blockTypeLabel(b.block_type), items: [] }));
-    const loose = { key: "sin-bloque", label: blocksOrder.length ? "Sin bloque" : "Ejercicios", items: [] };
+    const out = blocksOrder.map((b, i) => ({ key: b.id, label: b.title || blockTypeLabel(b.block_type), items: [], block: b, index: b.order_index ?? i }));
+    const loose = { key: "sin-bloque", label: blocksOrder.length ? "Sin bloque" : "Ejercicios", items: [], block: null, index: blocksOrder.length ? null : LIST_TIMER_INDEX };
     slots.forEach((s) => {
       const g = out.find((x) => x.key === s.block_id);
       (g || loose).items.push(s);
@@ -244,6 +283,9 @@ export function PlanLoadsEditor({ userId, model = "atr", dayGoals = {}, startDat
     const repsOnly = mode === "reps";
     const kgLoads = exLoads.filter((l) => KG_TYPES.includes(l.base_type));
     const special = exLoads.find((l) => l.base_type === "double" || l.base_type === "rir");
+    // Solo las formas de progresar de este tipo de planeación (y la que ya tenga el ejercicio, para no esconder nada)
+    const current = mode === "kg" && kgLoads.length === 0 ? (allowedModes.includes("kg") ? "kg" : null) : mode;
+    const modeButtons = [...allowedModes, ...(current && !allowedModes.includes(current) ? [current] : [])];
     const rounding = (special || kgLoads[0])?.rounding ?? 2.5;
     const hasManual = Object.keys(cells).some((k) => k.startsWith(`${exId}:`));
     const others = otherRoutines(exId);
@@ -284,8 +326,9 @@ export function PlanLoadsEditor({ userId, model = "atr", dayGoals = {}, startDat
 
         {/* Tipo de progresión: con peso (RM o peso × reps) o solo series y reps */}
         <div className="flex gap-1 bg-field rounded-lg p-1 mb-3 w-full sm:w-auto sm:inline-flex" role="group" aria-label="Tipo de progresión">
-          {MODES.map(([k, l]) => {
-            const on = k === mode;
+          {modeButtons.map((k) => {
+            const l = modeLabel(k, model);
+            const on = k === current;
             return (
               <button key={k} type="button" aria-pressed={on} onClick={() => { if (!on) setMode(exId, k); }}
                 className={`flex-1 sm:flex-none text-xs rounded-md px-3 py-1.5 transition-colors ${on ? "bg-accent text-app font-semibold" : "text-soft hover:text-ink"}`}>
@@ -295,7 +338,8 @@ export function PlanLoadsEditor({ userId, model = "atr", dayGoals = {}, startDat
           })}
         </div>
 
-        {mode === "kg" && (kgLoads.length === 0 ? (
+        {!current && <p className="text-muted text-[11px] mb-2">Elija cómo progresa este ejercicio.</p>}
+        {current === "kg" && (kgLoads.length === 0 ? (
           <button onClick={() => addBase(exId)} className="bg-field text-soft text-xs rounded-lg px-3 py-2 flex items-center gap-1.5 hover:text-ink mb-2">
             <Plus size={13} /> Ingresar RM o peso
           </button>
@@ -510,7 +554,7 @@ export function PlanLoadsEditor({ userId, model = "atr", dayGoals = {}, startDat
   return (
     <div>
       <div className="bg-card rounded-xl p-4 mb-4">
-        <p className="text-ink text-sm font-medium mb-1">{showRir ? "%, reps, series y RIR de cada semana" : "%, reps y series de cada semana"}</p>
+        <p className="text-ink text-sm font-medium mb-1">{showRir ? "%, reps, series y RIR de cada semana" : hidePct ? "Reps y series de cada semana" : "%, reps y series de cada semana"}</p>
         <p className="text-muted text-xs mb-3">
           Salen de las fases. Podés cambiar una semana puntual escribiendo encima; para volver al cálculo, borrá el número.
           {model === "ondulante_diaria" ? " Es la base de la semana: cada día la ajusta según su objetivo." : ""}
@@ -520,7 +564,7 @@ export function PlanLoadsEditor({ userId, model = "atr", dayGoals = {}, startDat
             <div className="w-16 shrink-0" />
             {headerRow}
           </div>
-          {[["pct", "% del RM", "decimal"], ["reps", "Reps", "text"], ["sets", "Series", "numeric"], ...(showRir ? [["rir", "RIR", "decimal"]] : [])].map(([k, label, mode]) => (
+          {[...(hidePct ? [] : [["pct", "% del RM", "decimal"]]), ["reps", "Reps", "text"], ["sets", "Series", "numeric"], ...(showRir ? [["rir", "RIR", "decimal"]] : [])].map(([k, label, mode]) => (
             <div key={k} className="flex gap-2 items-center mt-1 min-w-max">
               <span className="w-16 shrink-0 text-muted text-xs">{label}</span>
               <div className="flex gap-1">
@@ -586,10 +630,50 @@ export function PlanLoadsEditor({ userId, model = "atr", dayGoals = {}, startDat
             Los cambios de ejercicios (sustituir, quitar, agregar) son solo para este alumno y valen desde la semana que elijas. La rutina original no cambia.
           </p>
 
+          {userId && routine && (() => {
+            const dayNote = notesFor(routineNotes, routineId)[ROUTINE_NOTE_INDEX] || "";
+            return (
+              <div className="bg-card rounded-xl px-4 py-3 mb-4 flex flex-wrap items-start justify-between gap-2">
+                <div className="min-w-0">
+                  <p className="text-ink text-sm font-medium">Comentario del día</p>
+                  <p className={`text-xs mt-0.5 whitespace-pre-wrap break-words ${dayNote ? "text-soft" : "text-muted"}`}>{dayNote || "Va arriba de la rutina, solo para este alumno."}</p>
+                </div>
+                <button onClick={() => setBlockEdit({ kind: "note", index: ROUTINE_NOTE_INDEX, title: "Comentario del día", block: null })} className="bg-field text-soft text-xs rounded-lg px-3 py-1.5 flex items-center gap-1.5 hover:text-ink shrink-0">
+                  {dayNote ? <Pencil size={12} /> : <MessageSquarePlus size={12} />} {dayNote ? "Editar" : "Agregar"}
+                </button>
+              </div>
+            );
+          })()}
           <div className="space-y-5">
             {groups.map((g) => (
               <div key={g.key}>
-                <p className="text-soft text-xs font-medium uppercase tracking-wide mb-2">{g.label}</p>
+                {(() => {
+                  const own = notesFor(routineNotes, routineId);
+                  const tm = g.index != null ? timersFor(timerRows, routineId, userId)[g.index] : null;
+                  const note = g.block ? own[g.index] || g.block.notes || "" : "";
+                  return (
+                    <div className="mb-2">
+                      <div className="flex flex-wrap items-center justify-between gap-2">
+                        <p className="text-soft text-xs font-medium uppercase tracking-wide">{g.label}</p>
+                        {userId && (
+                          <div className="flex gap-1.5">
+                            {g.block && (
+                              <button onClick={() => setBlockEdit({ kind: "note", index: g.index, title: g.label, block: g.block })} className={`text-xs rounded-lg px-2.5 py-1 flex items-center gap-1 ${own[g.index] ? "bg-accent/15 text-accent" : "bg-field text-soft hover:text-ink"}`}>
+                                <MessageSquareText size={12} /> Comentario
+                              </button>
+                            )}
+                            {g.index != null && (
+                              <button onClick={() => setBlockEdit({ kind: "timer", index: g.index, title: g.label, timer: tm })} className={`text-xs rounded-lg px-2.5 py-1 flex items-center gap-1 ${tm?.custom ? "bg-accent/15 text-accent" : "bg-field text-soft hover:text-ink"}`}>
+                                <Timer size={12} /> {tm ? timerLabel(tm.timer) : "Reloj"}
+                              </button>
+                            )}
+                          </div>
+                        )}
+                      </div>
+                      {note && <p className="text-soft text-[11px] mt-1 whitespace-pre-wrap break-words">{note}</p>}
+                    </div>
+                  );
+                })()}
                 <div className="space-y-3">
                   {g.items.length === 0 && <p className="text-muted text-xs">Sin ejercicios.</p>}
                   {g.items.map(slotCard)}
@@ -610,6 +694,28 @@ export function PlanLoadsEditor({ userId, model = "atr", dayGoals = {}, startDat
         </>
       )}
 
+      {blockEdit?.kind === "note" && (
+        <RoutineNoteEditor
+          title={blockEdit.title}
+          routineTitle={routine?.title}
+          initial={notesFor(routineNotes, routineId)[blockEdit.index] || ""}
+          base={blockEdit.block?.notes || ""}
+          isCustom={!!notesFor(routineNotes, routineId)[blockEdit.index]}
+          onSave={saveBlockNote}
+          onClose={() => setBlockEdit(null)}
+        />
+      )}
+      {blockEdit?.kind === "timer" && (
+        <TimerOverrideEditor
+          blockTitle={blockEdit.title}
+          routineTitle={routine?.title}
+          initial={blockEdit.timer?.timer || null}
+          base={blockEdit.timer?.base || null}
+          isCustom={!!blockEdit.timer?.custom}
+          onSave={saveBlockTimer}
+          onClose={() => setBlockEdit(null)}
+        />
+      )}
       {noteTarget && (
         <ExerciseNoteEditor
           exerciseName={noteTarget.name}

@@ -12,6 +12,7 @@ import { RoutineScreen } from "@/components/student/RoutineScreen";
 import { Skeleton } from "@/components/ui/Skeleton";
 import { PanelLayout } from "./PanelLayout";
 import { ExerciseNoteEditor } from "./ExerciseNoteEditor";
+import { ExerciseEditSheet } from "./ExerciseEditSheet";
 import { TimerOverrideEditor } from "./TimerOverrideEditor";
 import { saveStudentTimer } from "@/lib/routineTimers";
 import { RoutineNoteEditor } from "./RoutineNoteEditor";
@@ -33,6 +34,7 @@ export function RoutinePreviewPanel({ student, onClose, onOpenPanel }) {
   const [routine, setRoutine] = useState(null);
   const [loading, setLoading] = useState(true);
   const [editing, setEditing] = useState(null); // ejercicio al que se le escribe la observación
+  const [editingEx, setEditingEx] = useState(null); // ejercicio que se edita (peso, series, reps, cambiarlo)
   const [editingTimer, setEditingTimer] = useState(null); // { part, block } reloj solo para este alumno
   const [editingNote, setEditingNote] = useState(null); // { part, block } comentario solo para este alumno (block === part: el del día)
   const [session, setSession] = useState(null); // ¿el alumno ya finalizó este día?
@@ -190,7 +192,7 @@ export function RoutinePreviewPanel({ student, onClose, onOpenPanel }) {
     <PanelLayout title="Rutina como la ve el alumno" subtitle={student.isSelf ? "Mi entrenamiento" : student.name} onClose={onClose} width="max-w-2xl">
       <p className="text-muted text-xs mb-4 flex items-start gap-2">
         <Eye size={14} className="shrink-0 mt-0.5" />
-        <span>Así le aparece al alumno (con su plan, cargas y cambios de esa semana). Tocá «Observación» en cualquier ejercicio: es solo para este alumno, vale todas las semanas y no cambia la rutina ni la planeación.</span>
+        <span>Así le aparece al alumno (con su plan, cargas y cambios de esa semana). Desde aquí podés editar todo: «Editar» cambia peso, series, reps o el ejercicio (solo esta semana o desde esta semana); «Observación», los comentarios y el reloj son solo para este alumno.</span>
       </p>
 
       <div className="flex flex-wrap gap-2 mb-4">
@@ -281,6 +283,7 @@ export function RoutinePreviewPanel({ student, onClose, onOpenPanel }) {
               userId={student.id}
               preview
               onEditNote={setEditing}
+              onEditExercise={setEditingEx}
               onEditRoutineNote={(part, block) => setEditingNote({ part, block })}
               onEditTimer={(part, block) => setEditingTimer({ part, block })}
               coachEdit={weekOffset === 0}
@@ -315,6 +318,18 @@ export function RoutinePreviewPanel({ student, onClose, onOpenPanel }) {
           isCustom={editingNote.block === editingNote.part ? !!editingNote.part.dayNote : !!editingNote.block.notesCustom}
           onSave={saveRoutineNote}
           onClose={() => setEditingNote(null)}
+        />
+      )}
+      {editingEx && routine && (
+        <ExerciseEditSheet
+          student={student}
+          routine={routine}
+          exercise={editingEx}
+          plan={week.days.find((d) => d.label === day)?.plan || null}
+          planWeek={week.days.find((d) => d.label === day)?.planWeek || null}
+          dayLabel={day}
+          onClose={() => setEditingEx(null)}
+          onSaved={async () => { await loadWeekSchedule(); }}
         />
       )}
       {editing && (

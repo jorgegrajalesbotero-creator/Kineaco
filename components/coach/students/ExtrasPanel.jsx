@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { BookOpen, Pencil, Plus, Timer, Trash2, Wrench } from "lucide-react";
+import { BookOpen, Eye, Pencil, Plus, Timer, Trash2, Wrench } from "lucide-react";
 import { supabase } from "@/lib/supabaseClient";
 import { libraryRoutines } from "@/lib/libraryRoutines";
 import { WEEK_DAYS, localDateString } from "@/lib/dates";
@@ -271,6 +271,11 @@ export function ExtrasPanel({ student, onClose, onOpenPanel }) {
   return (
     <PanelLayout title="Extras" subtitle={student.isSelf ? "Mi entrenamiento" : student.name} onClose={onClose} width="max-w-2xl">
       <p className="text-muted text-xs mb-4">Remates, intermitentes o entrenos adicionales que se suman a su día, en los días y fechas que elijas. No cambian su planeación (ATR): ni semanas, ni cargas, ni ejercicios.</p>
+      {onOpenPanel && (
+        <button onClick={() => onOpenPanel("routine")} className="w-full mb-4 bg-card border border-accent/30 text-accent text-sm font-medium rounded-xl py-2.5 flex items-center justify-center gap-1.5">
+          <Eye size={15} /> Ver y editar como el alumno (peso, series, ejercicios, observaciones, comentarios y reloj)
+        </button>
+      )}
 
       <div className="grid grid-cols-3 gap-2 mb-5">
         {QUICK_TYPES.map(([k, label]) => (
