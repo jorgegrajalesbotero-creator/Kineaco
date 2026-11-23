@@ -198,7 +198,7 @@ export default function AdminPanel() {
           </div>
         )}
 
-        <div id="coach-scroll" className="flex-1 min-h-0 bg-app overflow-y-auto overscroll-contain pb-[env(safe-area-inset-bottom)]">
+        <div id="coach-scroll" className="flex-1 min-w-0 min-h-0 bg-app overflow-y-auto overflow-x-hidden overscroll-contain pb-[env(safe-area-inset-bottom)]">
           <div className="px-4 pt-4 md:px-8 md:pt-6 w-full max-w-6xl mx-auto empty:hidden">
             {coachId && <PushPromptCard userId={coachId} className="mb-0!" />}
           </div>
