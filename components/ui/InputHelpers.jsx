@@ -9,7 +9,9 @@ import { useEffect } from "react";
 //    (← → solo cuando el cursor está al inicio o al final del texto).
 //  · Esc: primero sale del campo; si no hay campo activo, cierra el panel o ventana de arriba (su botón «Cerrar»).
 //  · Arrastrar con el mouse (clic sostenido) mueve de lado las zonas que se desplazan a lo ancho.
-//  · Celular: deslizar el dedo desde el borde izquierdo hacia la derecha es "atrás" (cierra el panel abierto).
+//  · iPhone con la app instalada en la pantalla de inicio: deslizar desde el borde izquierdo es "atrás".
+//    En Safari, Chrome y Android el sistema ya hace "atrás" con ese gesto: ahí no se agrega nada
+//    (si se hiciera también, se devolvería dos veces).
 const FIELD = 'input:not([type="hidden"]):not([type="checkbox"]):not([type="radio"]):not([type="button"]):not([type="submit"]):not([type="file"]):not([type="range"]):not([disabled]):not([readonly]), select:not([disabled]), textarea:not([disabled])';
 const TEXTLIKE = new Set(["", "text", "number", "email", "tel", "url", "decimal", "date", "time"]);
 const visible = (el) => !!(el.offsetParent || el.getClientRects().length) && getComputedStyle(el).visibility !== "hidden";
@@ -157,9 +159,13 @@ export function InputHelpers() {
       drag = null;
     };
 
-    // Deslizar desde el borde izquierdo = atrás (solo si hay algo abierto dentro de la app)
+    // Deslizar desde el borde izquierdo = atrás: solo en iPhone/iPad con la app instalada (sin gesto propio del sistema)
+    const ios = /iPhone|iPad|iPod/.test(navigator.userAgent) || (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
+    const standalone = navigator.standalone === true || window.matchMedia?.("(display-mode: standalone)").matches;
+    const edgeBack = ios && standalone;
     let edge = null;
     const onTouchStart = (e) => {
+      if (!edgeBack) return;
       const t = e.touches[0];
       edge = t && t.clientX < 24 && e.touches.length === 1 ? { x: t.clientX, y: t.clientY, done: false } : null;
     };
