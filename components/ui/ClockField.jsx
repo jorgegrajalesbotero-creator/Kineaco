@@ -111,7 +111,7 @@ export function ClockField({ field, value, onChange, t = (x) => x, size = "lg" }
           onBlur={() => { if (!commit()) setEditing(false); }}
           onKeyDown={(e) => {
             if (e.key === "Enter") { e.preventDefault(); commit(); }
-            if (e.key === "Escape") setEditing(false);
+            if (e.key === "Escape") { e.preventDefault(); setEditing(false); }
           }}
           aria-label={t(field.label)}
           placeholder={field.unit === "time" ? "0:08" : ""}

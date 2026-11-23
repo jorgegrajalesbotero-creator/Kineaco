@@ -1,6 +1,8 @@
 "use client";
 
-import { ArrowDown, ArrowUp, Plus, X } from "lucide-react";
+import { Copy, Plus, X } from "lucide-react";
+import { DragHandle, SortableList, SortableRow, arrayMove, useListKeys } from "@/components/ui/Sortable";
+import { useUndo } from "@/components/ui/UndoToast";
 import { PHASE_DEFAULTS, PHASE_TYPES, phaseType } from "@/lib/loadCalc";
 import { cleanDecimal, cleanInt } from "@/lib/numbers";
 import { modelPhases } from "@/lib/planModels";
@@ -48,12 +50,23 @@ export function PlanPhasesEditor({ phases, onChange, showRir = false, types = nu
       ...(setsUntouched ? { sets_start: nextDefaults.sets_start, sets_end: nextDefaults.sets_end } : {}),
     });
   };
-  const move = (i, dir) => {
-    const t = i + dir;
-    if (t < 0 || t >= phases.length) return;
-    const copy = [...phases];
-    [copy[i], copy[t]] = [copy[t], copy[i]];
-    onChange(copy);
+  // Mover (arrastrando o con las flechas en la agarradera), duplicar y quitar con "Deshacer"
+  const rows = useListKeys(phases.length);
+  const { offer, toast } = useUndo();
+  const moveTo = (from, to) => {
+    if (to < 0 || to >= phases.length || from === to) return;
+    rows.move(from, to);
+    onChange(arrayMove(phases, from, to));
+  };
+  const duplicate = (i) => {
+    rows.insert(i + 1);
+    onChange([...phases.slice(0, i + 1), { ...phases[i] }, ...phases.slice(i + 1)]);
+  };
+  const remove = (i) => {
+    const prev = phases;
+    rows.remove(i);
+    onChange(phases.filter((_, j) => j !== i));
+    offer("Se quitó la fase", () => { rows.insert(i); onChange(prev); });
   };
   const field = "w-full bg-field text-ink text-sm rounded-lg px-2.5 py-2 outline-none focus:ring-1 focus:ring-accent";
   const label = "text-muted text-[11px]";
@@ -65,22 +78,24 @@ export function PlanPhasesEditor({ phases, onChange, showRir = false, types = nu
   }, 1);
 
   return (
-    <div className="space-y-2">
+    <div data-grid>
+    <SortableList ids={rows.keys} onMove={moveTo} className="space-y-2 mb-2">
       {phases.map((p, i) => {
         const t = phaseType(p.phase_type);
         const def = stringDefaults(p.phase_type);
         const n = Number(p.weeks) || 0;
         const from = phaseStarts[i];
         return (
-          <div key={i} className="bg-field/40 rounded-lg p-3" style={{ borderLeft: `3px solid ${t.color}`, borderRadius: 0 }}>
+          <SortableRow key={rows.keys[i]} id={rows.keys[i]}>{(handle) => (
+          <div className="bg-field/40 rounded-lg p-3" style={{ borderLeft: `3px solid ${t.color}`, borderRadius: 0 }}>
             <div className="flex items-center gap-2 mb-2">
+              <DragHandle {...handle} onKeyMove={(dir) => moveTo(i, i + dir)} label="Mover fase (arrastre o use las flechas ↑ ↓)" />
               <span className="text-xs font-medium" style={{ color: t.color }}>
                 {n > 0 ? (n === 1 ? `Semana ${from}` : `Semanas ${from}–${from + n - 1}`) : "Sin semanas"}
               </span>
               <div className="ml-auto flex items-center gap-1">
-                <button onClick={() => move(i, -1)} disabled={i === 0} aria-label="Subir fase" className="w-7 h-7 rounded-md text-soft flex items-center justify-center disabled:opacity-30 hover:text-accent"><ArrowUp size={14} /></button>
-                <button onClick={() => move(i, 1)} disabled={i === phases.length - 1} aria-label="Bajar fase" className="w-7 h-7 rounded-md text-soft flex items-center justify-center disabled:opacity-30 hover:text-accent"><ArrowDown size={14} /></button>
-                <button onClick={() => onChange(phases.filter((_, j) => j !== i))} aria-label="Quitar fase" className="w-7 h-7 rounded-md text-soft flex items-center justify-center hover:text-danger"><X size={14} /></button>
+                <button onClick={() => duplicate(i)} aria-label="Duplicar fase" title="Duplicar fase" className="w-7 h-7 rounded-md text-soft flex items-center justify-center hover:text-accent"><Copy size={13} /></button>
+                <button onClick={() => remove(i)} aria-label="Quitar fase" className="w-7 h-7 rounded-md text-soft flex items-center justify-center hover:text-danger"><X size={14} /></button>
               </div>
             </div>
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
@@ -139,11 +154,14 @@ export function PlanPhasesEditor({ phases, onChange, showRir = false, types = nu
               )}
             </div>
           </div>
+          )}</SortableRow>
         );
       })}
+    </SortableList>
       <button onClick={() => onChange([...phases, newPhase(phases.length === 0 ? allowed[0] : allowed.includes(phases[phases.length - 1].phase_type) ? phases[phases.length - 1].phase_type : allowed[0], 1)])} className="bg-field text-soft text-xs rounded-lg px-3 py-2 flex items-center gap-1.5 hover:text-ink">
         <Plus size={13} /> Agregar fase
       </button>
+      {toast}
     </div>
   );
 }

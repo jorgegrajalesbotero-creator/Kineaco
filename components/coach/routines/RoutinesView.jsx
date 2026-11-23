@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useScrollMemory } from "@/lib/useScrollMemory";
-import { Check, ChevronRight, Clock, Copy, Download, GitMerge, GripVertical, Pencil, Plus, Trash2, UserPlus, X } from "lucide-react";
+import { Check, ChevronRight, Clock, Copy, Download, GitMerge, Plus, Trash2, UserPlus, X } from "lucide-react";
 import { matchesSearch } from "@/lib/search";
 import { filterItems, sortItems } from "@/lib/filters";
 import { useFilterState } from "@/lib/useFilterState";
@@ -18,6 +18,8 @@ import { AssignRoutineModal } from "@/components/coach/routines/AssignRoutineMod
 import { RoutineModeToggle } from "@/components/coach/routines/RoutineModeToggle";
 import { RoutineTimerField } from "@/components/coach/routines/RoutineTimerField";
 import { SearchSelect } from "@/components/ui/Search";
+import { DragHandle, SortableList, SortableRow, arrayMove, keyOf } from "@/components/ui/Sortable";
+import { useUndo } from "@/components/ui/UndoToast";
 import { FilterBar } from "@/components/ui/FilterBar";
 import { Select } from "@/components/ui/Select";
 import { WeightInput } from "@/components/ui/WeightInput";
@@ -50,44 +52,78 @@ function routineFacets(assignedIds) {
   ];
 }
 
-// Lista simple de ejercicios: cada uno se puede editar (lápiz), mover o quitar
+// Lista simple de ejercicios: cada uno se puede editar (tocando el nombre), mover arrastrando desde ⋮⋮
+// (o con las flechas ↑ ↓ en la agarradera) o quitar. "Elegir varios" permite duplicar o quitar varios juntos.
 function ListItems({ items, setItems, catalog }) {
   const [editing, setEditing] = useState(null);
+  const [picked, setPicked] = useState(null); // null = modo normal; Set de índices = eligiendo varios
   const [unit] = useWeightUnit();
-  const move = (i, dir) => {
-    const t = i + dir;
-    if (t < 0 || t >= items.length) return;
-    const copy = [...items];
-    [copy[i], copy[t]] = [copy[t], copy[i]];
-    setItems(copy);
+  const { offer, toast } = useUndo();
+  const ids = items.map(keyOf);
+  const moveTo = (from, to) => {
+    if (to < 0 || to >= items.length || from === to) return;
+    setItems(arrayMove(items, from, to));
     setEditing(null);
   };
+  const removeAt = (set, label) => {
+    const prev = items;
+    setItems(items.filter((_, j) => !set.has(j)));
+    setEditing(null);
+    setPicked(null);
+    offer(label, () => setItems(prev));
+  };
+  const duplicateSet = (set) => {
+    const out = [];
+    items.forEach((x, j) => { out.push(x); if (set.has(j)) out.push({ ...x, itemKey: null }); });
+    setItems(out);
+    setPicked(null);
+  };
+  const toggle = (i) => setPicked((s) => { const n = new Set(s); if (n.has(i)) n.delete(i); else n.add(i); return n; });
   return (
-    <div className="space-y-2 mb-3">
-      {items.map((ex, i) =>
-        editing === i ? (
-          <ExerciseItemEditor
-            key={`edit-${i}`}
-            item={ex}
-            catalog={catalog}
-            showSets
-            onSave={(patch) => { setItems(items.map((x, j) => (j === i ? { ...x, ...patch } : x))); setEditing(null); }}
-            onCancel={() => setEditing(null)}
-          />
-        ) : (
-          <div key={i} className="flex items-center gap-2 bg-card rounded-lg px-3 py-2.5">
-            <GripVertical size={14} className="text-muted shrink-0" />
-            <button type="button" onClick={() => setEditing(i)} className="text-ink text-sm flex-1 min-w-0 truncate text-left hover:text-accent">{ex.name}</button>
-            <span className="text-muted text-xs shrink-0">
-              {[ex.sets && ex.sets !== "0" ? `${ex.sets}×${ex.reps || "—"}` : ex.reps, formatWeight(ex.targetWeight, unit)].filter(Boolean).join(" · ")}
-            </span>
-            <button type="button" onClick={() => move(i, -1)} disabled={i === 0} className="text-muted text-xs px-1 disabled:opacity-30" aria-label="Subir">↑</button>
-            <button type="button" onClick={() => move(i, 1)} disabled={i === items.length - 1} className="text-muted text-xs px-1 disabled:opacity-30" aria-label="Bajar">↓</button>
-            <button type="button" onClick={() => setEditing(i)} className="text-muted hover:text-ink px-1" aria-label="Editar ejercicio"><Pencil size={13} /></button>
-            <button type="button" onClick={() => { setItems(items.filter((_, j) => j !== i)); setEditing(null); }} className="text-muted hover:text-danger px-1" aria-label="Quitar ejercicio"><Trash2 size={13} /></button>
-          </div>
-        )
+    <div className="mb-3">
+      {items.length > 1 && (
+        <div className="flex items-center justify-end gap-2 mb-1.5 text-xs">
+          {picked ? (
+            <>
+              <span className="text-muted mr-auto">{picked.size} elegidos</span>
+              <button type="button" disabled={!picked.size} onClick={() => duplicateSet(picked)} className="flex items-center gap-1 text-soft hover:text-accent disabled:opacity-40"><Copy size={12} /> Duplicar</button>
+              <button type="button" disabled={!picked.size} onClick={() => removeAt(picked, picked.size === 1 ? "Se quitó 1 ejercicio" : `Se quitaron ${picked.size} ejercicios`)} className="flex items-center gap-1 text-soft hover:text-danger disabled:opacity-40"><Trash2 size={12} /> Quitar</button>
+              <button type="button" onClick={() => setPicked(null)} className="text-muted hover:text-ink">Listo</button>
+            </>
+          ) : (
+            <button type="button" onClick={() => { setPicked(new Set()); setEditing(null); }} className="text-muted hover:text-accent">Elegir varios</button>
+          )}
+        </div>
       )}
+      <SortableList ids={ids} onMove={moveTo} className="space-y-2">
+        {items.map((ex, i) => (
+          <SortableRow key={ids[i]} id={ids[i]} disabled={editing === i || !!picked}>{(handle) =>
+            editing === i ? (
+              <ExerciseItemEditor
+                item={ex}
+                catalog={catalog}
+                showSets
+                onSave={(patch) => { setItems(items.map((x, j) => (j === i ? { ...x, ...patch } : x))); setEditing(null); }}
+                onCancel={() => setEditing(null)}
+              />
+            ) : (
+              <div className={`flex items-center gap-2 bg-card rounded-lg px-3 py-2.5 ${picked?.has(i) ? "ring-1 ring-accent/60" : ""}`}>
+                {picked ? (
+                  <input type="checkbox" checked={picked.has(i)} onChange={() => toggle(i)} aria-label={`Elegir ${ex.name}`} className="w-4 h-4 accent-[var(--color-accent)] shrink-0" />
+                ) : (
+                  <DragHandle {...handle} onKeyMove={(dir) => moveTo(i, i + dir)} />
+                )}
+                <button type="button" onClick={() => (picked ? toggle(i) : setEditing(i))} className="text-ink text-sm flex-1 min-w-0 truncate text-left hover:text-accent">{ex.name}</button>
+                <span className="text-muted text-xs shrink-0">
+                  {[ex.sets && ex.sets !== "0" ? `${ex.sets}×${ex.reps || "—"}` : ex.reps, formatWeight(ex.targetWeight, unit)].filter(Boolean).join(" · ")}
+                </span>
+                {!picked && <button type="button" onClick={() => removeAt(new Set([i]), `Se quitó ${ex.name}`)} className="text-muted hover:text-danger px-1" aria-label="Quitar ejercicio"><X size={14} /></button>}
+              </div>
+            )
+          }</SortableRow>
+        ))}
+      </SortableList>
+      {toast}
     </div>
   );
 }

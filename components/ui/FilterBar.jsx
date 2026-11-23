@@ -48,6 +48,7 @@ export function FilterBar({ state, placeholder = "Buscar...", facets = [], sorts
     if (!open) return;
     const onKey = (e) => {
       if (e.key === "Escape") {
+        e.preventDefault();
         setOpen(false);
         buttonRef.current?.focus();
       }
