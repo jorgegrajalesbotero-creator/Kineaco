@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Check, ChevronLeft, ChevronRight, Download, Lock, MessageSquarePlus, MessageSquareText, Pencil, Play, Plus, SquarePen, Timer, X } from "lucide-react";
+import { Check, ChevronLeft, ChevronRight, Download, Lock, MessageSquarePlus, MessageSquareText, Pencil, Play, Plus, SlidersHorizontal, SquarePen, Timer, X } from "lucide-react";
 import { blockTypeLabel } from "@/lib/blocks";
 import { currentWeekStartISO } from "@/lib/dates";
 import { appLocale, tr } from "@/lib/i18n";
@@ -29,7 +29,8 @@ const firstNumber = (text) => {
 // coachEdit = (solo con preview) el coach puede corregir peso y reps de las series que el alumno ya hizo (semana actual).
 //             El coach nunca marca ni desmarca series ni ejercicios.
 // liveTick = (solo con preview) cambia cada vez que el alumno marca algo: se recargan las series al instante
-export function RoutineScreen({ routine, userId, pet = null, onClose, onToggle, onProgressChange, preview = false, onEditNote = null, onEditRoutineNote = null, onEditTimer = null, coachEdit = false, liveTick = 0 }) {
+// onEditExercise = (solo con preview) el coach edita peso, series, reps o cambia el ejercicio
+export function RoutineScreen({ routine, userId, pet = null, onClose, onToggle, onProgressChange, preview = false, onEditNote = null, onEditRoutineNote = null, onEditTimer = null, onEditExercise = null, coachEdit = false, liveTick = 0 }) {
   const [unit] = useWeightUnit();
   const [detailIndex, setDetailIndex] = useState(null);
   const [playing, setPlaying] = useState(false); // el video solo se carga cuando el alumno toca "Ver video"
@@ -300,12 +301,21 @@ export function RoutineScreen({ routine, userId, pet = null, onClose, onToggle, 
           )}
         </div>
       </div>
+      {preview && onEditExercise && (
+        <button
+          onClick={(e) => { e.stopPropagation(); onEditExercise(ex); }}
+          aria-label="Editar ejercicio"
+          className="shrink-0 flex items-center gap-1 text-xs rounded-lg px-2.5 py-1.5 bg-field text-soft hover:text-ink"
+        >
+          <SlidersHorizontal size={12} /> Editar
+        </button>
+      )}
       {preview && onEditNote && ex.itemKey ? (
         <button
           onClick={(e) => { e.stopPropagation(); onEditNote(ex); }}
           className={`shrink-0 flex items-center gap-1 text-xs rounded-lg px-2.5 py-1.5 ${ex.note ? "bg-accent/15 text-accent" : "bg-field text-soft hover:text-ink"}`}
         >
-          {ex.note ? <Pencil size={12} /> : <MessageSquarePlus size={12} />} {ex.note ? "Editar" : "Observación"}
+          {ex.note ? <Pencil size={12} /> : <MessageSquarePlus size={12} />} Observación
         </button>
       ) : (
         <button onClick={(e) => { e.stopPropagation(); openDetail(i); }} aria-label={tr("Ver ejercicio")} className="text-muted transition-colors group-hover:text-ink shrink-0">
@@ -544,6 +554,11 @@ export function RoutineScreen({ routine, userId, pet = null, onClose, onToggle, 
                 </p>
                 <p className="text-ink text-sm whitespace-pre-wrap break-words">{detail.note}</p>
               </div>
+            )}
+            {preview && onEditExercise && (
+              <button onClick={() => { const d = detail; closeDetail(); onEditExercise(d); }} className="w-full mb-2 flex items-center justify-center gap-1.5 bg-field text-ink text-sm rounded-xl py-2.5 hover:bg-field-hover">
+                <SlidersHorizontal size={14} /> Editar peso, series, reps o ejercicio
+              </button>
             )}
             {preview && onEditNote && (
               detail.itemKey ? (

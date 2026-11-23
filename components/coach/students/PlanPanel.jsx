@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { useScrollMemory } from "@/lib/useScrollMemory";
-import { CalendarDays, Copy, CopyPlus, Download, Layers, Minus, Pencil, Plus, Trash2 } from "lucide-react";
+import { CalendarDays, Copy, CopyPlus, Download, Eye, Layers, Minus, Pencil, Plus, Trash2 } from "lucide-react";
 import { WEEK_DAYS, localDateString } from "@/lib/dates";
 import { supabase } from "@/lib/supabaseClient";
 import { libraryRoutines } from "@/lib/libraryRoutines";
@@ -72,7 +72,7 @@ function weeksFromPlan(plan) {
 }
 
 // Coach → alumno → Plan: plan por semanas (hasta 52) con fases, rutinas por día y cargas calculadas
-export function PlanPanel({ student, onClose }) {
+export function PlanPanel({ student, onClose, onOpenPanel }) {
   const [plans, setPlans] = useState([]);
   const [fixed, setFixed] = useState([]);
   const [routines, setRoutines] = useState([]);
@@ -118,7 +118,7 @@ export function PlanPanel({ student, onClose }) {
             .select("routine_id, exercise_id, block_id, item_key, sets, reps, order_index, target_weight_kg, rest_minutes, exercises(name)")
             .in("routine_id", ids)
             .order("order_index"),
-          supabase.from("routine_blocks").select("id, routine_id, block_type, title, order_index").in("routine_id", ids).order("order_index"),
+          supabase.from("routine_blocks").select("id, routine_id, block_type, title, notes, order_index").in("routine_id", ids).order("order_index"),
         ]);
         rex = ex.data || [];
         blocks = bl.data || [];
@@ -555,7 +555,7 @@ export function PlanPanel({ student, onClose }) {
                 ? "La fase da las series. El peso y el rango de reps de cada ejercicio se ponen en Cargas y ejercicios: el peso sube solo cuando el alumno llega al tope del rango."
                 : "Cada fase tiene su % del RM de inicio y de fin: la app los reparte entre sus semanas y calcula los pesos en Cargas. Todo se puede cambiar. Sin fases, el plan es solo de rutinas."}
           </p>
-          <PlanPhasesEditor phases={editing.phases} onChange={setPhases} showRir={model.key === "rir"} />
+          <PlanPhasesEditor phases={editing.phases} onChange={setPhases} showRir={!!model.showRir} types={model.phaseTypes} hidePct={!!model.hidePct} />
         </div>
 
         <div className="flex gap-1 bg-card rounded-xl p-1 mb-4">
@@ -635,6 +635,11 @@ export function PlanPanel({ student, onClose }) {
       <p className="text-soft text-sm mb-4">
         Armá el plan por semanas: el tipo de planeación (ATR, lineal, progresión doble, ondulante o por RIR), la rutina de cada día y las cargas, que se calculan solas. Mientras el plan está activo reemplaza sus días fijos y avanza solo cada lunes.
       </p>
+      {onOpenPanel && (
+        <button onClick={() => onOpenPanel("routine")} className="w-full mb-4 bg-card border border-accent/30 text-accent text-sm font-medium rounded-xl py-2.5 flex items-center justify-center gap-1.5">
+          <Eye size={15} /> Ver y editar su rutina como el alumno (semana por semana)
+        </button>
+      )}
       <div className="flex flex-wrap items-center gap-2 mb-5">
         <button onClick={startNew} className="bg-accent text-app font-semibold px-4 py-2.5 rounded-lg text-sm flex items-center gap-2">
           <Plus size={16} /> Nuevo plan

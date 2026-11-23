@@ -50,3 +50,17 @@ describe("applyPlanChanges", () => {
     expect(out[0].block_id).toBe("b1");
   });
 });
+
+describe("cambios sobre ejercicios agregados", () => {
+  const add = { id: "a", routine_id: "r1", from_week: 2, action: "add", after_item_key: "k1", exercise_id: "ex-A", exercises: { name: "A" }, new_item_key: "n1" };
+  it("un agregado solo por una semana (se quita la siguiente)", () => {
+    const changes = [add, { id: "b", routine_id: "r1", from_week: 3, action: "remove", item_key: "n1" }];
+    expect(names(applyPlanChanges(base, changes, "r1", 2))).toEqual(["Sentadilla", "A", "Zancada", "Plancha"]);
+    expect(names(applyPlanChanges(base, changes, "r1", 3))).toEqual(["Sentadilla", "Zancada", "Plancha"]);
+  });
+  it("un agregado se puede sustituir", () => {
+    const changes = [add, { id: "b", routine_id: "r1", from_week: 4, action: "replace", item_key: "n1", exercise_id: "ex-B", exercises: { name: "B" } }];
+    expect(names(applyPlanChanges(base, changes, "r1", 4))).toEqual(["Sentadilla", "B", "Zancada", "Plancha"]);
+  });
+});
+
