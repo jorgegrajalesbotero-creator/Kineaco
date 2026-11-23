@@ -10,9 +10,10 @@ import { addDays, loadSchedule, mondayOf, parseDate, planLastDay, planStart, pla
 import { downloadPlanPdf } from "@/lib/planPdf";
 import { DayRoutinesEditor } from "@/components/coach/programs/DayRoutinesEditor";
 import { PanelLayout } from "./PanelLayout";
-import { PlanPhasesEditor, ATR_PRESET } from "./PlanPhasesEditor";
+import { PlanPhasesEditor } from "./PlanPhasesEditor";
 import { PlanLoadsEditor } from "./PlanLoadsEditor";
-import { cellKey, phaseType, planWeeks } from "@/lib/loadCalc";
+import { DAY_GOALS, cellKey, phaseType, planWeeks } from "@/lib/loadCalc";
+import { PLAN_MODELS, defaultDayGoals, modelPhases, planModel } from "@/lib/planModels";
 import { Select } from "@/components/ui/Select";
 
 const MAX_WEEKS = 52;
@@ -20,6 +21,12 @@ const str = (v) => (v == null ? "" : String(v));
 const nOrNull = (v) => (v === "" || v == null ? null : Number(String(v).replace(",", ".")));
 const setsOrNull = (v) => { const n = parseInt(String(v ?? ""), 10); return n > 0 ? Math.min(n, 20) : null; };
 const phaseWeeksTotal = (phases) => phases.reduce((s, p) => s + (Number(p.weeks) || 0), 0);
+const rirOrNull = (v) => { const n = nOrNull(v); return n == null || Number.isNaN(n) || n < 0 ? null : Math.min(10, Math.round(n * 2) / 2); };
+const intOrNullStr = (v) => { const n = parseInt(String(v ?? ""), 10); return n > 0 ? n : null; };
+// Fase guardada → formato del editor (todo texto)
+const phaseToEdit = (p) => ({ phase_type: p.phase_type, name: p.name || "", weeks: str(p.weeks), pct_start: str(p.pct_start), pct_end: str(p.pct_end), reps_start: p.reps_start || "", reps_end: p.reps_end || "", sets_start: str(p.sets_start), sets_end: str(p.sets_end), rir_start: str(p.rir_start), rir_end: str(p.rir_end) });
+// Días con rutina en la primera semana que tenga alguna (para los objetivos de la ondulante diaria)
+const trainingDaysOf = (data) => { const w = (data || []).find((x) => Object.values(x).some((l) => l.length)) || {}; const days = WEEK_DAYS.filter((d) => (w[d] || []).length); return days.length ? days : ["Lunes", "Miércoles", "Viernes"]; };
 
 // Corre todo lo que está en la semana >= desde (índice 1) en "delta" semanas
 function shiftWeekKeys(obj, from, delta) {
@@ -148,7 +155,7 @@ export function PlanPanel({ student, onClose }) {
     const [schedule, { data: lib }, { data: tpls }, { data: cat }] = await Promise.all([
       loadSchedule(supabase, student.id, "id, title"),
       libraryRoutines(supabase, "id, title, level, goal", (q) => q.order("title"), { withArchived: true }),
-      supabase.from("plan_templates").select("id, name, plan_template_phases(*), plan_template_days(*)").order("name"),
+      supabase.from("plan_templates").select("*, plan_template_phases(*), plan_template_days(*)").order("name"),
       supabase.from("exercises").select("id, name").order("name"),
     ]);
     setCatalog(cat || []);
@@ -161,7 +168,7 @@ export function PlanPanel({ student, onClose }) {
   useEffect(() => { load(); }, [student.id]);
 
   const startNew = () => {
-    setEditing({ id: null, name: "", start: suggestedStart(plans), weeks: 4, data: emptyWeeks(4), phases: [], weekOv: {}, loads: [], cells: {}, changes: [] });
+    setEditing({ id: null, name: "", start: suggestedStart(plans), weeks: 4, data: emptyWeeks(4), phases: [], weekOv: {}, loads: [], cells: {}, changes: [], model: "atr", dayGoals: {} });
     setTab("rutinas");
     setWeek(0);
   };
@@ -169,7 +176,7 @@ export function PlanPanel({ student, onClose }) {
   const startFromTemplate = (tpl) => {
     const phases = [...(tpl.plan_template_phases || [])]
       .sort((a, b) => (a.order_index ?? 0) - (b.order_index ?? 0))
-      .map((p) => ({ phase_type: p.phase_type, name: p.name || "", weeks: str(p.weeks), pct_start: str(p.pct_start), pct_end: str(p.pct_end), reps_start: p.reps_start || "", reps_end: p.reps_end || "", sets_start: str(p.sets_start), sets_end: str(p.sets_end) }));
+      .map(phaseToEdit);
     const days = tpl.plan_template_days || [];
     const n = Math.min(MAX_WEEKS, Math.max(1, phaseWeeksTotal(phases) || Math.max(4, ...days.map((d) => d.week_index))));
     const data = emptyWeeks(n);
@@ -177,7 +184,7 @@ export function PlanPanel({ student, onClose }) {
       const w = data[d.week_index - 1];
       if (w) w[d.day_label] = [...(w[d.day_label] || []), d.routine_id];
     });
-    setEditing({ id: null, name: tpl.name, start: suggestedStart(plans), weeks: n, data, phases, weekOv: {}, loads: [], cells: {}, changes: [] });
+    setEditing({ id: null, name: tpl.name, start: suggestedStart(plans), weeks: n, data, phases, weekOv: {}, loads: [], cells: {}, changes: [], model: tpl.model || "atr", dayGoals: tpl.day_goals || {} });
     setWeek(0);
     setTab("rutinas");
   };
@@ -186,9 +193,9 @@ export function PlanPanel({ student, onClose }) {
     const name = prompt("Nombre de la plantilla:", plan.name || `Plan de ${plan.weeks} semanas`);
     if (!name || !name.trim()) return;
     const { data: ph } = await supabase.from("training_plan_phases").select("*").eq("plan_id", plan.id).order("order_index");
-    const { data: tpl, error } = await supabase.from("plan_templates").insert({ name: name.trim().slice(0, 80) }).select("id").single();
+    const { data: tpl, error } = await supabase.from("plan_templates").insert({ name: name.trim().slice(0, 80), model: plan.model || "atr", day_goals: plan.day_goals || null }).select("id").single();
     if (error || !tpl) return alert("No se pudo crear la plantilla.");
-    const phaseRows = (ph || []).map((p) => ({ template_id: tpl.id, order_index: p.order_index, phase_type: p.phase_type, name: p.name, weeks: p.weeks, pct_start: p.pct_start, pct_end: p.pct_end, reps_start: p.reps_start, reps_end: p.reps_end, sets_start: p.sets_start ?? null, sets_end: p.sets_end ?? null }));
+    const phaseRows = (ph || []).map((p) => ({ template_id: tpl.id, order_index: p.order_index, phase_type: p.phase_type, name: p.name, weeks: p.weeks, pct_start: p.pct_start, pct_end: p.pct_end, reps_start: p.reps_start, reps_end: p.reps_end, sets_start: p.sets_start ?? null, sets_end: p.sets_end ?? null, rir_start: p.rir_start ?? null, rir_end: p.rir_end ?? null }));
     const dayRows = (plan.training_plan_days || []).map((d) => ({ template_id: tpl.id, week_index: d.week_index, day_label: d.day_label, routine_id: d.routine_id, order_index: d.order_index ?? 0 }));
     const res = await Promise.all([
       phaseRows.length ? supabase.from("plan_template_phases").insert(phaseRows) : { error: null },
@@ -216,14 +223,16 @@ export function PlanPanel({ student, onClose }) {
       supabase.from("training_plan_exercise_changes").select("*, exercises(name)").eq("plan_id", plan.id).order("order_index"),
     ]);
     const weekOv = {};
-    (wk || []).forEach((r) => { weekOv[r.week_index] = { pct: str(r.pct), reps: r.reps || "", sets: str(r.sets) }; });
+    (wk || []).forEach((r) => { weekOv[r.week_index] = { pct: str(r.pct), reps: r.reps || "", sets: str(r.sets), rir: str(r.rir) }; });
     const cells = {};
     (cl || []).forEach((c) => { cells[cellKey(c.exercise_id, c.week_index)] = { value: str(c.value), reps: c.reps || "", sets: str(c.sets) }; });
     setEditing({
       id: plan.id, name: plan.name || "", start: plan.start_date, weeks: plan.weeks, data: weeksFromPlan(plan),
-      phases: (ph || []).map((p) => ({ phase_type: p.phase_type, name: p.name || "", weeks: str(p.weeks), pct_start: str(p.pct_start), pct_end: str(p.pct_end), reps_start: p.reps_start || "", reps_end: p.reps_end || "", sets_start: str(p.sets_start), sets_end: str(p.sets_end) })),
+      phases: (ph || []).map(phaseToEdit),
       weekOv,
-      loads: (ld || []).map((l) => ({ exercise_id: l.exercise_id, from_week: l.from_week, base_type: l.base_type, weight_kg: str(l.weight_kg), reps: str(l.reps), rounding: Number(l.rounding) || 2.5 })),
+      loads: (ld || []).map((l) => ({ exercise_id: l.exercise_id, from_week: l.from_week, base_type: l.base_type, weight_kg: str(l.weight_kg), reps: str(l.reps), rounding: Number(l.rounding) || 2.5, rep_min: str(l.rep_min), rep_max: str(l.rep_max), increment: str(l.increment) })),
+      model: plan.model || "atr",
+      dayGoals: plan.day_goals || {},
       cells,
       changes: (ch || []).map((c) => ({ ...c })),
     });
@@ -346,7 +355,9 @@ export function PlanPanel({ student, onClose }) {
     const keep = "\n\nSus cambios siguen en pantalla: puede intentar Guardar de nuevo.";
     setSaving(true);
     try {
-      const row = { user_id: student.id, name: editing.name.trim() || null, start_date: startMonday, weeks: editing.weeks };
+      const model = editing.model || "atr";
+      const goals = model === "ondulante_diaria" ? Object.fromEntries(Object.entries(editing.dayGoals || {}).filter(([, g]) => g)) : null;
+      const row = { user_id: student.id, name: editing.name.trim() || null, start_date: startMonday, weeks: editing.weeks, model, day_goals: goals && Object.keys(goals).length ? goals : null };
       let planId = editing.id;
       if (planId) {
         const { error } = await supabase.from("training_plans").update(row).eq("id", planId);
@@ -369,16 +380,23 @@ export function PlanPanel({ student, onClose }) {
       // Fases, % por semana, bases de carga y casillas escritas a mano
       const phaseRows = editing.phases
         .filter((p) => Number(p.weeks) > 0)
-        .map((p, i) => ({ plan_id: planId, order_index: i, phase_type: p.phase_type, name: p.name.trim() || null, weeks: Number(p.weeks), pct_start: nOrNull(p.pct_start), pct_end: nOrNull(p.pct_end), reps_start: p.reps_start.trim() || null, reps_end: p.reps_end.trim() || null, sets_start: setsOrNull(p.sets_start), sets_end: setsOrNull(p.sets_end) }));
+        .map((p, i) => ({ plan_id: planId, order_index: i, phase_type: p.phase_type, name: p.name.trim() || null, weeks: Number(p.weeks), pct_start: nOrNull(p.pct_start), pct_end: nOrNull(p.pct_end), reps_start: p.reps_start.trim() || null, reps_end: p.reps_end.trim() || null, sets_start: setsOrNull(p.sets_start), sets_end: setsOrNull(p.sets_end), rir_start: rirOrNull(p.rir_start), rir_end: rirOrNull(p.rir_end) }));
       const weekRows = Object.entries(editing.weekOv)
         .filter(([w]) => Number(w) <= n)
-        .map(([w, v]) => ({ plan_id: planId, week_index: Number(w), pct: nOrNull(v.pct), reps: (v.reps || "").trim() || null, sets: setsOrNull(v.sets) }))
-        .filter((r) => r.pct != null || r.reps || r.sets != null);
+        .map(([w, v]) => ({ plan_id: planId, week_index: Number(w), pct: nOrNull(v.pct), reps: (v.reps || "").trim() || null, sets: setsOrNull(v.sets), rir: rirOrNull(v.rir) }))
+        .filter((r) => r.pct != null || r.reps || r.sets != null || r.rir != null);
       const seenBase = new Set();
       const loadRows = editing.loads
-        .filter((l) => Number(l.from_week) <= n && (l.base_type === "reps" || (nOrNull(l.weight_kg) > 0 && (l.base_type === "rm" || Number(l.reps) > 0))))
+        .filter((l) => Number(l.from_week) <= n && (l.base_type === "reps" || l.base_type === "rir"
+          || (l.base_type === "double" && nOrNull(l.weight_kg) > 0 && intOrNullStr(l.rep_min) && intOrNullStr(l.rep_max) >= intOrNullStr(l.rep_min))
+          || (nOrNull(l.weight_kg) > 0 && (l.base_type === "rm" || Number(l.reps) > 0))))
         .filter((l) => { const k = `${l.exercise_id}:${l.from_week}`; if (seenBase.has(k)) return false; seenBase.add(k); return true; })
-        .map((l) => ({ plan_id: planId, exercise_id: l.exercise_id, from_week: Number(l.from_week) || 1, base_type: l.base_type, weight_kg: l.base_type === "reps" ? null : nOrNull(l.weight_kg), reps: l.base_type === "work" ? Number(l.reps) : null, rounding: Number(l.rounding) || 2.5 }));
+        .map((l) => ({
+          plan_id: planId, exercise_id: l.exercise_id, from_week: Number(l.from_week) || 1, base_type: l.base_type,
+          weight_kg: l.base_type === "reps" ? null : nOrNull(l.weight_kg) > 0 ? nOrNull(l.weight_kg) : null,
+          reps: l.base_type === "work" ? Number(l.reps) : null, rounding: Number(l.rounding) || 2.5,
+          ...(l.base_type === "double" ? { rep_min: intOrNullStr(l.rep_min), rep_max: intOrNullStr(l.rep_max), increment: nOrNull(l.increment) > 0 ? nOrNull(l.increment) : null } : {}),
+        }));
       const cellRows = Object.entries(editing.cells)
         .map(([k, v]) => { const [ex, w] = k.split(":"); return { plan_id: planId, exercise_id: ex, week_index: Number(w), value_type: "kg", value: nOrNull(v.value), reps: (v.reps || "").trim() || null, sets: setsOrNull(v.sets) }; })
         .filter((c) => c.week_index <= n && (c.value != null || c.reps || c.sets != null));
@@ -460,6 +478,13 @@ export function PlanPanel({ student, onClose }) {
     const wStart = addDays(parseDate(startMonday), week * 7);
     const countOf = (w) => Object.values(w).reduce((x, l) => x + l.length, 0);
     const weeksInfo = planWeeks(editing.phases, editing.weeks, editing.weekOv);
+    const model = planModel(editing.model);
+    // Cambiar el tipo: si no hay fases, se ponen las del tipo; si hay, se pregunta
+    const chooseModel = (key) => {
+      const m = planModel(key);
+      setEditing((x) => ({ ...x, model: key, dayGoals: key === "ondulante_diaria" && !Object.values(x.dayGoals || {}).some(Boolean) ? defaultDayGoals(trainingDaysOf(x.data)) : x.dayGoals }));
+      if (editing.phases.length === 0 || confirm(`¿Poner las fases de ${m.label}? Las fases actuales se reemplazan; las rutinas y las cargas no cambian.`)) setPhases(modelPhases(key));
+    };
     return (
       <PanelLayout title={editing.id ? "Editar plan" : "Nuevo plan"} subtitle={student.name} onClose={closeEditor} width="max-w-4xl">
         <div className="bg-card rounded-xl p-4 mb-4 grid grid-cols-1 sm:grid-cols-2 gap-3">
@@ -489,16 +514,48 @@ export function PlanPanel({ student, onClose }) {
         </div>
 
         <div className="bg-card rounded-xl p-4 mb-4">
+          <p className="text-ink text-sm font-medium mb-2">Tipo de planeación</p>
+          <Select value={model.key} onChange={(e) => chooseModel(e.target.value)} className="w-full" aria-label="Tipo de planeación">
+            {PLAN_MODELS.map((m) => <option key={m.key} value={m.key}>{m.label} · {m.short}</option>)}
+          </Select>
+          <p className="text-muted text-xs mt-2">{model.help}</p>
+        </div>
+
+        {model.key === "ondulante_diaria" && (
+          <div className="bg-card rounded-xl p-4 mb-4">
+            <p className="text-ink text-sm font-medium mb-1">Objetivo de cada día</p>
+            <p className="text-muted text-xs mb-3">
+              El % de la semana sale de las fases; cada día lo ajusta: fuerza +7,5 % (4-6 reps, +1 serie), hipertrofia igual (8-10 reps), potencia −10 % (3-5 reps), resistencia −12,5 % (12-15 reps, −1 serie).
+            </p>
+            <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-2">
+              {WEEK_DAYS.map((d) => (
+                <label key={d} className="block">
+                  <span className="text-muted text-[11px]">{d}</span>
+                  <Select value={editing.dayGoals?.[d] || ""} onChange={(e) => setEditing((x) => ({ ...x, dayGoals: { ...(x.dayGoals || {}), [d]: e.target.value } }))} className="w-full">
+                    <option value="">Sin objetivo</option>
+                    {DAY_GOALS.map((g) => <option key={g.key} value={g.key}>{g.label}</option>)}
+                  </Select>
+                </label>
+              ))}
+            </div>
+          </div>
+        )}
+
+        <div className="bg-card rounded-xl p-4 mb-4">
           <div className="flex items-center justify-between gap-2 mb-2">
             <p className="text-ink text-sm font-medium flex items-center gap-2"><Layers size={15} className="text-accent" /> Fases</p>
-            {editing.phases.length === 0 && (
-              <button onClick={() => setPhases(ATR_PRESET())} className={chip}>Usar ATR (4 · 3 · 2 semanas)</button>
-            )}
+            <button onClick={() => { if (editing.phases.length === 0 || confirm(`¿Reemplazar las fases por las de ${model.label}? Las rutinas y las cargas no cambian.`)) setPhases(modelPhases(model.key)); }} className={chip}>
+              {editing.phases.length === 0 ? `Usar fases de ${model.label}` : "Volver a las fases del tipo"}
+            </button>
           </div>
           <p className="text-muted text-xs mb-3">
-            Cada fase tiene su % del RM de inicio y de fin: la app los reparte entre sus semanas y calcula los pesos en Cargas. Sin fases, el plan es solo de rutinas.
+            {model.key === "rir"
+              ? "Cada fase tiene reps, series y RIR (repeticiones en reserva) de inicio y de fin. Si deja el % vacío, sale solo de las reps + RIR. Todo se puede cambiar."
+              : model.key === "doble"
+                ? "La fase da las series. El peso y el rango de reps de cada ejercicio se ponen en Cargas y ejercicios: el peso sube solo cuando el alumno llega al tope del rango."
+                : "Cada fase tiene su % del RM de inicio y de fin: la app los reparte entre sus semanas y calcula los pesos en Cargas. Todo se puede cambiar. Sin fases, el plan es solo de rutinas."}
           </p>
-          <PlanPhasesEditor phases={editing.phases} onChange={setPhases} />
+          <PlanPhasesEditor phases={editing.phases} onChange={setPhases} showRir={model.key === "rir"} />
         </div>
 
         <div className="flex gap-1 bg-card rounded-xl p-1 mb-4">
@@ -511,6 +568,9 @@ export function PlanPanel({ student, onClose }) {
           <div className="mb-6">
             <PlanLoadsEditor
               userId={student.id}
+              model={model.key}
+              dayGoals={editing.dayGoals || {}}
+              startDate={startMonday}
               weeks={weeksInfo}
               routines={planRoutines}
               extra={extraLoads}
@@ -573,7 +633,7 @@ export function PlanPanel({ student, onClose }) {
   return (
     <PanelLayout title="Plan de entrenamiento" subtitle={student.name} onClose={onClose}>
       <p className="text-soft text-sm mb-4">
-        Armá el plan por semanas: fases (ATR), la rutina de cada día y las cargas, que se calculan solas desde el RM. Mientras el plan está activo reemplaza sus días fijos y avanza solo cada lunes.
+        Armá el plan por semanas: el tipo de planeación (ATR, lineal, progresión doble, ondulante o por RIR), la rutina de cada día y las cargas, que se calculan solas. Mientras el plan está activo reemplaza sus días fijos y avanza solo cada lunes.
       </p>
       <div className="flex flex-wrap items-center gap-2 mb-5">
         <button onClick={startNew} className="bg-accent text-app font-semibold px-4 py-2.5 rounded-lg text-sm flex items-center gap-2">
@@ -601,6 +661,7 @@ export function PlanPanel({ student, onClose }) {
                 <div className="flex items-start justify-between gap-3">
                   <div className="min-w-0">
                     <p className="text-ink text-sm font-medium truncate">{p.name || `Plan de ${p.weeks} semanas`}</p>
+                    <p className="text-accent text-[11px] mt-0.5">{planModel(p.model).label}</p>
                     <p className="text-muted text-xs mt-0.5">
                       {fmtDay(planStart(p))} – {fmtDay(planLastDay(p), true)} · {p.weeks} semanas · {count} {count === 1 ? "rutina asignada" : "rutinas asignadas"}
                     </p>
@@ -633,7 +694,7 @@ export function PlanPanel({ student, onClose }) {
                     <div className="flex h-1.5 rounded-full overflow-hidden mt-1.5 max-w-xs bg-field">
                       {ph.map((p, i) => <span key={i} style={{ flex: p.weeks || 1, background: phaseType(p.phase_type).color }} />)}
                     </div>
-                    <p className="text-muted text-[11px] mt-1">{weeksN ? `${weeksN} semanas · ` : ""}{ph.length} {ph.length === 1 ? "fase" : "fases"} · {routinesN} {routinesN === 1 ? "rutina" : "rutinas"}</p>
+                    <p className="text-muted text-[11px] mt-1">{planModel(tpl.model).label} · {weeksN ? `${weeksN} semanas · ` : ""}{ph.length} {ph.length === 1 ? "fase" : "fases"} · {routinesN} {routinesN === 1 ? "rutina" : "rutinas"}</p>
                   </div>
                   <button onClick={() => startFromTemplate(tpl)} className={chip}><Plus size={13} /> Usar</button>
                   <button onClick={() => deleteTemplate(tpl)} aria-label="Eliminar plantilla" className={`${chip} hover:text-danger`}><Trash2 size={13} /></button>

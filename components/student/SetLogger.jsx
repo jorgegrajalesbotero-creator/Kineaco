@@ -5,7 +5,7 @@ import { Check, MessageSquareText, Plus, Timer, X } from "lucide-react";
 import { supabase } from "@/lib/supabaseClient";
 import { currentWeekStartISO } from "@/lib/dates";
 import { tr } from "@/lib/i18n";
-import { cleanInt, toNumber } from "@/lib/numbers";
+import { cleanDecimal, cleanInt, toNumber } from "@/lib/numbers";
 import { UnitToggle, WeightInput } from "@/components/ui/WeightInput";
 import { formatWeight, useWeightUnit } from "@/lib/weightUnits";
 import { Chameleon } from "@/components/ui/Chameleon";
@@ -14,6 +14,12 @@ import { Chameleon } from "@/components/ui/Chameleon";
 const firstNumber = (text) => {
   const m = String(text || "").match(/\d+/);
   return m ? Number(m[0]) : null;
+};
+
+// Número más alto de las reps ("8-12" → 12): el tope de la progresión doble
+const topNumber = (text) => {
+  const all = String(text || "").match(/\d+/g);
+  return all ? Math.max(...all.map(Number)) : null;
 };
 
 const inputCls =
@@ -35,13 +41,17 @@ export function SetLogger({ exercise, routine, userId, onClose, onComplete, onUn
   const byItem = exercise.byItem && exercise.itemKey;
   const restSeconds = Math.round((Number(exercise.restMinutes) || 1.5) * 60);
   const targetWeight = exercise.targetWeight != null ? String(exercise.targetWeight) : "";
+  // Planeación autorregulada: cada serie anota cuántas reps le quedaban en reserva (RIR)
+  const usesRir = exercise.targetRir != null;
+  const targetRir = usesRir ? String(exercise.targetRir) : "";
+  const grid = usesRir ? "grid-cols-[36px_1fr_1fr_52px_44px]" : "grid-cols-[40px_1fr_1fr_44px]";
 
   // Trae las series ya registradas esta semana para este ejercicio
   useEffect(() => {
     async function load() {
       let q = supabase
         .from("progress_sets")
-        .select("id, set_number, weight_kg, reps")
+        .select(usesRir ? "id, set_number, weight_kg, reps, rir" : "id, set_number, weight_kg, reps")
         .eq("user_id", userId)
         .eq("routine_id", routineId)
         .eq("day_label", routine.day_label)
@@ -54,8 +64,8 @@ export function SetLogger({ exercise, routine, userId, onClose, onComplete, onUn
         Array.from({ length: count }, (_, i) => {
           const s = saved.find((x) => x.set_number === i + 1);
           return s
-            ? { n: i + 1, weight: s.weight_kg ?? "", reps: s.reps ?? "", done: true, id: s.id }
-            : { n: i + 1, weight: targetWeight, reps: firstNumber(exercise.targetReps) ?? "", done: false, id: null };
+            ? { n: i + 1, weight: s.weight_kg ?? "", reps: s.reps ?? "", rir: s.rir ?? "", done: true, id: s.id }
+            : { n: i + 1, weight: targetWeight, reps: firstNumber(exercise.targetReps) ?? "", rir: targetRir, done: false, id: null };
         })
       );
       setLoading(false);
@@ -72,6 +82,7 @@ export function SetLogger({ exercise, routine, userId, onClose, onComplete, onUn
     set_number: r.n,
     weight_kg: toNumber(r.weight),
     reps: toNumber(r.reps) == null ? null : Math.round(toNumber(r.reps)),
+    ...(usesRir ? { rir: toNumber(r.rir) == null ? null : Math.max(0, Math.min(10, Math.round(toNumber(r.rir) * 2) / 2)) } : {}),
   });
 
   // Cuando cambian las series: si están todas hechas, el ejercicio queda hecho; si se desmarca una, deja de estarlo
@@ -129,7 +140,7 @@ export function SetLogger({ exercise, routine, userId, onClose, onComplete, onUn
 
   const addRow = () => {
     const last = rows[rows.length - 1];
-    const next = [...rows, { n: rows.length + 1, weight: last?.weight ?? targetWeight, reps: last?.reps ?? "", done: false, id: null }];
+    const next = [...rows, { n: rows.length + 1, weight: last?.weight ?? targetWeight, reps: last?.reps ?? "", rir: last?.rir ?? targetRir, done: false, id: null }];
     setRows(next);
     if (exercise.completed) syncExercise(next);
   };
@@ -150,7 +161,7 @@ export function SetLogger({ exercise, routine, userId, onClose, onComplete, onUn
       const r = rows[idx];
       if (!r?.done || !r.id) continue;
       const v = rowValues(r);
-      const { error } = await supabase.from("progress_sets").update({ weight_kg: v.weight_kg, reps: v.reps }).eq("id", r.id);
+      const { error } = await supabase.from("progress_sets").update({ weight_kg: v.weight_kg, reps: v.reps, ...(usesRir ? { rir: v.rir } : {}) }).eq("id", r.id);
       if (error) {
         setBusy(false);
         return alert("No se pudo guardar la corrección. Revisá que el SQL «en vivo y avisos» esté aplicado en Supabase.");
@@ -191,8 +202,15 @@ export function SetLogger({ exercise, routine, userId, onClose, onComplete, onUn
             exercise.setsCount ? tr("{p0} series", { p0: exercise.setsCount }) : "",
             exercise.targetReps ? tr("{p0} reps", { p0: exercise.targetReps }) : "",
             formatWeight(exercise.targetWeight, unit),
+            usesRir ? tr("RIR {p0}", { p0: targetRir.replace(".", ",") }) : "",
           ].filter(Boolean).join(" · ") || tr("Registre lo que hizo en cada serie.")}
         </p>
+        {exercise.progressKind === "double" && topNumber(exercise.targetReps) && (
+          <p className="text-soft text-xs -mt-2 mb-4">{tr("Progresión doble: cuando haga {p0} reps en todas las series, la próxima vez el peso sube solo.", { p0: topNumber(exercise.targetReps) })}</p>
+        )}
+        {usesRir && (
+          <p className="text-soft text-xs -mt-2 mb-4">{tr("Elija un peso que le deje {p0} repeticiones en reserva (RIR) y anote en cada serie cuántas le quedaron.", { p0: targetRir.replace(".", ",") })}</p>
+        )}
         {exercise.note && (
           <div className="bg-accent/10 border border-accent/30 rounded-xl px-3 py-2.5 mb-4">
             <p className="text-accent text-[11px] font-semibold flex items-center gap-1.5 mb-0.5">
@@ -206,15 +224,16 @@ export function SetLogger({ exercise, routine, userId, onClose, onComplete, onUn
           <div className="h-32 rounded-2xl bg-card animate-pulse" />
         ) : (
           <>
-            <div className="grid grid-cols-[40px_1fr_1fr_44px] gap-2 items-center px-1 mb-2 text-muted text-[10px] uppercase tracking-wider">
+            <div className={`grid ${grid} gap-2 items-center px-1 mb-2 text-muted text-[10px] uppercase tracking-wider`}>
               <span>{tr("Serie")}</span>
               <span className="flex items-center justify-center gap-1.5">{tr("Peso")} <UnitToggle t={tr} /></span>
               <span className="text-center">{tr("Reps")}</span>
+              {usesRir && <span className="text-center">RIR</span>}
               <span />
             </div>
             <div className="space-y-2 mb-4">
               {rows.map((r, idx) => (
-                <div key={r.n} className={`grid grid-cols-[40px_1fr_1fr_44px] gap-2 items-center rounded-2xl p-1.5 ${r.done ? "bg-accent/[0.07]" : ""}`}>
+                <div key={r.n} className={`grid ${grid} gap-2 items-center rounded-2xl p-1.5 ${r.done ? "bg-accent/[0.07]" : ""}`}>
                   <span className={`text-sm font-semibold text-center ${r.done ? "text-accent" : "text-soft"}`}>{r.n}</span>
                   <WeightInput
                     valueKg={r.weight}
@@ -234,6 +253,18 @@ export function SetLogger({ exercise, routine, userId, onClose, onComplete, onUn
                     onChange={(e) => update(idx, "reps", cleanInt(e.target.value))}
                     className={inputCls}
                   />
+                  {usesRir && (
+                    <input
+                      type="text"
+                      inputMode="decimal"
+                      value={r.rir}
+                      placeholder={targetRir || "—"}
+                      aria-label={tr("Reps en reserva (RIR)")}
+                      disabled={coachMode ? !r.done : r.done || readOnly}
+                      onChange={(e) => update(idx, "rir", cleanDecimal(e.target.value, 1).slice(0, 3))}
+                      className={inputCls}
+                    />
+                  )}
                   {coachMode ? (
                     <span
                       aria-label={r.done ? "Serie hecha por el alumno" : "Serie pendiente"}

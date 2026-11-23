@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { cellKey, roundTo, fmtNum, rmOf, baseFor, planWeeks, loadFor, loadMapForWeek } from "@/lib/loadCalc";
+import { cellKey, roundTo, fmtNum, rmOf, baseFor, planWeeks, loadFor, loadMapForWeek, pctFromRir } from "@/lib/loadCalc";
 
 describe("cellKey", () => {
   it("compone la clave ejercicio:semana", () => {
@@ -116,5 +116,71 @@ describe("modo solo series y reps", () => {
     expect(r.kg).toBe(65);
     expect(r.reps).toBe("8");
     expect(r.repsManual).toBe(true);
+  });
+});
+
+describe("RIR (autorregulada)", () => {
+  it("sin % en la fase, el % sale de reps + RIR", () => {
+    const w = planWeeks([{ phase_type: "acumulacion", weeks: 2, reps_start: "10", reps_end: "10", rir_start: 2, rir_end: 2 }], 2);
+    expect(w[0].rir).toBe(2);
+    expect(w[0].pct).toBe(pctFromRir("10", 2));
+    expect(w[0].pct).toBe(71.5);
+  });
+  it("cambiar el RIR de una semana recalcula su %", () => {
+    const w = planWeeks([{ phase_type: "acumulacion", weeks: 1, reps_start: "10", rir_start: 2 }], 1, { 1: { rir: 0 } });
+    expect(w[0].rir).toBe(0);
+    expect(w[0].pct).toBe(pctFromRir("10", 0));
+  });
+  it("base por esfuerzo sin RM: usa la última sesión registrada", () => {
+    const weeks = planWeeks([{ phase_type: "acumulacion", weeks: 2, reps_start: "10", rir_start: 2 }], 2);
+    const loads = [{ exercise_id: "e", from_week: 1, base_type: "rir", weight_kg: 40, rounding: 2.5 }];
+    // Sin registro: el peso de partida
+    expect(loadFor({ weeks, loads, exerciseId: "e", week: 1, startDate: "2026-11-02" }).kg).toBe(40);
+    // Con registro: 50 kg × 10 dejando 2 → RM ~ 70 → 71,5 % ≈ 50
+    const history = { e: [{ date: "2026-11-03", weight: 50, reps: 10, rir: 2 }] };
+    const r = loadFor({ weeks, loads, exerciseId: "e", week: 2, startDate: "2026-11-02", history });
+    expect(r.kg).toBe(50);
+    expect(r.rir).toBe(2);
+  });
+});
+
+describe("progresión doble", () => {
+  const weeks = planWeeks([{ phase_type: "otro", weeks: 4, sets_start: 3, sets_end: 3 }], 4);
+  const loads = [{ exercise_id: "e", from_week: 1, base_type: "double", weight_kg: 20, rep_min: 8, rep_max: 12, rounding: 2.5 }];
+  it("sin registro queda el peso inicial y las reps son el rango", () => {
+    const r = loadFor({ weeks, loads, exerciseId: "e", week: 1, startDate: "2026-11-02" });
+    expect(r.kg).toBe(20);
+    expect(r.reps).toBe("8-12");
+  });
+  it("sube cuando hace el tope en todas las series", () => {
+    const history = { e: [
+      { date: "2026-11-03", weight: 20, reps: 12 }, { date: "2026-11-03", weight: 20, reps: 12 }, { date: "2026-11-03", weight: 20, reps: 11 },
+      { date: "2026-11-05", weight: 20, reps: 12 }, { date: "2026-11-05", weight: 20, reps: 12 }, { date: "2026-11-05", weight: 20, reps: 12 },
+    ] };
+    expect(loadFor({ weeks, loads, exerciseId: "e", week: 2, startDate: "2026-11-02", history }).kg).toBe(22.5);
+    // Un día antes del 5 todavía no había subido
+    expect(loadFor({ weeks, loads, exerciseId: "e", week: 1, startDate: "2026-11-02", history, date: "2026-11-05" }).kg).toBe(20);
+  });
+  it("usa el incremento propio si lo tiene", () => {
+    const own = [{ ...loads[0], increment: 5 }];
+    const history = { e: [1, 2, 3].map(() => ({ date: "2026-11-03", weight: 20, reps: 12 })) };
+    expect(loadFor({ weeks, loads: own, exerciseId: "e", week: 2, startDate: "2026-11-02", history }).kg).toBe(25);
+  });
+});
+
+describe("ondulante diaria", () => {
+  const weeks = planWeeks([{ phase_type: "progresion", weeks: 1, pct_start: 75, sets_start: 4, sets_end: 4 }], 1);
+  const loads = [{ exercise_id: "e", from_week: 1, base_type: "rm", weight_kg: 100, rounding: 2.5 }];
+  it("cada objetivo ajusta %, reps y series", () => {
+    const f = loadFor({ weeks, loads, exerciseId: "e", week: 1, goal: "fuerza" });
+    expect(f.kg).toBe(82.5);
+    expect(f.reps).toBe("4-6");
+    expect(f.sets).toBe(5);
+    const r = loadFor({ weeks, loads, exerciseId: "e", week: 1, goal: "resistencia" });
+    expect(r.kg).toBe(62.5);
+    expect(r.sets).toBe(3);
+  });
+  it("sin objetivo queda la semana tal cual", () => {
+    expect(loadFor({ weeks, loads, exerciseId: "e", week: 1 }).kg).toBe(75);
   });
 });

@@ -3,9 +3,10 @@
 import { ArrowDown, ArrowUp, Plus, X } from "lucide-react";
 import { PHASE_DEFAULTS, PHASE_TYPES, phaseType } from "@/lib/loadCalc";
 import { cleanDecimal, cleanInt } from "@/lib/numbers";
+import { modelPhases } from "@/lib/planModels";
 import { Select } from "@/components/ui/Select";
 
-export const newPhase = (type = "acumulacion", weeks = 4) => ({ phase_type: type, name: "", weeks: String(weeks), ...stringDefaults(type) });
+export const newPhase = (type = "acumulacion", weeks = 4) => ({ phase_type: type, name: "", weeks: String(weeks), ...stringDefaults(type), rir_start: "", rir_end: "" });
 
 function stringDefaults(type) {
   const d = PHASE_DEFAULTS[type] || PHASE_DEFAULTS.otro;
@@ -19,22 +20,29 @@ function stringDefaults(type) {
   };
 }
 
-export const ATR_PRESET = () => [newPhase("acumulacion", 4), newPhase("transformacion", 3), newPhase("realizacion", 2)];
+const hasRir = (p) => String(p.rir_start ?? "").trim() !== "" || String(p.rir_end ?? "").trim() !== "";
+
+export const ATR_PRESET = () => modelPhases("atr");
 
 // Fases del plan: tipo, nombre, semanas, % de inicio y fin, reps y series de inicio y fin
-export function PlanPhasesEditor({ phases, onChange }) {
+// showRir = planeación autorregulada (o alguna fase ya tiene RIR): muestra RIR de inicio y fin.
+export function PlanPhasesEditor({ phases, onChange, showRir = false }) {
+  const rirOn = showRir || phases.some(hasRir);
   const set = (i, patch) => onChange(phases.map((p, j) => (j === i ? { ...p, ...patch } : p)));
   const changeType = (i, type) => {
     const p = phases[i];
     const old = stringDefaults(p.phase_type);
     // Si los % siguen siendo los de partida del tipo anterior, se cambian por los del tipo nuevo
     const untouched = ["pct_start", "pct_end", "reps_start", "reps_end"].every((k) => (p[k] || "") === old[k]);
+    // En la autorregulada el % sale del RIR: no se llena el % al cambiar el tipo
+    const keepPctEmpty = hasRir(p) && !(p.pct_start || "") && !(p.pct_end || "");
     const nextDefaults = stringDefaults(type);
     // Las series también se cambian si estaban vacías o eran las de partida del tipo anterior
     const setsUntouched = ["sets_start", "sets_end"].every((k) => !(p[k] || "") || (p[k] || "") === old[k]);
     set(i, {
       phase_type: type,
       ...(untouched ? nextDefaults : {}),
+      ...(untouched && keepPctEmpty ? { pct_start: "", pct_end: "" } : {}),
       ...(setsUntouched ? { sets_start: nextDefaults.sets_start, sets_end: nextDefaults.sets_end } : {}),
     });
   };
@@ -91,11 +99,11 @@ export function PlanPhasesEditor({ phases, onChange }) {
               <div />
               <label className="block">
                 <span className={label}>% inicio</span>
-                <input inputMode="decimal" value={p.pct_start} onChange={(e) => set(i, { pct_start: cleanDecimal(e.target.value, 1) })} placeholder="—" className={field} />
+                <input inputMode="decimal" value={p.pct_start} onChange={(e) => set(i, { pct_start: cleanDecimal(e.target.value, 1) })} placeholder={hasRir(p) ? "Del RIR" : "—"} className={field} />
               </label>
               <label className="block">
                 <span className={label}>% fin</span>
-                <input inputMode="decimal" value={p.pct_end} onChange={(e) => set(i, { pct_end: cleanDecimal(e.target.value, 1) })} placeholder="—" className={field} />
+                <input inputMode="decimal" value={p.pct_end} onChange={(e) => set(i, { pct_end: cleanDecimal(e.target.value, 1) })} placeholder={hasRir(p) ? "Del RIR" : "—"} className={field} />
               </label>
               <label className="block">
                 <span className={label}>Reps inicio</span>
@@ -113,6 +121,18 @@ export function PlanPhasesEditor({ phases, onChange }) {
                 <span className={label}>Series fin</span>
                 <input inputMode="numeric" value={p.sets_end || ""} onChange={(e) => set(i, { sets_end: cleanInt(e.target.value).slice(0, 2) })} placeholder={def.sets_end || "De la rutina"} className={field} />
               </label>
+              {rirOn && (
+                <>
+                  <label className="block">
+                    <span className={label}>RIR inicio</span>
+                    <input inputMode="decimal" value={p.rir_start ?? ""} onChange={(e) => set(i, { rir_start: cleanDecimal(e.target.value, 1).slice(0, 3) })} placeholder="—" title="Repeticiones que le quedan en reserva" className={field} />
+                  </label>
+                  <label className="block">
+                    <span className={label}>RIR fin</span>
+                    <input inputMode="decimal" value={p.rir_end ?? ""} onChange={(e) => set(i, { rir_end: cleanDecimal(e.target.value, 1).slice(0, 3) })} placeholder="—" title="Repeticiones que le quedan en reserva" className={field} />
+                  </label>
+                </>
+              )}
             </div>
           </div>
         );

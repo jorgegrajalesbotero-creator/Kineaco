@@ -2,19 +2,30 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { AlertTriangle, ArrowLeftRight, MessageSquarePlus, MessageSquareText, Pencil, Plus, RotateCcw, Trash2, Undo2, X } from "lucide-react";
-import { EPLEY_MAX_REPS, cellKey, fmtNum, loadFor, phaseType, rmOf } from "@/lib/loadCalc";
+import { EPLEY_MAX_REPS, cellKey, dayGoal, fmtNum, loadFor, phaseType, rmOf } from "@/lib/loadCalc";
+import { WEEK_DAYS, localDateString } from "@/lib/dates";
+import { fetchAllRows } from "@/lib/fetchAll";
 import { applyPlanChanges } from "@/lib/planChanges";
 import { loadExerciseNotes, noteFor, noteKey, saveExerciseNote } from "@/lib/exerciseNotes";
 import { supabase } from "@/lib/supabaseClient";
 import { ExerciseNoteEditor } from "./ExerciseNoteEditor";
 import { blockTypeLabel } from "@/lib/blocks";
-import { cleanInt } from "@/lib/numbers";
+import { cleanDecimal, cleanInt } from "@/lib/numbers";
 import { Select } from "@/components/ui/Select";
 import { SearchSelect } from "@/components/ui/Search";
 import { UnitToggle, WeightInput } from "@/components/ui/WeightInput";
 import { fromKg, roundingStep, useWeightUnit } from "@/lib/weightUnits";
 
 const CELL_W = 76;
+const KG_TYPES = ["rm", "work"];
+// Forma de progresar de un ejercicio según sus bases
+const modeOf = (exLoads) => {
+  if (exLoads.some((l) => l.base_type === "reps")) return "reps";
+  if (exLoads.some((l) => l.base_type === "double")) return "double";
+  if (exLoads.some((l) => l.base_type === "rir")) return "rir";
+  return "kg";
+};
+const MODES = [["kg", "RM o peso"], ["double", "Progresión doble"], ["rir", "Por esfuerzo (RIR)"], ["reps", "Solo series y reps"]];
 const newKey = () => (typeof crypto !== "undefined" && crypto.randomUUID ? crypto.randomUUID() : `${Date.now()}-${Math.random().toString(16).slice(2)}`);
 
 // Cargas del plan, por rutina y por bloque, con los cambios de ejercicios del alumno.
@@ -24,7 +35,9 @@ const newKey = () => (typeof crypto !== "undefined" && crypto.randomUUID ? crypt
 // changes = [{ routine_id, from_week, action: "remove" | "replace" | "add", item_key, exercise_id, after_item_key, new_item_key, sets, reps, exercises: { name } }]
 // extra = ejercicios con cargas guardadas que ya no están en las rutinas del plan [{ exercise_id, name }]
 // userId = alumno: las observaciones por ejercicio se guardan al instante y aparte (no cambian el plan)
-export function PlanLoadsEditor({ userId, weeks, routines, catalog, changes, onChanges, extra = [], loads, cells, weekOv, onLoads, onCells, onWeekOv, onCreateExercise }) {
+// model = tipo de planeación (lib/planModels) · dayGoals = { Lunes: "fuerza", ... } (ondulante diaria)
+// startDate = lunes de inicio del plan (para la progresión doble y la autorregulada, que leen el registro del alumno)
+export function PlanLoadsEditor({ userId, model = "atr", dayGoals = {}, startDate = null, weeks, routines, catalog, changes, onChanges, extra = [], loads, cells, weekOv, onLoads, onCells, onWeekOv, onCreateExercise }) {
   const [routineId, setRoutineId] = useState(routines[0]?.id || null);
   const [creatingEx, setCreatingEx] = useState(false);
   const [form, setForm] = useState(null); // { kind, itemKey?, afterKey?, exerciseId, fromWeek, sets, reps }
@@ -35,6 +48,33 @@ export function PlanLoadsEditor({ userId, weeks, routines, catalog, changes, onC
   useEffect(() => {
     if (!routines.some((r) => r.id === routineId)) setRoutineId(routines[0]?.id || null);
   }, [routines, routineId]);
+
+  // ---------- Registro del alumno (progresión doble y autorregulada) ----------
+  const [history, setHistory] = useState({});
+  useEffect(() => {
+    if (!userId) return;
+    let cancel = false;
+    (async () => {
+      // Si el SQL del RIR todavía no está aplicado, se lee sin esa columna
+      const probe = await supabase.from("progress_sets").select("rir").limit(1);
+      const cols = probe.error ? "exercise_id, weight_kg, reps, completed_at" : "exercise_id, weight_kg, reps, rir, completed_at";
+      const rows = await fetchAllRows(() => supabase.from("progress_sets").select(cols).eq("user_id", userId).order("completed_at"));
+      const map = {};
+      (rows || []).forEach((r) => {
+        const k = String(r.exercise_id);
+        (map[k] = map[k] || []).push({ date: localDateString(new Date(r.completed_at)), weight: r.weight_kg, reps: r.reps, rir: r.rir ?? null });
+      });
+      if (!cancel) setHistory(map);
+    })();
+    return () => { cancel = true; };
+  }, [userId]);
+
+  // ---------- Ondulante diaria: día que se está viendo ----------
+  const goalDays = WEEK_DAYS.filter((d) => dayGoal(dayGoals?.[d]));
+  const [dayView, setDayView] = useState(null);
+  const viewDay = model === "ondulante_diaria" && goalDays.length ? (goalDays.includes(dayView) ? dayView : goalDays[0]) : null;
+  const goal = viewDay ? dayGoals[viewDay] : null;
+  const showRir = model === "rir" || weeks.some((w) => w.rir != null);
 
   // ---------- Observaciones del alumno (aparte del plan) ----------
   const [notes, setNotes] = useState({});
@@ -65,18 +105,24 @@ export function PlanLoadsEditor({ userId, weeks, routines, catalog, changes, onC
     loads.filter((l) => String(l.exercise_id) === String(exId)).sort((a, b) => (Number(a.from_week) || 1) - (Number(b.from_week) || 1));
   const updateLoad = (target, patch) => onLoads(loads.map((l) => (l === target ? { ...l, ...patch } : l)));
   const addBase = (exId) => {
-    const existing = loadsOf(exId).filter((l) => l.base_type !== "reps");
+    const existing = loadsOf(exId).filter((l) => KG_TYPES.includes(l.base_type));
     const first = existing[0];
     const last = existing[existing.length - 1];
     const from = last ? Math.min(total, (Number(last.from_week) || 1) + 1) : 1;
     if (last && existing.some((l) => Number(l.from_week) === from)) return;
-    onLoads([...loads.filter((l) => !(String(l.exercise_id) === String(exId) && l.base_type === "reps")), { exercise_id: exId, from_week: from, base_type: "rm", weight_kg: "", reps: "", rounding: first?.rounding ?? 2.5 }]);
+    onLoads([...loads.filter((l) => !(String(l.exercise_id) === String(exId) && !KG_TYPES.includes(l.base_type))), { exercise_id: exId, from_week: from, base_type: "rm", weight_kg: "", reps: "", rounding: first?.rounding ?? 2.5 }]);
   };
   const removeLoad = (target) => onLoads(loads.filter((l) => l !== target));
   const setRounding = (exId, rounding) => onLoads(loads.map((l) => (String(l.exercise_id) === String(exId) ? { ...l, rounding } : l)));
   const setMode = (exId, mode) => {
+    const mine = loadsOf(exId);
     const others = loads.filter((l) => String(l.exercise_id) !== String(exId));
-    if (mode === "reps") onLoads([...others, { exercise_id: exId, from_week: 1, base_type: "reps", weight_kg: "", reps: "", rounding: 2.5 }]);
+    const rounding = mine[0]?.rounding ?? 2.5;
+    // Peso de partida: el que ya tenía escrito (si venía de otra forma)
+    const w = mine.find((l) => l.weight_kg !== "" && l.weight_kg != null)?.weight_kg ?? "";
+    if (mode === "reps") onLoads([...others, { exercise_id: exId, from_week: 1, base_type: "reps", weight_kg: "", reps: "", rounding }]);
+    else if (mode === "double") onLoads([...others, { exercise_id: exId, from_week: 1, base_type: "double", weight_kg: w, reps: "", rep_min: "8", rep_max: "12", increment: "", rounding }]);
+    else if (mode === "rir") onLoads([...others, { exercise_id: exId, from_week: 1, base_type: "rir", weight_kg: w, reps: "", rounding }]);
     else onLoads(others);
   };
   const setCell = (exId, week, patch) => {
@@ -95,7 +141,7 @@ export function PlanLoadsEditor({ userId, weeks, routines, catalog, changes, onC
   const setWeek = (week, patch) => {
     const next = { ...(weekOv[week] || {}), ...patch };
     const copy = { ...weekOv };
-    if ((next.pct === "" || next.pct == null) && !(next.reps || "").trim() && !String(next.sets || "").trim()) delete copy[week];
+    if ((next.pct === "" || next.pct == null) && !(next.reps || "").trim() && !String(next.sets || "").trim() && !String(next.rir ?? "").trim()) delete copy[week];
     else copy[week] = next;
     onWeekOv(copy);
   };
@@ -194,9 +240,11 @@ export function PlanLoadsEditor({ userId, weeks, routines, catalog, changes, onC
   // activeFrom / activeTo: semanas en que ese ejercicio está en la rutina (las demás se ven más tenues)
   const progressRow = (exId, name, { label, activeFrom = 1, activeTo = total, noteItemKey = null } = {}) => {
     const exLoads = loadsOf(exId);
-    const repsOnly = exLoads.some((l) => l.base_type === "reps");
-    const kgLoads = exLoads.filter((l) => l.base_type !== "reps");
-    const rounding = kgLoads[0]?.rounding ?? 2.5;
+    const mode = modeOf(exLoads);
+    const repsOnly = mode === "reps";
+    const kgLoads = exLoads.filter((l) => KG_TYPES.includes(l.base_type));
+    const special = exLoads.find((l) => l.base_type === "double" || l.base_type === "rir");
+    const rounding = (special || kgLoads[0])?.rounding ?? 2.5;
     const hasManual = Object.keys(cells).some((k) => k.startsWith(`${exId}:`));
     const others = otherRoutines(exId);
     const note = userId && noteItemKey ? noteFor(notes, routineId, noteItemKey, exId) : null;
@@ -221,7 +269,7 @@ export function PlanLoadsEditor({ userId, weeks, routines, catalog, changes, onC
               </button>
             )}
             {!repsOnly && (
-              <Select size="sm" aria-label="Redondeo" value={String(rounding)} onChange={(e) => setRounding(exId, Number(e.target.value))} disabled={kgLoads.length === 0}>
+              <Select size="sm" aria-label="Redondeo" value={String(rounding)} onChange={(e) => setRounding(exId, Number(e.target.value))} disabled={kgLoads.length === 0 && !special}>
                 <option value="2.5">Redondeo {fmtNum(roundingStep(2.5, unit))} {unit}</option>
                 <option value="1">Redondeo {fmtNum(roundingStep(1, unit))} {unit}</option>
               </Select>
@@ -236,8 +284,8 @@ export function PlanLoadsEditor({ userId, weeks, routines, catalog, changes, onC
 
         {/* Tipo de progresión: con peso (RM o peso × reps) o solo series y reps */}
         <div className="flex gap-1 bg-field rounded-lg p-1 mb-3 w-full sm:w-auto sm:inline-flex" role="group" aria-label="Tipo de progresión">
-          {[["kg", "Con peso"], ["reps", "Solo series y reps"]].map(([k, l]) => {
-            const on = (k === "reps") === repsOnly;
+          {MODES.map(([k, l]) => {
+            const on = k === mode;
             return (
               <button key={k} type="button" aria-pressed={on} onClick={() => { if (!on) setMode(exId, k); }}
                 className={`flex-1 sm:flex-none text-xs rounded-md px-3 py-1.5 transition-colors ${on ? "bg-accent text-app font-semibold" : "text-soft hover:text-ink"}`}>
@@ -247,7 +295,7 @@ export function PlanLoadsEditor({ userId, weeks, routines, catalog, changes, onC
           })}
         </div>
 
-        {!repsOnly && (kgLoads.length === 0 ? (
+        {mode === "kg" && (kgLoads.length === 0 ? (
           <button onClick={() => addBase(exId)} className="bg-field text-soft text-xs rounded-lg px-3 py-2 flex items-center gap-1.5 hover:text-ink mb-2">
             <Plus size={13} /> Ingresar RM o peso
           </button>
@@ -295,13 +343,40 @@ export function PlanLoadsEditor({ userId, weeks, routines, catalog, changes, onC
           </div>
         ))}
         {repsOnly && <p className="text-muted text-[11px] mb-2">Sin peso: toma las series y reps de cada fase. Podés cambiar cualquier semana.</p>}
+        {mode === "double" && special && (
+          <div className="mb-2">
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="text-soft text-xs">Peso inicial</span>
+              <WeightInput toggle={false} valueKg={special.weight_kg} onChangeKg={(kg) => updateLoad(special, { weight_kg: kg })} placeholder={unit} wrapperClassName="w-20" className={`${field} w-full py-1.5`} />
+              <span className="text-muted text-xs">{unit} · rango</span>
+              <input inputMode="numeric" value={special.rep_min ?? ""} onChange={(e) => updateLoad(special, { rep_min: cleanInt(e.target.value).slice(0, 2) })} placeholder="8" aria-label="Reps mínimas" className={`${field} w-14 py-1.5 text-center`} />
+              <span className="text-muted text-xs">a</span>
+              <input inputMode="numeric" value={special.rep_max ?? ""} onChange={(e) => updateLoad(special, { rep_max: cleanInt(e.target.value).slice(0, 2) })} placeholder="12" aria-label="Reps máximas" className={`${field} w-14 py-1.5 text-center`} />
+              <span className="text-muted text-xs">reps · subir de a</span>
+              <input inputMode="decimal" value={special.increment ?? ""} onChange={(e) => updateLoad(special, { increment: cleanDecimal(e.target.value, 2).slice(0, 5) })} placeholder={fmtNum(Number(rounding) || 2.5)} aria-label="Incremento en kg" className={`${field} w-16 py-1.5 text-center`} />
+              <span className="text-muted text-xs">kg</span>
+            </div>
+            <p className="text-muted text-[11px] mt-1">Cuando el alumno hace el tope del rango en todas las series con ese peso, la siguiente sesión sube solo. Las semanas que ya pasaron muestran lo que logró.</p>
+          </div>
+        )}
+        {mode === "rir" && special && (
+          <div className="mb-2">
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="text-soft text-xs">Peso de partida (opcional)</span>
+              <WeightInput toggle={false} valueKg={special.weight_kg} onChangeKg={(kg) => updateLoad(special, { weight_kg: kg })} placeholder={unit} wrapperClassName="w-20" className={`${field} w-full py-1.5`} />
+              <span className="text-muted text-xs">{unit}</span>
+            </div>
+            <p className="text-muted text-[11px] mt-1">Sin RM: el alumno elige el peso que le deja el RIR de la semana. Desde su primer registro, la app le sugiere el peso con lo que hizo la última vez (peso × reps + RIR).</p>
+          </div>
+        )}
 
         <div className="overflow-x-auto pb-1">
           <div className="min-w-max">
             {headerRow}
             <div className="flex gap-1 mt-1">
               {weeks.map((w) => {
-                const r = loadFor({ weeks, loads, cells, exerciseId: exId, week: w.week, unit });
+                const r = loadFor({ weeks, loads, cells, exerciseId: exId, week: w.week, unit, goal, history, startDate });
+                const below = [r.kg != null && r.pct != null ? `${fmtNum(r.pct)}%` : "", r.rir != null ? `RIR ${fmtNum(r.rir)}` : "", r.steps ? `↑${r.steps}` : ""].filter(Boolean).join(" · ");
                 const cell = cells[cellKey(exId, w.week)] || {};
                 const off = w.week < activeFrom || w.week > activeTo;
                 return (
@@ -322,7 +397,7 @@ export function PlanLoadsEditor({ userId, weeks, routines, catalog, changes, onC
                         aria-label={`Reps semana ${w.week}`} title="Reps de esta semana"
                         className={`w-[60%] text-center text-[11px] rounded-md py-1 bg-field/60 outline-none focus:ring-1 focus:ring-accent placeholder:text-muted ${r.repsManual ? "text-accent ring-1 ring-accent/60" : "text-ink"}`} />
                     </div>
-                    <p className="text-muted text-[10px] text-center mt-0.5 truncate">{r.kg != null && r.pct != null ? `${fmtNum(r.pct)}%` : ""}</p>
+                    <p className="text-muted text-[10px] text-center mt-0.5 truncate" title={r.steps ? `Subió ${r.steps} ${r.steps === 1 ? "vez" : "veces"} por llegar al tope del rango` : undefined}>{below}</p>
                   </div>
                 );
               })}
@@ -435,28 +510,29 @@ export function PlanLoadsEditor({ userId, weeks, routines, catalog, changes, onC
   return (
     <div>
       <div className="bg-card rounded-xl p-4 mb-4">
-        <p className="text-ink text-sm font-medium mb-1">%, reps y series de cada semana</p>
+        <p className="text-ink text-sm font-medium mb-1">{showRir ? "%, reps, series y RIR de cada semana" : "%, reps y series de cada semana"}</p>
         <p className="text-muted text-xs mb-3">
           Salen de las fases. Podés cambiar una semana puntual escribiendo encima; para volver al cálculo, borrá el número.
+          {model === "ondulante_diaria" ? " Es la base de la semana: cada día la ajusta según su objetivo." : ""}
         </p>
         <div className="overflow-x-auto pb-1">
           <div className="flex gap-2 items-end min-w-max">
             <div className="w-16 shrink-0" />
             {headerRow}
           </div>
-          {[["pct", "% del RM", "decimal"], ["reps", "Reps", "text"], ["sets", "Series", "numeric"]].map(([k, label, mode]) => (
+          {[["pct", "% del RM", "decimal"], ["reps", "Reps", "text"], ["sets", "Series", "numeric"], ...(showRir ? [["rir", "RIR", "decimal"]] : [])].map(([k, label, mode]) => (
             <div key={k} className="flex gap-2 items-center mt-1 min-w-max">
               <span className="w-16 shrink-0 text-muted text-xs">{label}</span>
               <div className="flex gap-1">
                 {weeks.map((w) => {
-                  const auto = k === "pct" ? (w.pctAuto == null ? "—" : fmtNum(w.pctAuto)) : k === "reps" ? (w.repsAuto || "—") : (w.setsAuto == null ? "Rutina" : String(w.setsAuto));
-                  const edited = k === "pct" ? w.pctEdited : k === "reps" ? w.repsEdited : w.setsEdited;
+                  const auto = k === "pct" ? (w.pct == null || w.pctEdited ? (w.pctAuto == null ? "—" : fmtNum(w.pctAuto)) : fmtNum(w.pct)) : k === "reps" ? (w.repsAuto || "—") : k === "rir" ? (w.rirAuto == null ? "—" : fmtNum(w.rirAuto)) : (w.setsAuto == null ? "Rutina" : String(w.setsAuto));
+                  const edited = k === "pct" ? w.pctEdited : k === "reps" ? w.repsEdited : k === "rir" ? w.rirEdited : w.setsEdited;
                   return (
                     <input key={w.week} inputMode={mode} maxLength={k === "reps" ? 20 : undefined} style={{ width: CELL_W }}
                       value={weekOv[w.week]?.[k] ?? ""} placeholder={auto}
                       onChange={(e) => {
                         const v = e.target.value;
-                        setWeek(w.week, { [k]: k === "sets" ? cleanInt(v).slice(0, 2) : k === "pct" ? v.replace(/[^\d.,]/g, "").slice(0, 5) : v });
+                        setWeek(w.week, { [k]: k === "sets" ? cleanInt(v).slice(0, 2) : k === "pct" ? v.replace(/[^\d.,]/g, "").slice(0, 5) : k === "rir" ? cleanDecimal(v, 1).slice(0, 3) : v });
                       }}
                       aria-label={`${label} semana ${w.week}`}
                       className={`shrink-0 text-center text-xs rounded-md py-1.5 bg-field outline-none focus:ring-1 focus:ring-accent placeholder:text-soft ${edited ? "text-accent ring-1 ring-accent/60" : "text-ink"}`} />
@@ -466,8 +542,24 @@ export function PlanLoadsEditor({ userId, weeks, routines, catalog, changes, onC
             </div>
           ))}
         </div>
-        {noPct && <p className="text-warning text-xs mt-3">Ninguna semana tiene %: agregá fases con % de inicio y fin (arriba, en Fases) para que se calculen los pesos.</p>}
+        {noPct && model !== "doble" && <p className="text-warning text-xs mt-3">{model === "rir" ? "Ninguna semana tiene %: ponga reps (números) y RIR en las fases para que el % salga solo." : "Ninguna semana tiene %: agregá fases con % de inicio y fin (arriba, en Fases) para que se calculen los pesos."}</p>}
       </div>
+
+      {model === "ondulante_diaria" && (
+        goalDays.length === 0 ? (
+          <p className="text-warning text-xs bg-card rounded-xl p-4 mb-4">Elija el objetivo de cada día (arriba, en «Objetivo de cada día») para ver los pesos de cada día.</p>
+        ) : (
+          <div className="flex flex-wrap items-center gap-1.5 mb-4">
+            <span className="text-muted text-xs mr-1">Ver pesos del</span>
+            {goalDays.map((d) => (
+              <button key={d} onClick={() => setDayView(d)} className={`text-xs rounded-full px-3 py-1.5 ${d === viewDay ? "bg-accent text-app font-medium" : "bg-card text-soft hover:text-ink"}`}>
+                {d} · {dayGoal(dayGoals[d]).label}
+              </button>
+            ))}
+            <span className="text-muted text-[11px] w-full mt-1">Un peso escrito a mano en una semana vale para todos sus días.</span>
+          </div>
+        )
+      )}
 
       {routines.length === 0 ? (
         <p className="text-muted text-sm bg-card rounded-xl p-4">Primero asigná rutinas en las semanas del plan (pestaña «Rutinas por semana»). Acá aparecen todos sus ejercicios.</p>
