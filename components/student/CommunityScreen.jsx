@@ -14,7 +14,16 @@ import { ChallengeManager } from "@/components/coach/ChallengeManager";
 // Comunidad de su coach: mascotas, ejercicio destacado, constancia, retos y reacciones con un toque.
 // coachMode = la ve el coach desde su panel. isStaff = coach o admin en su vista de alumno.
 // El coach/admin siempre está dentro (no tiene que "entrar"), aparece con su mascota y puede publicar avisos y crear retos.
-export function CommunityScreen({ userId, coachMode = false, isStaff = false, header = null }) {
+// Igual que las demás pantallas del alumno: la pantalla tiene su propio scroll (si no, en computador no baja)
+export function CommunityScreen(props) {
+  return (
+    <div className="flex-1 min-h-0 overflow-y-auto overscroll-contain">
+      <CommunityBody {...props} />
+    </div>
+  );
+}
+
+function CommunityBody({ userId, coachMode = false, isStaff = false, header = null }) {
   const staff = coachMode || isStaff;
   const [posts, setPosts] = useState([]);
   const [membership, setMembershipState] = useState(null); // { missing, member }
