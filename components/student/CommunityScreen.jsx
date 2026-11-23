@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { Award, Flame, Lock, Megaphone, Sparkles, Trash2, Trophy, User, Users } from "lucide-react";
 import { supabase } from "@/lib/supabaseClient";
+import { signedAvatarUrls } from "@/lib/avatars";
 import { tr } from "@/lib/i18n";
 import { PET_STATES } from "@/lib/chameleon";
 import { Chameleon } from "@/components/ui/Chameleon";
@@ -32,7 +33,9 @@ export function CommunityScreen({ userId, coachMode = false, isStaff = false, he
     setMembershipState(m);
     if (m.missing || (!m.member?.visible && !staff)) { setFeed([]); return; }
     const [f, c, t, p] = await Promise.all([loadFeed(supabase), loadChallenges(supabase), todayExercises(supabase, userId), loadPosts(supabase)]);
-    setFeed(f.members);
+    // Las fotos están en un bucket privado: se guarda la ruta y aquí se firma para poder mostrarla
+    const urls = await signedAvatarUrls(f.members.map((x) => x.avatar_url));
+    setFeed(f.members.map((x, i) => ({ ...x, avatar_url: urls[i] || null })));
     setChallenges(c);
     setTodayList(t);
     setPosts(p);
