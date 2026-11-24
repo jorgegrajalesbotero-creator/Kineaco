@@ -387,6 +387,7 @@ export function RoutinesView({ initialOpenId = null, onInitialOpenDone } = {}) {
   };
   useBackClose(!!viewingId, finishDetail); // "atrás" del celular
   useBackClose(creating, () => setCreating(false));
+  useBackClose(!!saveChoice, () => setSaveChoice(null));
 
   // Trae los ejercicios de otra rutina al final de esta (queda en pantalla; se guarda con "Guardar cambios")
   const mergeRoutine = async () => {

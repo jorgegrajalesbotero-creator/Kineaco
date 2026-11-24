@@ -6,9 +6,11 @@ import { supabase } from "@/lib/supabaseClient";
 import { WEEK_DAYS } from "@/lib/dates";
 import { matchesSearch } from "@/lib/search";
 import { SearchInput } from "@/components/ui/Search";
+import { useBackClose } from "@/lib/backStack";
 
 // Ventana para asignar una rutina a un alumno en uno o varios días de la semana (días fijos)
 export function AssignRoutineModal({ routine, onClose }) {
+  useBackClose(true, onClose); // "atrás" del celular cierra esta ventana (no la pantalla de atrás)
   const [students, setStudents] = useState([]);
   const [loading, setLoading] = useState(true);
   const [query, setQuery] = useState("");

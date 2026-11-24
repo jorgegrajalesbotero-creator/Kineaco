@@ -5,12 +5,14 @@ import { Check, X } from "lucide-react";
 import { supabase } from "@/lib/supabaseClient";
 import { tr } from "@/lib/i18n";
 import { ISSUE_KINDS, ISSUE_SIDES, ISSUE_TIMES, ISSUE_ZONES, saveCheckout } from "@/lib/checkout";
+import { useBackClose } from "@/lib/backStack";
 
 const keyOf = (e) => `${e.routineId || ""}|${e.itemKey || ""}|${e.exerciseId}`;
 
 // Check-out opcional al terminar: esfuerzo, molestias por ejercicio (zona, lado, tipo, intensidad, cuándo) y comentario.
 // initial = check-out ya guardado (para editarlo). exercises = ejercicios del día.
 export function CheckoutSheet({ userId, weekStart, dayLabel, exercises, initial = null, onClose, onSaved }) {
+  useBackClose(true, onClose); // "atrás" del celular cierra esta ventana (no la pantalla de atrás)
   const [effort, setEffort] = useState(initial?.effort || null);
   const [hadIssue, setHadIssue] = useState(initial ? !!initial.had_issue : null);
   const [issues, setIssues] = useState(() => {

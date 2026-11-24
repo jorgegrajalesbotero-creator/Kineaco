@@ -4,10 +4,12 @@ import { useState } from "react";
 import { Timer, X } from "lucide-react";
 import { normalizeTimer, timerLabel } from "@/lib/clock";
 import { TimerSettings } from "@/components/coach/TimerSettings";
+import { useBackClose } from "@/lib/backStack";
 
 // Ventana para programar el reloj de un bloque SOLO para un alumno.
 // base = reloj de la rutina (si tiene). onSave(timer | null) devuelve true si salió bien (null = volver al de la rutina).
 export function TimerOverrideEditor({ blockTitle, routineTitle, initial, base, isCustom, onSave, onClose }) {
+  useBackClose(true, onClose); // "atrás" del celular cierra esta ventana (no la pantalla de atrás)
   const [timer, setTimer] = useState(normalizeTimer(initial));
   const [busy, setBusy] = useState(false);
 

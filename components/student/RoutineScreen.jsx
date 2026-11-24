@@ -21,6 +21,7 @@ import { finishSession, fmtFinished, isLocked, loadSession, weekStartISO } from 
 import { loadCheckout } from "@/lib/checkout";
 import { CheckoutSheet } from "./CheckoutSheet";
 import { ExerciseCommentBox } from "./ExerciseCommentBox";
+import { useBackClose } from "@/lib/backStack";
 
 // Primer número de las reps sugeridas ("8-10" → 8)
 const firstNumber = (text) => {
@@ -39,6 +40,7 @@ export function RoutineScreen({ routine, userId, pet = null, onClose, onToggle, 
   const [playing, setPlaying] = useState(false); // el video solo se carga cuando el alumno toca "Ver video"
   const openDetail = (i) => { setPlaying(false); setDetailIndex(i); };
   const closeDetail = () => { setPlaying(false); setDetailIndex(null); };
+  useBackClose(detailIndex != null, closeDetail); // "atrás" del celular cierra el ejercicio abierto
   const [loggerIndex, setLoggerIndex] = useState(null);
   // El reloj y el descanso entre series viven en lib/clockStore (siguen corriendo en la píldora de arriba)
   const tabataByDefault = (routine.parts || [routine]).some((p) => p.blocks?.some((b) => b.block_type === "intermitentes"));

@@ -9,9 +9,8 @@ import { useEffect } from "react";
 //    (← → solo cuando el cursor está al inicio o al final del texto).
 //  · Esc: primero sale del campo; si no hay campo activo, cierra el panel o ventana de arriba (su botón «Cerrar»).
 //  · Arrastrar con el mouse (clic sostenido) mueve de lado las zonas que se desplazan a lo ancho.
-//  · iPhone con la app instalada en la pantalla de inicio: deslizar desde el borde izquierdo es "atrás".
-//    En Safari, Chrome y Android el sistema ya hace "atrás" con ese gesto: ahí no se agrega nada
-//    (si se hiciera también, se devolvería dos veces).
+//  · "Atrás" deslizando el dedo lo hace el propio celular (iPhone y Android): la app no agrega otro gesto,
+//    porque si lo hiciera se devolvería dos veces.
 const FIELD = 'input:not([type="hidden"]):not([type="checkbox"]):not([type="radio"]):not([type="button"]):not([type="submit"]):not([type="file"]):not([type="range"]):not([disabled]):not([readonly]), select:not([disabled]), textarea:not([disabled])';
 const TEXTLIKE = new Set(["", "text", "number", "email", "tel", "url", "decimal", "date", "time"]);
 const visible = (el) => !!(el.offsetParent || el.getClientRects().length) && getComputedStyle(el).visibility !== "hidden";
@@ -159,39 +158,13 @@ export function InputHelpers() {
       drag = null;
     };
 
-    // Deslizar desde el borde izquierdo = atrás: solo en iPhone/iPad con la app instalada (sin gesto propio del sistema)
-    const ios = /iPhone|iPad|iPod/.test(navigator.userAgent) || (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
-    const standalone = navigator.standalone === true || window.matchMedia?.("(display-mode: standalone)").matches;
-    const edgeBack = ios && standalone;
-    let edge = null;
-    const onTouchStart = (e) => {
-      if (!edgeBack) return;
-      const t = e.touches[0];
-      edge = t && t.clientX < 24 && e.touches.length === 1 ? { x: t.clientX, y: t.clientY, done: false } : null;
-    };
-    const onTouchMove = (e) => {
-      if (!edge || edge.done) return;
-      const t = e.touches[0];
-      const dx = t.clientX - edge.x;
-      const dy = Math.abs(t.clientY - edge.y);
-      if (dy > 50) { edge = null; return; }
-      if (dx > 80 && history.state?.kinBack) { edge.done = true; history.back(); }
-    };
-    const onTouchEnd = () => { edge = null; };
-
     document.addEventListener("keydown", onKey);
     document.addEventListener("mousedown", onDown);
-    document.addEventListener("touchstart", onTouchStart, { passive: true });
-    document.addEventListener("touchmove", onTouchMove, { passive: true });
-    document.addEventListener("touchend", onTouchEnd, { passive: true });
     window.addEventListener("mousemove", onMove);
     window.addEventListener("mouseup", onUp);
     return () => {
       document.removeEventListener("keydown", onKey);
       document.removeEventListener("mousedown", onDown);
-      document.removeEventListener("touchstart", onTouchStart);
-      document.removeEventListener("touchmove", onTouchMove);
-      document.removeEventListener("touchend", onTouchEnd);
       window.removeEventListener("mousemove", onMove);
       window.removeEventListener("mouseup", onUp);
     };

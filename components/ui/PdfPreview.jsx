@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { Download, FileText, X } from "lucide-react";
 import { downloadBlob } from "@/lib/pdf";
+import { useBackClose } from "@/lib/backStack";
 
 const plain = (text, params) => (params ? text.replace(/\{(\w+)\}/g, (_, k) => (params[k] ?? "").toString()) : text);
 const MAX_PIXEL_RATIO = 2; // nitidez suficiente sin gastar memoria de más en celulares
@@ -29,6 +30,7 @@ function loadPdfjs() {
 // Vista previa de un PDF generado en la app, antes de descargarlo.
 // file: { blob, filename } · t: traductor (pantallas del alumno).
 export function PdfPreview({ file, onClose, t = plain }) {
+  useBackClose(true, onClose); // "atrás" del celular cierra la vista del PDF
   const pagesRef = useRef(null);
   const [status, setStatus] = useState("loading"); // loading | rendering | ready | error
   const [progress, setProgress] = useState({ page: 0, total: 0 });
