@@ -45,6 +45,7 @@ export function RoutineScreen({ routine, userId, pet = null, onClose, onToggle, 
   // El reloj y el descanso entre series viven en lib/clockStore (siguen corriendo en la píldora de arriba)
   const tabataByDefault = (routine.parts || [routine]).some((p) => p.blocks?.some((b) => b.block_type === "intermitentes"));
   const [celebrate, setCelebrate] = useState(false);
+  const [justFinished, setJustFinished] = useState(false); // acaba de tocar «Finalizar»: el camaleón celebra
   const [pdfBusy, setPdfBusy] = useState(false);
   const [showPdf, pdfPreview] = usePdfPreview(tr);
   const downloadPdf = async () => {
@@ -253,6 +254,7 @@ export function RoutineScreen({ routine, userId, pet = null, onClose, onToggle, 
     setFinishing(false);
     if (error) return alert(tr("No se pudo finalizar: "));
     setSession(data);
+    setJustFinished(true);
     stopRest();
     navigator.vibrate?.([20, 60, 30]);
     // Check-out opcional: se ofrece apenas termina (se puede cerrar con «Ahora no»)
@@ -439,11 +441,15 @@ export function RoutineScreen({ routine, userId, pet = null, onClose, onToggle, 
           onSaved={(row) => setCheckout(row)}
         />
       )}
-      {celebrate && <Confetti onDone={() => setTimeout(() => setCelebrate(false), 1200)} />}
+      {celebrate && <Confetti onDone={() => setTimeout(() => setCelebrate(false), pet ? 2800 : 1200)} />}
       {celebrate && (
         <div className="fixed inset-x-0 top-1/3 z-[61] flex justify-center px-6 pointer-events-none">
           <div className="animate-celebrate bg-panel border border-accent/30 rounded-3xl px-6 py-5 text-center shadow-[0_20px_60px_-10px_rgba(0,0,0,0.8)]">
-            <p className="text-3xl mb-1">🎉</p>
+            {pet ? (
+              <div className="pet-flip w-fit mx-auto"><div className="pet-dance"><Chameleon mood={5} size={120} /></div></div>
+            ) : (
+              <p className="text-3xl mb-1">🎉</p>
+            )}
             <p className="text-ink text-lg font-semibold">{tr("¡Entrenamiento completado!")}</p>
             <p className="text-soft text-sm">{tr("Excelente trabajo hoy.")}</p>
           </div>
@@ -558,7 +564,11 @@ export function RoutineScreen({ routine, userId, pet = null, onClose, onToggle, 
           <div className="bg-card border border-accent/30 rounded-2xl p-4 mt-6 text-center">
             {pet && (
               <>
-                <Chameleon mood={5} size={170} className="mx-auto" />
+                {justFinished ? (
+                  <div className="pet-flip w-fit mx-auto"><div className="pet-dance"><Chameleon mood={5} size={170} /></div></div>
+                ) : (
+                  <Chameleon mood={5} size={170} className="mx-auto" />
+                )}
                 <p className="text-ink text-base font-semibold mt-1">{tr("¡Lo logramos!")}</p>
                 <p className="text-soft text-xs mb-2">{tr("{p0} está orgulloso de usted.", { p0: pet.name || tr("Su camaleón") })}</p>
               </>
