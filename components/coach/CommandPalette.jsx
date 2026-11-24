@@ -8,12 +8,14 @@ import { Dumbbell, LayoutDashboard, Search, Users, CornerDownLeft } from "lucide
 import { supabase } from "@/lib/supabaseClient";
 import { libraryRoutines } from "@/lib/libraryRoutines";
 import { matchesSearch } from "@/lib/search";
+import { useBackClose } from "@/lib/backStack";
 
 export function CommandPalette({ open, onClose, sections, onGo }) {
   const [q, setQ] = useState("");
   const [data, setData] = useState(null); // { students, routines, exercises }
   const [active, setActive] = useState(0);
   const listRef = useRef(null);
+  useBackClose(open, onClose); // "atrás" del celular cierra el buscador
 
   useEffect(() => {
     if (!open) return;

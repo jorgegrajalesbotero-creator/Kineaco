@@ -5,8 +5,10 @@ import { fetchAllRows } from "@/lib/fetchAll";
 import { appLocale, tr } from "@/lib/i18n";
 import { supabase } from "@/lib/supabaseClient";
 import { Skeleton } from "@/components/ui/Skeleton";
+import { X } from "lucide-react";
 
-export function MessagesScreen({ userId, onMessagesRead }) {
+// onClose: cuando se abre como ventana (burbuja flotante) muestra la X para cerrarla
+export function MessagesScreen({ userId, onMessagesRead, onClose }) {
   const [topic, setTopic] = useState("general");
   const [messages, setMessages] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -71,7 +73,14 @@ export function MessagesScreen({ userId, onMessagesRead }) {
 
   return (
     <div className="flex-1 overflow-y-auto px-5 pt-6 pb-4 flex flex-col">
-      <h1 className="text-ink text-xl font-semibold mb-4">{tr("Mensajes")}</h1>
+      <div className="flex items-center justify-between gap-3 mb-4">
+        <h1 className="text-ink text-xl font-semibold">{tr("Mensajes")}</h1>
+        {onClose && (
+          <button type="button" onClick={onClose} aria-label={tr("Cerrar")} className="w-9 h-9 -mr-2 rounded-full flex items-center justify-center text-soft hover:text-ink">
+            <X size={20} />
+          </button>
+        )}
+      </div>
 
       <div className="flex gap-2 mb-4">
         {topics.map((t) => (

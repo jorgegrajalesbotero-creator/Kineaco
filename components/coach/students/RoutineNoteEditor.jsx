@@ -3,11 +3,13 @@
 import { useState } from "react";
 import { MessageSquare, X } from "lucide-react";
 import { ROUTINE_NOTE_MAX } from "@/lib/routineNotes";
+import { useBackClose } from "@/lib/backStack";
 
 // Ventana para escribir un comentario SOLO para un alumno: el de un bloque o el del día entero.
 // base = lo que trae la rutina (si tiene). onSave(texto) devuelve true si salió bien;
 // con el texto vacío se borra el comentario del alumno y vuelve el de la rutina.
 export function RoutineNoteEditor({ title, routineTitle, initial = "", base = "", isCustom = false, onSave, onClose }) {
+  useBackClose(true, onClose); // "atrás" del celular cierra esta ventana (no la pantalla de atrás)
   const [text, setText] = useState(initial);
   const [busy, setBusy] = useState(false);
 

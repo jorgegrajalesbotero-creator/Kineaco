@@ -10,6 +10,7 @@ import { UnitToggle, WeightInput } from "@/components/ui/WeightInput";
 import { formatWeight, useWeightUnit } from "@/lib/weightUnits";
 import { Chameleon } from "@/components/ui/Chameleon";
 import { ExerciseCommentBox } from "./ExerciseCommentBox";
+import { useBackClose } from "@/lib/backStack";
 
 // Primer número de las reps sugeridas ("8-10" → 8) para "Marcar todas como sugeridas"
 const firstNumber = (text) => {
@@ -31,6 +32,7 @@ const inputCls =
 // coachMode = lo abre el coach: NO puede marcar ni desmarcar series (eso solo lo hace el alumno);
 //             solo corrige el peso y las reps de las series que el alumno ya registró.
 export function SetLogger({ exercise, routine, userId, onClose, onComplete, onUncomplete, onStartRest, readOnly = false, pet = null, coachMode = false, onCorrected = null, comment = "", onCommentSaved = null }) {
+  useBackClose(true, onClose); // "atrás" del celular cierra esta ventana (no la pantalla de atrás)
   const [rows, setRows] = useState([]);
   const [dirty, setDirty] = useState(() => new Set()); // series corregidas por el coach sin guardar
   const [savedMsg, setSavedMsg] = useState("");

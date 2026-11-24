@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { Activity, Calendar, ChevronLeft, ChevronRight, Eye, Lock, LockOpen, PlusCircle } from "lucide-react";
+import { Activity, Calendar, ChevronLeft, ChevronRight, Eye, Layers, Lock, LockOpen, PlusCircle } from "lucide-react";
 import { supabase } from "@/lib/supabaseClient";
 import { WEEK_DAYS, todayDayLabel } from "@/lib/dates";
 import { addDays, loadSchedule, mondayOf, routinesForDate } from "@/lib/trainingPlan";
@@ -13,6 +13,7 @@ import { Skeleton } from "@/components/ui/Skeleton";
 import { PanelLayout } from "./PanelLayout";
 import { ExerciseNoteEditor } from "./ExerciseNoteEditor";
 import { ExerciseEditSheet } from "./ExerciseEditSheet";
+import { BulkSetsSheet } from "./BulkSetsSheet";
 import { CheckoutSummary } from "./CheckoutSummary";
 import { loadCheckout } from "@/lib/checkout";
 import { TimerOverrideEditor } from "./TimerOverrideEditor";
@@ -37,6 +38,7 @@ export function RoutinePreviewPanel({ student, onClose, onOpenPanel }) {
   const [loading, setLoading] = useState(true);
   const [editing, setEditing] = useState(null); // ejercicio al que se le escribe la observación
   const [editingEx, setEditingEx] = useState(null); // ejercicio que se edita (peso, series, reps, cambiarlo)
+  const [bulkOpen, setBulkOpen] = useState(false); // series de todos los ejercicios a la vez
   const [editingTimer, setEditingTimer] = useState(null); // { part, block } reloj solo para este alumno
   const [editingNote, setEditingNote] = useState(null); // { part, block } comentario solo para este alumno (block === part: el del día)
   const [session, setSession] = useState(null); // ¿el alumno ya finalizó este día?
@@ -288,6 +290,13 @@ export function RoutinePreviewPanel({ student, onClose, onOpenPanel }) {
           )}
           {weekOffset === 0 && <p className="text-muted text-[11px] mb-2">Las series y ejercicios los marca solo el alumno; vos ves cada uno apenas lo marca. Para corregir un peso o unas reps de una serie ya hecha: abrí el ejercicio → «Corregir peso y reps de cada serie».</p>}
           {checkout && <div className="mb-3"><CheckoutSummary checkout={checkout} title="Check-out de este día" /></div>}
+          {weekOffset === 0 && (routine?.exercises || []).length > 1 && (
+            <button onClick={() => setBulkOpen(true)} className="w-full bg-card text-ink text-sm rounded-xl px-4 py-3 mb-3 flex items-center gap-2 hover:bg-field">
+              <Layers size={15} className="text-accent" />
+              <span className="flex-1 text-left">Cambiar series de todos los ejercicios</span>
+              <span className="text-muted text-xs">Para uno solo: «Editar»</span>
+            </button>
+          )}
           {noteCount > 0 && <p className="text-accent text-xs mb-2">{noteCount} ejercicio{noteCount > 1 ? "s" : ""} con observación este día</p>}
           <div className="rounded-2xl border border-white/[0.06] overflow-hidden">
             <RoutineScreen
@@ -342,6 +351,17 @@ export function RoutinePreviewPanel({ student, onClose, onOpenPanel }) {
           planWeek={week.days.find((d) => d.label === day)?.planWeek || null}
           dayLabel={day}
           onClose={() => setEditingEx(null)}
+          onSaved={async () => { await loadWeekSchedule(); }}
+        />
+      )}
+      {bulkOpen && routine && (
+        <BulkSetsSheet
+          student={student}
+          routine={routine}
+          plan={week.days.find((d) => d.label === day)?.plan || null}
+          planWeek={week.days.find((d) => d.label === day)?.planWeek || null}
+          dayLabel={day}
+          onClose={() => setBulkOpen(false)}
           onSaved={async () => { await loadWeekSchedule(); }}
         />
       )}

@@ -3,10 +3,12 @@
 import { useState } from "react";
 import { MessageSquareText, Trash2, X } from "lucide-react";
 import { NOTE_MAX } from "@/lib/exerciseNotes";
+import { useBackClose } from "@/lib/backStack";
 
 // Ventana para escribir la observación de un ejercicio para UN alumno.
 // onSave(texto) guarda (texto vacío = borrar) y devuelve true si salió bien.
 export function ExerciseNoteEditor({ exerciseName, routineTitle, initial = "", onSave, onClose }) {
+  useBackClose(true, onClose); // "atrás" del celular cierra esta ventana (no la pantalla de atrás)
   const [text, setText] = useState(initial || "");
   const [busy, setBusy] = useState(false);
 

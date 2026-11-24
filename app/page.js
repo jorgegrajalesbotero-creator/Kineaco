@@ -32,6 +32,7 @@ import { RoutineScreen } from "@/components/student/RoutineScreen";
 import { CalendarScreen } from "@/components/student/CalendarScreen";
 import { ClockHost } from "@/components/student/ClockIsland";
 import { useBackClose, useBackTabs } from "@/lib/backStack";
+import { MessagesBubble } from "@/components/student/MessagesBubble";
 
 export default function App() {
   const [lang, setLangState] = useState("es");
@@ -76,6 +77,7 @@ export default function App() {
   const pendingPetName = useRef("");
   const [showMeasure, setShowMeasure] = useState(false);
   const [showAnnouncements, setShowAnnouncements] = useState(false);
+  const [chatOpen, setChatOpen] = useState(false); // mensajes con el coach (burbuja flotante)
   const [hasNutritionProfile, setHasNutritionProfile] = useState(false);
   const [unreadMessageCount, setUnreadMessageCount] = useState(0);
   const [notifKey, setNotifKey] = useState(0);
@@ -251,7 +253,11 @@ export default function App() {
       setShowCheckin(true);
       return;
     }
-    const target = { messages: "messages", progress: "progress", photos: "progress", measurements: "progress", nutrition: "nutrition", profile: "profile", community: "community" }[n.link] || "home";
+    if (n.link === "messages") {
+      setChatOpen(true);
+      return;
+    }
+    const target = { progress: "progress", photos: "progress", measurements: "progress", nutrition: "nutrition", profile: "profile", community: "community" }[n.link] || "home";
     handleSelectTab(target);
   };
 
@@ -749,6 +755,17 @@ export default function App() {
         </main>
         {/* Reloj del alumno: sigue corriendo en una píldora arriba aunque cambie de pantalla o salga de la app */}
         {!hideNav && userId && <ClockHost userId={userId} onProgressMarked={() => refreshRoutine(uidRef.current, selectedDay)} />}
+        {!hideNav && userId && (
+          <MessagesBubble
+            userId={userId}
+            unread={unreadMessageCount}
+            open={chatOpen}
+            onOpenChange={setChatOpen}
+            onRead={() => { setUnreadMessageCount(0); setNotifKey((k) => k + 1); }}
+            isCoach={isCoach}
+            hidden={showRoutine || showCheckin || showCalendar || showMeasure || showAnnouncements || tab === "messages"}
+          />
+        )}
         {!hideNav && (
           <div className="md:hidden absolute inset-x-0 bottom-[max(0.75rem,calc(env(safe-area-inset-bottom)-0.5rem))] z-40 pointer-events-none">
             <BottomNav active={tab} onSelect={selectTab} unreadCount={unreadMessageCount} isCoach={isCoach} />

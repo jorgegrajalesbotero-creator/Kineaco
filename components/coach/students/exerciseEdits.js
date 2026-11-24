@@ -210,3 +210,47 @@ export async function editRoutineExercise({ routineId, itemKey, patch = {}, acti
   const err = await writeRoutineContent(routineId, content.mode, content.list, content.blocks, { timer: content.timer });
   if (err) throw fail("No se pudo guardar el cambio en la rutina.", err);
 }
+
+// Series (y reps, si se escriben) de VARIOS ejercicios a la vez, desde "Ver su rutina".
+// exercises = ejercicios del día que se cambian · onlyMain = solo los del trabajo principal (en bloques).
+// Con planeación: cada ejercicio va a la planeación (solo esta semana o desde esta semana).
+// Sin planeación o en un extra: una sola escritura en la copia de la rutina de este alumno.
+export async function saveSetsForAll({ plan, planWeek, scope, part, exercises, sets, reps, studentId, dayLabel, isPrivate }) {
+  const setsVal = sets ? Number(sets) : null;
+  const repsVal = (reps || "").trim();
+  const changed = { kg: false, sets: setsVal != null, reps: !!repsVal };
+  if (!changed.sets && !changed.reps) return;
+  if (plan && planWeek && !part.isExtra) {
+    const ids = [...new Set(exercises.map((e) => String(e.exerciseId)))];
+    for (const exerciseId of ids) {
+      await savePlanValues({ plan, week: planWeek, exerciseId, scope, kg: null, sets: setsVal, reps: repsVal, currentKg: null, changed });
+    }
+    return;
+  }
+  let routineId = part.id;
+  let keyMap = null;
+  if (!isPrivate) {
+    const res = await ensurePrivateRoutine({ studentId, part, dayLabel });
+    routineId = res.routineId;
+    keyMap = res.keyMap || {};
+  }
+  const wanted = new Set(exercises.map((e) => String(keyMap ? keyMap[e.itemKey] : e.itemKey)).filter((k) => k && k !== "undefined" && k !== "null"));
+  const content = await loadRoutineContent(routineId);
+  const apply = (item) => { if (changed.reps) item.reps = repsVal; };
+  if (content.mode === "bloques") {
+    content.blocks.forEach((b) => {
+      const hit = (b.exercises || []).filter((e) => wanted.has(String(e.itemKey)));
+      if (!hit.length) return;
+      if (changed.sets) b.sets = String(setsVal); // en bloques, las series son del bloque
+      hit.forEach(apply);
+    });
+  } else {
+    content.list.forEach((e) => {
+      if (!wanted.has(String(e.itemKey))) return;
+      if (changed.sets) e.sets = String(setsVal);
+      apply(e);
+    });
+  }
+  const err = await writeRoutineContent(routineId, content.mode, content.list, content.blocks, { timer: content.timer });
+  if (err) throw fail("No se pudieron guardar las series en la rutina.", err);
+}

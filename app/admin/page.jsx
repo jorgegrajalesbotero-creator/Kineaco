@@ -23,6 +23,15 @@ import { BrandMark } from "@/components/ui/BrandMark";
 export default function AdminPanel() {
   const [tab, setTab] = useState("alumnos");
   useBackTabs(tab, setTab); // "atrás" del celular vuelve a la sección anterior
+  // Llegó con /admin?tab=mensajes (por ejemplo, desde la burbuja de Mensajes de su vista de alumno)
+  useEffect(() => {
+    const t = new URLSearchParams(window.location.search).get("tab");
+    const allowed = ["mensajes", "alumnos", "rutinas", "ejercicios", "programas", "anuncios", "comunidad", "reporte", "perfil"];
+    if (t && allowed.includes(t)) {
+      setTab(t);
+      window.history.replaceState(window.history.state, "", "/admin");
+    }
+  }, []);
   // Buscador general (Ctrl + K) y lo que hay que abrir al llegar a una sección
   const [paletteOpen, setPaletteOpen] = useState(false);
   const [pendingOpen, setPendingOpen] = useState(null); // { kind: "routine" | "exercise", id }

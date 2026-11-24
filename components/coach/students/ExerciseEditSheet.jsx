@@ -9,6 +9,7 @@ import { SearchSelect } from "@/components/ui/Search";
 import { WeightInput } from "@/components/ui/WeightInput";
 import { useWeightUnit } from "@/lib/weightUnits";
 import { editRoutineExercise, ensurePrivateRoutine, saveCustomWeight, savePlanChange, savePlanValues } from "./exerciseEdits";
+import { useBackClose } from "@/lib/backStack";
 
 const num = (v) => {
   if (v === "" || v == null) return null;
@@ -20,6 +21,7 @@ const num = (v) => {
 // (con la opción de crear un ejercicio nuevo). Con planeación se elige si vale solo esta semana o
 // desde esta semana en adelante; sin planeación (semana base) o en un extra, se edita solo para este alumno.
 export function ExerciseEditSheet({ student, routine, exercise, plan, planWeek, dayLabel, onClose, onSaved }) {
+  useBackClose(true, onClose); // "atrás" del celular cierra esta ventana (no la pantalla de atrás)
   const [unit] = useWeightUnit();
   const part = (routine?.parts || [])[exercise.partIndex ?? 0] || routine;
   const inPlan = !!(plan && planWeek && !part?.isExtra);
