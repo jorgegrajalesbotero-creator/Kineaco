@@ -269,7 +269,7 @@ export function RoutineScreen({ routine, userId, pet = null, onClose, onToggle, 
     let nextN = 1;
     while (nums.has(nextN)) nextN++;
     return (
-      <div className="flex items-center gap-1.5 mt-1.5" onClick={(e) => e.stopPropagation()}>
+      <div className="flex flex-wrap items-center gap-1.5 mt-2" onClick={(e) => e.stopPropagation()}>
         {Array.from({ length: ex.setsCount }, (_, k) => {
           const n = k + 1;
           const isDone = nums.has(n);
@@ -281,15 +281,15 @@ export function RoutineScreen({ routine, userId, pet = null, onClose, onToggle, 
               disabled={!clickable}
               onClick={() => (isDone ? unmarkLastSet(i) : markNextSet(i))}
               aria-label={isDone ? tr("Desmarcar serie {p0}", { p0: n }) : tr("Marcar serie {p0}", { p0: n })}
-              className={`w-6 h-6 rounded-full text-[10px] font-semibold flex items-center justify-center transition-all active:scale-90 ${
+              className={`w-7 h-7 shrink-0 rounded-full text-[11px] font-semibold flex items-center justify-center transition-all active:scale-90 ${
                 isDone ? "bg-accent text-app" : n === nextN && !preview ? "border-2 border-accent/70 text-accent" : "border border-field-strong text-muted"
               } disabled:cursor-default`}
             >
-              {isDone ? <Check size={11} strokeWidth={3} /> : n}
+              {isDone ? <Check size={12} strokeWidth={3} /> : n}
             </button>
           );
         })}
-        <span className="text-muted text-[11px] ml-1">
+        <span className="text-muted text-[11px] ml-1 whitespace-nowrap">
           {done.length >= ex.setsCount ? tr("Series completas") : tr("Serie {p0} de {p1}", { p0: Math.min(done.length + 1, ex.setsCount), p1: ex.setsCount })}
         </span>
       </div>
@@ -298,8 +298,8 @@ export function RoutineScreen({ routine, userId, pet = null, onClose, onToggle, 
 
   // Fila de un ejercicio. Si el coach le dejó una observación, se ve la marca antes de abrirlo.
   const exerciseRow = (ex, i, subtitle) => (
-    <div key={i} onClick={() => openDetail(i)} className={`flex items-center justify-between gap-2 rounded-2xl px-4 py-3 group cursor-pointer transition duration-200 ease-out hover:scale-[1.02] hover:bg-card-hover active:scale-[0.99] ${isEnCurso(ex) ? "bg-accent/15 ring-1 ring-accent/50" : ex.completed ? "bg-card/60" : "bg-card"}`}>
-      <div className="flex items-center gap-3 min-w-0">
+    <div key={i} onClick={() => openDetail(i)} className={`flex flex-wrap items-center justify-between gap-x-2 gap-y-2.5 rounded-2xl px-4 py-3 group cursor-pointer transition duration-200 ease-out hover:scale-[1.02] hover:bg-card-hover active:scale-[0.99] ${isEnCurso(ex) ? "bg-accent/15 ring-1 ring-accent/50" : ex.completed ? "bg-card/60" : "bg-card"}`}>
+      <div className="flex items-center gap-3 min-w-0 flex-1">
         <button
           onClick={(e) => { e.stopPropagation(); toggle(i); }}
           aria-label={preview ? tr("Ver ejercicio") : undefined}
@@ -330,22 +330,28 @@ export function RoutineScreen({ routine, userId, pet = null, onClose, onToggle, 
           )}
         </div>
       </div>
-      {preview && onEditExercise && (
-        <button
-          onClick={(e) => { e.stopPropagation(); onEditExercise(ex); }}
-          aria-label="Editar ejercicio"
-          className="shrink-0 flex items-center gap-1 text-xs rounded-lg px-2.5 py-1.5 bg-field text-soft hover:text-ink"
-        >
-          <SlidersHorizontal size={12} /> Editar
-        </button>
-      )}
-      {preview && onEditNote && ex.itemKey ? (
-        <button
-          onClick={(e) => { e.stopPropagation(); onEditNote(ex); }}
-          className={`shrink-0 flex items-center gap-1 text-xs rounded-lg px-2.5 py-1.5 ${ex.note ? "bg-accent/15 text-accent" : "bg-field text-soft hover:text-ink"}`}
-        >
-          {ex.note ? <Pencil size={12} /> : <MessageSquarePlus size={12} />} Observación
-        </button>
+      {/* Vista del coach: en el celular «Editar» y «Observación» van en su propia línea, a lo ancho,
+          para que el nombre y las series del ejercicio no queden apretados */}
+      {preview && (onEditExercise || (onEditNote && ex.itemKey)) ? (
+        <div className="flex items-center gap-1.5 w-full sm:w-auto pl-10 sm:pl-0">
+          {onEditExercise && (
+            <button
+              onClick={(e) => { e.stopPropagation(); onEditExercise(ex); }}
+              aria-label="Editar ejercicio"
+              className="flex-1 sm:flex-none justify-center flex items-center gap-1.5 text-xs rounded-lg px-3 py-2 bg-field text-soft hover:text-ink"
+            >
+              <SlidersHorizontal size={13} /> Editar
+            </button>
+          )}
+          {onEditNote && ex.itemKey && (
+            <button
+              onClick={(e) => { e.stopPropagation(); onEditNote(ex); }}
+              className={`flex-1 sm:flex-none justify-center flex items-center gap-1.5 text-xs rounded-lg px-3 py-2 ${ex.note ? "bg-accent/15 text-accent" : "bg-field text-soft hover:text-ink"}`}
+            >
+              {ex.note ? <Pencil size={13} /> : <MessageSquarePlus size={13} />} Observación
+            </button>
+          )}
+        </div>
       ) : (
         <button onClick={(e) => { e.stopPropagation(); openDetail(i); }} aria-label={tr("Ver ejercicio")} className="text-muted transition-colors group-hover:text-ink shrink-0">
           <ChevronRight size={16} />
