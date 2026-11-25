@@ -88,9 +88,10 @@ export function HomeScreen({ userId, onNavigate, onOpenCheckin, onOpenAnnounceme
             </div>
           </div>
           <div className="flex items-center gap-2 shrink-0">
-            <div className="flex items-center gap-1.5 bg-gradient-to-b from-danger/20 to-danger/5 border border-danger/25 px-3 h-10 rounded-full">
+            <div title={tr("Semanas seguidas cumpliendo su meta")} className="flex items-center gap-1.5 bg-gradient-to-b from-danger/20 to-danger/5 border border-danger/25 px-3 h-10 rounded-full">
               <Flame size={15} className="text-danger drop-" fill="currentColor" />
               <span className="text-ink text-sm font-semibold tabular-nums">{streak}</span>
+              <span className="text-soft text-[11px]">{tr("sem")}</span>
             </div>
             {bell}
           </div>

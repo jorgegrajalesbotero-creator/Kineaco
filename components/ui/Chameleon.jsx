@@ -2,6 +2,7 @@
 
 import { useEffect, useRef } from "react";
 import { PET_STATES } from "@/lib/chameleon";
+import { PetAura, PetBack, PetBackground, PetBody, PetEyes, PetFeet, PetHead, PetNeck, PetWaist } from "@/components/ui/petParts";
 
 // Oscurece (p < 0) o aclara (p > 0) un color #RRGGBB
 function shade(hex, p) {
@@ -18,7 +19,9 @@ const TAIL_DOWN = "M60 100 C36 110 20 98 22 84 C24 72 38 70 42 78 C45 84 38 88 3
 // animate: el ojo mira por su cuenta y parpadea, respira, mueve la cola; con "Con toda" saca la lengua.
 // level (logros de la comunidad): 0 rama · 1 con hojas · 2 en flor · 3 rama dorada
 // party = celebración: el camaleón (sin la rama) salta, da una vuelta hacia atrás, cae en su rama y baila
-export function Chameleon({ mood = 3, sleeping = false, animate = true, size = 160, className = "", title, level = 0, party = false }) {
+// outfit = { head, eyes, body, neck, waist, back, feet, aura, bg } (lo que tiene puesto). scene = dibujar su fondo.
+export function Chameleon({ mood = 3, sleeping = false, animate = true, size = 160, className = "", title, level = 0, party = false, outfit = null, scene = false }) {
+  const o = outfit || {};
   const k = sleeping ? 2 : PET_STATES[mood] ? mood : 3;
   const c = sleeping ? "#7D8580" : PET_STATES[k].color;
   const d = shade(c, -0.35);
@@ -74,6 +77,7 @@ export function Chameleon({ mood = 3, sleeping = false, animate = true, size = 1
   return (
     <svg viewBox="0 0 210 150" width={size} role="img" className={`block ${className}`} style={{ maxWidth: "100%", overflow: party ? "visible" : undefined }}>
       <title>{title || (sleeping ? "Camaleón dormido" : `Camaleón: ${PET_STATES[k].name}`)}</title>
+      {scene && <PetBackground item={o.bg || "selva"} />}
       <path d="M4 132 Q100 124 206 134" stroke={level >= 3 ? "#C9A227" : "#6B4F2A"} strokeWidth="8" fill="none" strokeLinecap="round" />
       {level >= 3 && <path d="M10 130 Q100 123 200 131" stroke="#F2D16B" strokeWidth="2" fill="none" strokeLinecap="round" opacity="0.8" />}
       <path d="M150 128 q10-16 22-14" stroke="#3B6D11" strokeWidth="4" fill="none" />
@@ -97,7 +101,9 @@ export function Chameleon({ mood = 3, sleeping = false, animate = true, size = 1
         </g>
       )}
       <g className={party ? "cham-party-flip" : ""}><g className={party ? "cham-party-dance" : ""}>
+      <PetAura item={o.aura} />
       <g transform={`translate(0 ${down})`}>
+        <PetBack item={o.back} />
         <g className={a && !sleeping ? (k === 5 ? "cham-tail cham-tail-fast" : "cham-tail") : ""}>
           <path d={k >= 4 ? TAIL_UP : TAIL_DOWN} stroke={c} strokeWidth="11" fill="none" strokeLinecap="round" />
         </g>
@@ -110,6 +116,9 @@ export function Chameleon({ mood = 3, sleeping = false, animate = true, size = 1
           <circle cx="88" cy="88" r="3.5" fill={d} />
           <circle cx="104" cy="82" r="2.5" fill={d} />
           <circle cx="112" cy="96" r="3" fill={d} />
+          <PetBody item={o.body} />
+          <PetWaist item={o.waist} />
+          <PetNeck item={o.neck} />
         </g>
         <g className={headCls}>
           <path d="M125 62 C140 45 165 50 180 72 C186 84 176 96 150 98 C140 99 134 90 130 85Z" fill={c} stroke={d} strokeWidth="1.5" />
@@ -141,9 +150,12 @@ export function Chameleon({ mood = 3, sleeping = false, animate = true, size = 1
           )}
           {!sleeping && k >= 4 && <circle cx="164" cy="79" r="3.5" fill="#ED93B1" opacity="0.7" />}
           {mouth}
+          <PetEyes item={o.eyes} />
+          <PetHead item={o.head} />
         </g>
         <path d="M84 104 L80 126" stroke={d} strokeWidth="6" strokeLinecap="round" />
         <path d="M106 106 L112 126" stroke={d} strokeWidth="6" strokeLinecap="round" />
+        <PetFeet item={o.feet} />
       </g>
       </g></g>
       <g className={a ? "cham-float" : ""}>

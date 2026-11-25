@@ -1,14 +1,16 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Award, Flame, Lock, Megaphone, Sparkles, Trash2, Trophy, User, Users } from "lucide-react";
+import { Award, Flame, Lock, Megaphone, Shirt, Sparkles, Trash2, Trophy, User, Users } from "lucide-react";
 import { supabase } from "@/lib/supabaseClient";
 import { signedAvatarUrls } from "@/lib/avatars";
 import { tr } from "@/lib/i18n";
 import { PET_STATES } from "@/lib/chameleon";
 import { Chameleon } from "@/components/ui/Chameleon";
 import { Skeleton } from "@/components/ui/Skeleton";
-import { HIGHLIGHT_LABEL, PET_LEVELS, REACTIONS, challengePct, createPost, deletePost, loadChallenges, loadFeed, loadMembership, loadPosts, react, setHighlight, setMembership, todayExercises } from "@/lib/community";
+import { HIGHLIGHT_LABEL, PET_LEVELS, REACTIONS, challengePct, createPost, deletePost, loadChallenges, loadFeed, loadMembership, loadMyPet, loadPosts, react, setHighlight, setMembership, todayExercises } from "@/lib/community";
+import { PET_ITEMS, cleanOutfit, progressText } from "@/lib/petItems";
+import { PetCloset } from "@/components/student/PetCloset";
 import { ChallengeManager } from "@/components/coach/ChallengeManager";
 
 // Comunidad de su coach: mascotas, ejercicio destacado, constancia, retos y reacciones con un toque.
@@ -31,6 +33,8 @@ function CommunityBody({ userId, coachMode = false, isStaff = false, header = nu
   const [challenges, setChallenges] = useState([]);
   const [busy, setBusy] = useState(false);
   const [todayList, setTodayList] = useState([]);
+  const [myPet, setMyPet] = useState(null); // { trainings, streak_now, streak_best, unlocked, outfit, ... }
+  const [closetOpen, setClosetOpen] = useState(false);
 
   async function load() {
     const m = await loadMembership(supabase, userId);
@@ -41,7 +45,8 @@ function CommunityBody({ userId, coachMode = false, isStaff = false, header = nu
     }
     setMembershipState(m);
     if (m.missing || (!m.member?.visible && !staff)) { setFeed([]); return; }
-    const [f, c, t, p] = await Promise.all([loadFeed(supabase), loadChallenges(supabase), todayExercises(supabase, userId), loadPosts(supabase)]);
+    const [f, c, t, p, pet] = await Promise.all([loadFeed(supabase), loadChallenges(supabase), todayExercises(supabase, userId), loadPosts(supabase), loadMyPet(supabase)]);
+    setMyPet(pet);
     // Las fotos están en un bucket privado: se guarda la ruta y aquí se firma para poder mostrarla
     const urls = await signedAvatarUrls(f.members.map((x) => x.avatar_url));
     setFeed(f.members.map((x, i) => ({ ...x, avatar_url: urls[i] || null })));
@@ -95,8 +100,8 @@ function CommunityBody({ userId, coachMode = false, isStaff = false, header = nu
           <p className="text-soft text-sm mt-1">{tr("Vea cómo van los demás, anímelos con un toque y sumen juntos en los retos.")}</p>
           <div className="text-left bg-white/[0.03] rounded-2xl p-4 mt-4 space-y-2">
             <p className="text-ink text-xs font-semibold">{tr("Los demás verán:")}</p>
-            <p className="text-soft text-xs">• {tr("Su foto en miniatura y su primer nombre")}</p>
-            <p className="text-soft text-xs">• {tr("Su mascota, su nombre y su ánimo de hoy")}</p>
+            <p className="text-soft text-xs">• {tr("Su foto en miniatura y su nombre con apellido")}</p>
+            <p className="text-soft text-xs">• {tr("Su mascota con su ropa y su fondo, su nombre y su ánimo de hoy")}</p>
             <p className="text-soft text-xs">• {tr("El ejercicio que destacó hoy (sin el peso)")}</p>
             <p className="text-soft text-xs">• {tr("Sus entrenamientos, su racha y sus récords del mes (sin números de peso)")}</p>
             <p className="text-ink text-xs font-semibold pt-2 flex items-center gap-1.5"><Lock size={12} /> {tr("Nunca se muestra:")}</p>
@@ -113,6 +118,20 @@ function CommunityBody({ userId, coachMode = false, isStaff = false, header = nu
 
   const me = feed.find((m) => m.is_me);
   const others = feed.filter((m) => !m.is_me);
+  const nameOf = (m) => m.display_name || m.first_name || tr("Alumno");
+  const outfitOf = (m) => (m.is_me && myPet ? cleanOutfit(myPet.outfit, myPet.unlocked) : m.outfit || {});
+  // Podio: los que más días entrenaron esta semana (y si empatan, la racha)
+  const podium = [...feed].filter((m) => Number(m.week_days) > 0)
+    .sort((a, b) => (b.week_days - a.week_days) || ((b.streak_weeks || 0) - (a.streak_weeks || 0)))
+    .slice(0, 3);
+  // Lo de hoy: récords, ejercicios destacados y quién entrenó
+  const todayFeed = feed.filter((m) => m.trained_today).map((m) => ({
+    m,
+    text: m.highlight_kind === "record" && m.highlight_name ? tr("hizo récord en {p0}", { p0: m.highlight_name })
+      : m.highlight_name ? tr("destacó {p0}", { p0: m.highlight_name })
+      : tr("entrenó hoy"),
+    record: m.highlight_kind === "record",
+  })).sort((a, b) => Number(b.record) - Number(a.record));
 
   return (
     <div className="p-4 md:p-8 max-w-3xl mx-auto">
@@ -152,29 +171,59 @@ function CommunityBody({ userId, coachMode = false, isStaff = false, header = nu
       )}
 
       {me && (
-        <div className="mb-5">
-          <MemberCard m={me} mine />
-          {todayList.length > 0 && (
-            <div className="bg-card rounded-2xl px-4 py-3 mt-2">
-              <p className="text-soft text-xs mb-2 flex items-center gap-1.5"><Sparkles size={13} /> {tr("¿Qué ejercicio quiere destacar hoy?")}</p>
-              <div className="flex flex-wrap gap-1.5">
-                <button onClick={() => chooseHighlight(null)} className={`text-xs rounded-full px-3 py-1.5 ${me.highlight_kind !== "elegido" ? "bg-accent text-app font-semibold" : "bg-field text-soft"}`}>{tr("El que elija la app")}</button>
-                {todayList.map((x) => (
-                  <button key={x.id} onClick={() => chooseHighlight(x.id)} className={`text-xs rounded-full px-3 py-1.5 ${me.highlight_kind === "elegido" && me.highlight_name === x.name ? "bg-accent text-app font-semibold" : "bg-field text-soft"}`}>{x.name}</button>
-                ))}
-              </div>
-            </div>
-          )}
-          <PetLevels level={me.level} workouts={me.workouts} streak={me.streak_weeks} />
+        <MyPetCard m={me} pet={myPet} outfit={outfitOf(me)} name={nameOf(me)} onDress={() => setClosetOpen(true)}
+          todayList={todayList} onHighlight={chooseHighlight} />
+      )}
+
+      {podium.length > 0 && (
+        <div className="bg-card rounded-2xl px-4 pt-4 pb-0 mb-5">
+          <p className="text-ink text-sm font-medium flex items-center gap-1.5 mb-1"><Award size={15} className="text-accent" /> {tr("Los más constantes de la semana")}</p>
+          <div className="flex items-end justify-center gap-2">
+            {[podium[1], podium[0], podium[2]].map((m, i) => {
+              if (!m) return <div key={i} className="flex-1" />;
+              const pos = i === 1 ? 1 : i === 0 ? 2 : 3;
+              const h = pos === 1 ? "h-14" : pos === 2 ? "h-10" : "h-7";
+              const color = pos === 1 ? "bg-accent text-app" : pos === 2 ? "bg-field-strong text-ink" : "bg-field text-soft";
+              return (
+                <div key={m.user_id} className="flex-1 min-w-0 text-center">
+                  <Chameleon mood={m.pet_mood || 4} level={m.level || 0} outfit={outfitOf(m)} size={pos === 1 ? 92 : 74} animate={false} className="mx-auto" />
+                  <p className="text-ink text-xs font-medium truncate mt-1">{nameOf(m)}</p>
+                  <p className="text-muted text-[10px] mb-1">{tr("{p0} días esta semana", { p0: m.week_days })}</p>
+                  <div className={`${h} ${color} rounded-t-xl flex items-start justify-center pt-1 text-sm font-semibold`}>{pos}</div>
+                </div>
+              );
+            })}
+          </div>
         </div>
       )}
 
+      {todayFeed.length > 0 && (
+        <div className="mb-5">
+          <p className="text-muted text-[11px] uppercase tracking-[0.14em] mb-2">{tr("Hoy en la comunidad")}</p>
+          <div className="flex gap-2 overflow-x-auto pb-1 min-w-0 max-w-full">
+            {todayFeed.map(({ m, text, record }) => (
+              <div key={m.user_id} className={`shrink-0 max-w-[240px] rounded-2xl pl-1 pr-3 py-1 flex items-center gap-2 ${record ? "bg-accent/15 border border-accent/30" : "bg-card"}`}>
+                <div className="w-12 shrink-0"><Chameleon mood={m.pet_mood || 4} outfit={outfitOf(m)} size={48} animate={false} /></div>
+                <p className="text-xs min-w-0"><span className="text-ink font-medium">{nameOf(m)}</span> <span className="text-soft">{text}</span></p>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      <p className="text-muted text-[11px] uppercase tracking-[0.14em] mb-2">{tr("El terrario")}</p>
       {others.length === 0 ? (
         <p className="text-muted text-sm bg-card rounded-2xl p-4">{tr("Todavía no hay más personas en la comunidad. Cuando otros entren, aparecerán aquí.")}</p>
       ) : (
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-          {others.map((m) => <MemberCard key={m.user_id} m={m} onReact={(k) => toggleReaction(m, k)} />)}
+        <div className="grid grid-cols-2 lg:grid-cols-3 gap-3">
+          {others.map((m) => <TerrariumCard key={m.user_id} m={m} name={nameOf(m)} outfit={outfitOf(m)} onReact={(k) => toggleReaction(m, k)} />)}
         </div>
+      )}
+
+      {closetOpen && myPet && (
+        <PetCloset pet={myPet} petName={me?.pet_name} mood={me?.pet_mood || 4} level={me?.level || 0}
+          onClose={() => setClosetOpen(false)}
+          onSaved={(outfit) => { setMyPet((p) => ({ ...p, outfit })); setClosetOpen(false); }} />
       )}
     </div>
   );
@@ -244,83 +293,106 @@ function PostsBox({ posts, feed, userId, staff, onChange }) {
   );
 }
 
-function MemberCard({ m, mine = false, onReact }) {
+// Mi mascota: con su fondo y su ropa, la racha nueva, lo próximo que va a desbloquear y el botón para vestirla
+function MyPetCard({ m, pet, outfit, name, onDress, todayList, onHighlight }) {
   const mood = m.pet_mood || null;
   const sleeping = !mood && !m.trained_today;
-  const hl = m.highlight_name ? { name: m.highlight_name, label: tr(HIGHLIGHT_LABEL[m.highlight_kind] || "Destacó") } : null;
+  const unlocked = new Set(pet?.unlocked || []);
+  // Lo más cerca de desbloquear
+  const next = pet ? PET_ITEMS.filter((i) => i.metric && !unlocked.has(i.key))
+    .map((i) => ({ i, pct: Math.min(1, (Number(pet[i.metric]) || 0) / i.need) }))
+    .sort((a, b) => b.pct - a.pct)[0] : null;
   return (
-    <div className={`rounded-2xl p-4 ${mine ? "bg-card border border-accent/30" : "bg-card"}`}>
-      <div className="flex items-center gap-2.5">
-        <div className="w-9 h-9 rounded-full bg-field overflow-hidden flex items-center justify-center shrink-0">
-          {m.avatar_url ? <img src={m.avatar_url} alt="" loading="lazy" decoding="async" className="w-full h-full object-cover" /> : <User size={16} className="text-muted" />}
+    <div className="mb-5">
+      <div className="rounded-3xl overflow-hidden border border-accent/30 bg-card">
+        <div className="relative">
+          <Chameleon mood={mood || 3} sleeping={sleeping} level={m.level || 0} outfit={outfit} scene size={640} className="w-full" />
+          {m.pet_name && (
+            <span className="absolute left-3 top-3 bg-app/70 backdrop-blur text-ink text-xs font-semibold rounded-full px-3 py-1">{m.pet_name}</span>
+          )}
+          {pet && (
+            <button onClick={onDress} className="absolute right-3 top-3 bg-accent text-app text-xs font-semibold rounded-full px-3 py-1.5 flex items-center gap-1.5 active:scale-95">
+              <Shirt size={13} /> {tr("Vestir")}
+            </button>
+          )}
         </div>
-        <div className="min-w-0 flex-1">
-          <p className="text-ink text-sm font-medium truncate flex items-center gap-1.5">
-            {m.first_name}{mine ? ` (${tr("usted")})` : ""}
-            {m.is_coach && <span className="text-[10px] text-app bg-accent rounded-full px-2 py-0.5 font-semibold">Coach</span>}
-          </p>
-          <p className="text-muted text-[11px]">{m.trained_today ? tr("Entrenó hoy") : tr("Hoy no ha entrenado")}</p>
+        <div className="p-4">
+          <p className="text-ink text-sm font-semibold">{name} <span className="text-muted font-normal">({tr("usted")})</span></p>
+          <div className="flex flex-wrap gap-x-3 gap-y-1 mt-1 text-[11px] text-soft">
+            <span className="flex items-center gap-1"><Flame size={12} className="text-accent" /> {tr("{p0} semanas seguidas cumpliendo", { p0: m.streak_weeks || 0 })}</span>
+            <span className="flex items-center gap-1"><Award size={12} /> {tr("{p0} entrenamientos", { p0: m.workouts })}</span>
+            {m.week_days != null && <span>{tr("{p0} días esta semana", { p0: m.week_days })}</span>}
+          </div>
+          {next && (
+            <div className="mt-3">
+              <p className="text-soft text-[11px]">{tr("Próximo: {p0}", { p0: tr(next.i.name) })} · {progressText(next.i, pet)}</p>
+              <div className="h-1.5 rounded-full bg-field mt-1 overflow-hidden"><div className="h-full bg-accent rounded-full" style={{ width: `${Math.round(next.pct * 100)}%` }} /></div>
+            </div>
+          )}
         </div>
       </div>
-
-      {m.pet_name ? (
-        <div className="flex items-center gap-3 mt-3">
-          <Chameleon mood={mood || 3} sleeping={sleeping} level={m.level || 0} size={110} animate={mine} />
-          <div className="min-w-0">
-            <p className="text-ink text-base font-semibold truncate">{m.pet_name}</p>
-            <p className="text-soft text-xs">{sleeping ? tr("Descansando") : tr(PET_STATES[mood || 3].name)}</p>
-            <p className="text-muted text-[11px] mt-0.5">{tr(PET_LEVELS[m.level || 0].name)}</p>
+      {todayList.length > 0 && (
+        <div className="bg-card rounded-2xl px-4 py-3 mt-2">
+          <p className="text-soft text-xs mb-2 flex items-center gap-1.5"><Sparkles size={13} /> {tr("¿Qué ejercicio quiere destacar hoy?")}</p>
+          <div className="flex flex-wrap gap-1.5">
+            <button onClick={() => onHighlight(null)} className={`text-xs rounded-full px-3 py-1.5 ${m.highlight_kind !== "elegido" ? "bg-accent text-app font-semibold" : "bg-field text-soft"}`}>{tr("El que elija la app")}</button>
+            {todayList.map((x) => (
+              <button key={x.id} onClick={() => onHighlight(x.id)} className={`text-xs rounded-full px-3 py-1.5 ${m.highlight_kind === "elegido" && m.highlight_name === x.name ? "bg-accent text-app font-semibold" : "bg-field text-soft"}`}>{x.name}</button>
+            ))}
           </div>
         </div>
-      ) : (
-        <p className="text-muted text-xs mt-3">{m.is_coach ? tr("Su coach") : tr("Todavía no tiene mascota")}</p>
       )}
-
-      {hl && (
-        <p className="text-ink text-xs mt-3 bg-accent/10 border border-accent/20 rounded-xl px-3 py-2">
-          {m.highlight_kind === "record" ? "🏆 " : "⭐ "}<span className="text-accent font-semibold">{hl.label}:</span> {hl.name}
-        </p>
-      )}
-
-      <div className="flex flex-wrap gap-x-3 gap-y-1 mt-3 text-[11px] text-soft">
-        <span className="flex items-center gap-1"><Award size={12} /> {tr("{p0} entrenamientos", { p0: m.workouts })}</span>
-        {m.streak_weeks > 0 && <span className="flex items-center gap-1"><Flame size={12} /> {tr("Racha de {p0} sem.", { p0: m.streak_weeks })}</span>}
-        {m.records_month > 0 && <span className="flex items-center gap-1"><Trophy size={12} /> {tr("{p0} récords este mes", { p0: m.records_month })}</span>}
-      </div>
-
-      <div className="flex gap-1.5 mt-3">
-        {REACTIONS.map((r) => {
-          const n = Number(m.reactions?.[r.key] || 0);
-          const on = (m.my_reactions || []).includes(r.key);
-          return (
-            <button key={r.key} type="button" disabled={mine || !onReact} onClick={() => onReact?.(r.key)} aria-label={tr(r.label)}
-              className={`flex-1 rounded-xl py-1.5 text-sm flex items-center justify-center gap-1 transition-colors ${on ? "bg-accent/20 border border-accent/40" : "bg-white/[0.04] border border-transparent"} ${mine ? "cursor-default" : "active:scale-95"}`}>
-              <span>{r.emoji}</span>{n > 0 && <span className="text-soft text-xs tabular-nums">{n}</span>}
-            </button>
-          );
-        })}
-      </div>
     </div>
   );
 }
 
-// Logros de la mascota: la rama cambia con la constancia
-function PetLevels({ level = 0, workouts = 0, streak = 0 }) {
+// Tarjeta del terrario: la mascota en su fondo, con su ropa, y abajo de quién es y cómo va
+function TerrariumCard({ m, name, outfit, onReact }) {
+  const mood = m.pet_mood || null;
+  const sleeping = !mood && !m.trained_today;
+  const hl = m.highlight_name ? { name: m.highlight_name, label: tr(HIGHLIGHT_LABEL[m.highlight_kind] || "Destacó") } : null;
   return (
-    <div className="bg-card rounded-2xl p-4 mt-2">
-      <p className="text-ink text-sm font-medium mb-1">{tr("Logros de su mascota")}</p>
-      <p className="text-muted text-[11px] mb-3">{tr("{p0} entrenamientos · racha de {p1} semanas", { p0: workouts, p1: streak })}</p>
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-        {PET_LEVELS.map((l) => {
-          const on = level >= l.level;
-          return (
-            <div key={l.level} className={`rounded-xl p-2 text-center ${on ? "bg-accent/10 border border-accent/30" : "bg-field opacity-70"}`}>
-              <Chameleon mood={4} level={l.level} size={70} animate={false} className="mx-auto" />
-              <p className={`text-[11px] font-medium ${on ? "text-ink" : "text-soft"}`}>{tr(l.name)}</p>
-              <p className="text-muted text-[10px] leading-tight mt-0.5">{on ? tr("Logrado") : tr(l.need)}</p>
-            </div>
-          );
-        })}
+    <div className="rounded-2xl overflow-hidden bg-card flex flex-col">
+      <div className="relative">
+        <Chameleon mood={mood || 3} sleeping={sleeping} level={m.level || 0} outfit={outfit} scene size={400} animate={false} className="w-full" />
+        {m.streak_weeks > 0 && (
+          <span className="absolute right-2 top-2 bg-app/70 backdrop-blur text-accent text-[10px] font-semibold rounded-full px-2 py-0.5 flex items-center gap-1"><Flame size={10} /> {m.streak_weeks}</span>
+        )}
+        {m.is_coach && <span className="absolute left-2 top-2 text-[10px] text-app bg-accent rounded-full px-2 py-0.5 font-semibold">Coach</span>}
+      </div>
+      <div className="p-3 flex-1 flex flex-col">
+        <div className="flex items-center gap-2">
+          <div className="w-7 h-7 rounded-full bg-field overflow-hidden flex items-center justify-center shrink-0">
+            {m.avatar_url ? <img src={m.avatar_url} alt="" loading="lazy" decoding="async" className="w-full h-full object-cover" /> : <User size={13} className="text-muted" />}
+          </div>
+          <p className="text-ink text-xs font-semibold leading-tight line-clamp-2 min-w-0">{name}</p>
+        </div>
+        <p className="text-muted text-[11px] mt-1 truncate">
+          {m.pet_name ? `${m.pet_name} · ` : ""}{sleeping ? tr("Descansando") : tr(PET_STATES[mood || 3].name)}
+        </p>
+        <p className={`text-[11px] mt-0.5 ${m.trained_today ? "text-accent" : "text-muted"}`}>{m.trained_today ? tr("Entrenó hoy") : tr("Hoy no ha entrenado")}</p>
+        {hl && (
+          <p className="text-ink text-[11px] mt-2 bg-accent/10 border border-accent/20 rounded-lg px-2 py-1.5 line-clamp-2">
+            {m.highlight_kind === "record" ? "🏆 " : "⭐ "}<span className="text-accent font-semibold">{hl.label}:</span> {hl.name}
+          </p>
+        )}
+        <div className="flex flex-wrap gap-x-2 gap-y-0.5 mt-2 text-[10px] text-soft">
+          <span>{tr("{p0} entrenamientos", { p0: m.workouts })}</span>
+          {m.records_month > 0 && <span>· {tr("{p0} récords este mes", { p0: m.records_month })}</span>}
+          <span>· {tr(PET_LEVELS[m.level || 0].name)}</span>
+        </div>
+        <div className="flex gap-1 mt-auto pt-2">
+          {REACTIONS.map((r) => {
+            const n = Number(m.reactions?.[r.key] || 0);
+            const on = (m.my_reactions || []).includes(r.key);
+            return (
+              <button key={r.key} type="button" onClick={() => onReact?.(r.key)} aria-label={tr(r.label)}
+                className={`flex-1 rounded-lg py-1.5 text-sm flex items-center justify-center gap-1 transition-colors active:scale-95 ${on ? "bg-accent/20 border border-accent/40" : "bg-white/[0.04] border border-transparent"}`}>
+                <span>{r.emoji}</span>{n > 0 && <span className="text-soft text-[11px] tabular-nums">{n}</span>}
+              </button>
+            );
+          })}
+        </div>
       </div>
     </div>
   );
