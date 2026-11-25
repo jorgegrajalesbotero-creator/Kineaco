@@ -47,8 +47,8 @@ export function ProgressScreen({ streak, bestStreak, totalCompleted, weekStats, 
 
       <div className="grid grid-cols-3 gap-2.5 mb-7">
         {[
-          { icon: Flame, label: tr("Racha"), value: streak, tone: "text-danger", glow: "bg-danger/15" },
-          { icon: TrendingUp, label: tr("Récord"), value: bestStreak, tone: "text-accent", glow: "bg-accent/15" },
+          { icon: Flame, label: tr("Racha (semanas)"), value: streak, tone: "text-danger", glow: "bg-danger/15" },
+          { icon: TrendingUp, label: tr("Mejor racha"), value: bestStreak, tone: "text-accent", glow: "bg-accent/15" },
           { icon: Check, label: tr("Total"), value: totalCompleted, tone: "text-accent", glow: "bg-accent/15" },
         ].map(({ icon: Icon, label, value, tone, glow }) => (
           <div key={label} className="relative overflow-hidden rounded-2xl p-3.5 bg-gradient-to-b from-card to-deep border border-white/[0.06]">

@@ -33,6 +33,9 @@ import { CalendarScreen } from "@/components/student/CalendarScreen";
 import { ClockHost } from "@/components/student/ClockIsland";
 import { useBackClose, useBackTabs } from "@/lib/backStack";
 import { MessagesBubble } from "@/components/student/MessagesBubble";
+import { loadMyPet } from "@/lib/community";
+import { itemByKey } from "@/lib/petItems";
+import { PetUnlockCelebration } from "@/components/student/PetUnlockCelebration";
 
 export default function App() {
   const [lang, setLangState] = useState("es");
@@ -314,6 +317,24 @@ export default function App() {
     );
   };
 
+  // ¿Se desbloqueó algo nuevo para el camaleón? Se avisa una vez (y queda en la campanita)
+  const [petNews, setPetNews] = useState(null); // { keys: [...], outfit }
+  const checkNewUnlocks = (uid, pet) => {
+    const key = `pet_seen_${uid}`;
+    const now = (pet.unlocked || []).filter((k) => k !== "selva");
+    let seen = null;
+    try { seen = JSON.parse(localStorage.getItem(key) || "null"); } catch { seen = null; }
+    const fresh = now.filter((k) => !(seen || []).includes(k));
+    try { localStorage.setItem(key, JSON.stringify(now)); } catch { }
+    if (!fresh.length) return;
+    setPetNews({ keys: fresh, outfit: pet.outfit || {} });
+    addNotifications(supabase, fresh.map((k) => ({
+      recipient_id: uid, type: "badge", link: "community", dedupe_key: `pet:${k}`,
+      title: tr("Su camaleón desbloqueó: {p0}", { p0: tr(itemByKey(k)?.name || k) }),
+      body: tr("Entre a Comunidad → Vestir para ponérselo."),
+    })));
+  };
+
   const loadStreak = async (uid) => {
     const rows = await fetchAllRows(() =>
       supabase
@@ -374,6 +395,14 @@ export default function App() {
       prev = d;
     });
     setBestStreak(best);
+    // Racha nueva: semanas seguidas cumpliendo la meta de su plan (la calcula la base). Si el SQL nuevo
+    // todavía no está, se queda la de días de arriba.
+    const pet = await loadMyPet(supabase);
+    if (pet) {
+      setStreak(pet.streak_now || 0);
+      setBestStreak(pet.streak_best || 0);
+      checkNewUnlocks(uid, pet);
+    }
 
     const week = Array.from({ length: 7 }).map((_, i) => {
       const d = new Date();
@@ -764,6 +793,10 @@ export default function App() {
         </main>
         {/* Reloj del alumno: sigue corriendo en una píldora arriba aunque cambie de pantalla o salga de la app */}
         {!hideNav && userId && <ClockHost userId={userId} onProgressMarked={() => refreshRoutine(uidRef.current, selectedDay)} />}
+        {!hideNav && petNews && !showRoutine && (
+          <PetUnlockCelebration news={petNews} petName={pet.name} onClose={() => setPetNews(null)}
+            onDress={() => { setPetNews(null); handleSelectTab("community"); }} />
+        )}
         {!hideNav && userId && (
           <MessagesBubble
             userId={userId}
