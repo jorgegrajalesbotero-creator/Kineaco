@@ -78,6 +78,8 @@ export default function App() {
   const [showMeasure, setShowMeasure] = useState(false);
   const [showAnnouncements, setShowAnnouncements] = useState(false);
   const [chatOpen, setChatOpen] = useState(false); // mensajes con el coach (burbuja flotante)
+  // La racha y la actividad se recalculan UNA vez al salir de la rutina (no en cada ejercicio: eso la tildaba)
+  const progressDirty = useRef(false);
   const [hasNutritionProfile, setHasNutritionProfile] = useState(false);
   const [unreadMessageCount, setUnreadMessageCount] = useState(0);
   const [notifKey, setNotifKey] = useState(0);
@@ -558,6 +560,13 @@ export default function App() {
     if (key === "progress" && userId) loadBodyWeight(userId); // el peso pudo cambiar en Nutrición, Medidas o Check-in
   };
 
+  useEffect(() => {
+    if (showRoutine || !progressDirty.current || !userId) return;
+    progressDirty.current = false;
+    loadStreak(userId);
+    loadRecentActivity(userId);
+  }, [showRoutine]);
+
   // Botón "atrás" del celular: cierra la pantalla abierta (rutina, check-in, calendario...) o vuelve a la pestaña anterior
   useBackTabs(tab, handleSelectTab);
   useBackClose(showRoutine, () => setShowRoutine(false));
@@ -617,7 +626,7 @@ export default function App() {
       />
     );
   } else if (showRoutine && routine) {
-    content = <RoutineScreen routine={routine} userId={userId} pet={pet.enabled ? { name: pet.name, mood: petMood(todayCheckin) } : null} onClose={() => setShowRoutine(false)} onToggle={handleToggleExercise} onProgressChange={() => { loadStreak(userId); loadRecentActivity(userId); }} />;
+    content = <RoutineScreen routine={routine} userId={userId} pet={pet.enabled ? { name: pet.name, mood: petMood(todayCheckin) } : null} onClose={() => setShowRoutine(false)} onToggle={handleToggleExercise} onProgressChange={() => { progressDirty.current = true; }} />;
   } else if (tab === "nutrition") {
     content = <NutritionScreen userId={userId} onFirstRoutineAssigned={goToAssignedRoutine} />;
   } else if (tab === "home") {
