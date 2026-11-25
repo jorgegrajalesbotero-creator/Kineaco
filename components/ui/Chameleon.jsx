@@ -17,7 +17,8 @@ const TAIL_DOWN = "M60 100 C36 110 20 98 22 84 C24 72 38 70 42 78 C45 84 38 88 3
 // El color sale del estado. sleeping = todavía no hizo el check-in (gris, dormido).
 // animate: el ojo mira por su cuenta y parpadea, respira, mueve la cola; con "Con toda" saca la lengua.
 // level (logros de la comunidad): 0 rama · 1 con hojas · 2 en flor · 3 rama dorada
-export function Chameleon({ mood = 3, sleeping = false, animate = true, size = 160, className = "", title, level = 0 }) {
+// party = celebración: el camaleón (sin la rama) salta, da una vuelta hacia atrás, cae en su rama y baila
+export function Chameleon({ mood = 3, sleeping = false, animate = true, size = 160, className = "", title, level = 0, party = false }) {
   const k = sleeping ? 2 : PET_STATES[mood] ? mood : 3;
   const c = sleeping ? "#7D8580" : PET_STATES[k].color;
   const d = shade(c, -0.35);
@@ -71,7 +72,7 @@ export function Chameleon({ mood = 3, sleeping = false, animate = true, size = 1
   else mouth = <path d="M158 91 Q165 85 172 90" fill="none" stroke={d} strokeWidth="2.5" strokeLinecap="round" />;
 
   return (
-    <svg viewBox="0 0 210 150" width={size} role="img" className={`block ${className}`} style={{ maxWidth: "100%" }}>
+    <svg viewBox="0 0 210 150" width={size} role="img" className={`block ${className}`} style={{ maxWidth: "100%", overflow: party ? "visible" : undefined }}>
       <title>{title || (sleeping ? "Camaleón dormido" : `Camaleón: ${PET_STATES[k].name}`)}</title>
       <path d="M4 132 Q100 124 206 134" stroke={level >= 3 ? "#C9A227" : "#6B4F2A"} strokeWidth="8" fill="none" strokeLinecap="round" />
       {level >= 3 && <path d="M10 130 Q100 123 200 131" stroke="#F2D16B" strokeWidth="2" fill="none" strokeLinecap="round" opacity="0.8" />}
@@ -95,6 +96,7 @@ export function Chameleon({ mood = 3, sleeping = false, animate = true, size = 1
           ))}
         </g>
       )}
+      <g className={party ? "cham-party-flip" : ""}><g className={party ? "cham-party-dance" : ""}>
       <g transform={`translate(0 ${down})`}>
         <g className={a && !sleeping ? (k === 5 ? "cham-tail cham-tail-fast" : "cham-tail") : ""}>
           <path d={k >= 4 ? TAIL_UP : TAIL_DOWN} stroke={c} strokeWidth="11" fill="none" strokeLinecap="round" />
@@ -143,6 +145,7 @@ export function Chameleon({ mood = 3, sleeping = false, animate = true, size = 1
         <path d="M84 104 L80 126" stroke={d} strokeWidth="6" strokeLinecap="round" />
         <path d="M106 106 L112 126" stroke={d} strokeWidth="6" strokeLinecap="round" />
       </g>
+      </g></g>
       <g className={a ? "cham-float" : ""}>
         {(sleeping || k === 2) && (
           <>

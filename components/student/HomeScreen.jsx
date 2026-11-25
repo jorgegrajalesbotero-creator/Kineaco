@@ -8,6 +8,9 @@ import { Chameleon } from "@/components/ui/Chameleon";
 import { PET_SAYINGS } from "@/lib/chameleon";
 import { CheckinCard, CoachMessage, GoalsAndReminders, TodayNutrition, WeekSummary, useHomeExtras } from "@/components/student/HomeExtras";
 import { openClock } from "@/lib/clockStore";
+import { useEffect, useState } from "react";
+import { supabase } from "@/lib/supabaseClient";
+import { isLocked, loadSession, weekStartISO } from "@/lib/workoutSession";
 
 function greeting() {
   const h = new Date().getHours();
@@ -51,6 +54,16 @@ export function HomeScreen({ userId, onNavigate, onOpenCheckin, onOpenAnnounceme
   const extras = useHomeExtras(userId);
   const doneCount = routine ? routine.exercises.filter((e) => e.completed).length : 0;
   const total = routine ? routine.exercises.length : 0;
+  // ¿Ya finalizó este día? Así el botón dice «Terminado» en vez de «Continuar»
+  const [finished, setFinished] = useState(false);
+  const dayOfRoutine = routine?.day_label || null;
+  useEffect(() => {
+    let alive = true;
+    if (!userId || !dayOfRoutine) { setFinished(false); return undefined; }
+    loadSession(supabase, userId, weekStartISO(), dayOfRoutine).then((s) => { if (alive) setFinished(isLocked(s)); }).catch(() => {});
+    return () => { alive = false; };
+  }, [userId, dayOfRoutine]);
+  const actionLabel = finished ? tr("Terminado") : total > 0 && doneCount >= total ? tr("Finalizar") : doneCount > 0 ? tr("Continuar") : tr("Empezar");
   const today = new Date();
   const todayIndex = (today.getDay() + 6) % 7;
   const monday = new Date(today);
@@ -180,8 +193,8 @@ export function HomeScreen({ userId, onNavigate, onOpenCheckin, onOpenAnnounceme
                     <span className="flex items-center gap-1.5 text-soft text-xs bg-white/[0.04] border border-white/[0.06] rounded-full px-2.5 py-1.5 whitespace-nowrap">
                       <Dumbbell size={12} /> {total}
                     </span>
-                    <span className="ml-auto shrink-0 flex items-center gap-1.5 bg-accent text-app text-sm font-semibold rounded-full pl-3 pr-3.5 py-2 group-active:scale-95 transition-transform">
-                      <Play size={14} fill="currentColor" /> {doneCount > 0 ? tr("Continuar") : tr("Empezar")}
+                    <span className={`ml-auto shrink-0 flex items-center gap-1.5 text-sm font-semibold rounded-full pl-3 pr-3.5 py-2 group-active:scale-95 transition-transform ${finished ? "bg-accent/15 text-accent border border-accent/30" : "bg-accent text-app"}`}>
+                      {finished ? <Check size={14} strokeWidth={3} /> : <Play size={14} fill="currentColor" />} {actionLabel}
                     </span>
                   </div>
                 </div>

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Check, ChevronLeft, ChevronRight, Download, Lock, MessageCircle, MessageSquarePlus, MessageSquareText, Pencil, Play, Plus, SlidersHorizontal, SquarePen, Timer, X } from "lucide-react";
 import { blockTypeLabel } from "@/lib/blocks";
 import { currentWeekStartISO } from "@/lib/dates";
@@ -28,6 +28,10 @@ const firstNumber = (text) => {
   const m = String(text || "").match(/\d+/);
   return m ? Number(m[0]) : null;
 };
+
+// Id temporal de una serie que todavía se está guardando
+let tmpSeq = 0;
+const nextTmpId = () => `tmp-${++tmpSeq}`;
 
 // preview = el coach ve la rutina tal como la ve el alumno (sin marcar nada) y puede dejar observaciones (onEditNote)
 // coachEdit = (solo con preview) el coach puede corregir peso y reps de las series que el alumno ya hizo (semana actual).
@@ -63,19 +67,34 @@ export function RoutineScreen({ routine, userId, pet = null, onClose, onToggle, 
   // ---------- Rutinas por bloques: se marca de a UNA serie por ejercicio ----------
   // setsDone = { "rutina|item_key": [{ id, n, w }] } con las series ya hechas esta semana
   const [setsDone, setSetsDone] = useState({});
-  const [savingSet, setSavingSet] = useState(false);
+  // Marcar es instantáneo: la serie se ve marcada apenas se toca y se guarda por detrás, en orden.
+  // Si algo no se pudo guardar, se desmarca sola y se avisa.
+  const savingSet = false;
+  const queue = useRef(Promise.resolve());
+  const pending = useRef(0);
+  const realIds = useRef(new Map()); // id temporal → id real de la serie ya guardada
+  const enqueue = (job) => {
+    pending.current += 1;
+    queue.current = queue.current.then(job).catch(() => {}).finally(() => {
+      pending.current -= 1;
+      if (pending.current === 0) loadSets(); // al terminar de guardar, queda igual que en el servidor
+    });
+    return queue.current;
+  };
   const setKey = (ex) => `${ex.routineId || routine.id}|${ex.itemKey}`;
   const bySet = (ex) => !!(ex.byItem && ex.itemKey && ex.setsCount > 0);
   async function loadSets() {
     const ids = [...new Set(routine.exercises.filter((e) => e.byItem).map((e) => e.routineId || routine.id))];
     if (!ids.length || !userId) return;
-    const { data } = await supabase
+    if (pending.current > 0) return; // hay series guardándose: no se pisa lo que el alumno ya ve marcado
+    const { data, error } = await supabase
       .from("progress_sets")
       .select("id, routine_id, item_key, set_number, weight_kg")
       .eq("user_id", userId)
       .in("routine_id", ids)
       .eq("day_label", routine.day_label)
       .gte("completed_at", currentWeekStartISO());
+    if (error || pending.current > 0) return;
     const map = {};
     (data || []).forEach((r) => {
       if (!r.item_key) return;
@@ -92,57 +111,66 @@ export function RoutineScreen({ routine, userId, pet = null, onClose, onToggle, 
   const doneOf = (ex) => setsDone[setKey(ex)] || [];
 
   // Marca la siguiente serie del ejercicio (con el peso y las reps sugeridas)
-  const markNextSet = async (i) => {
+  const markNextSet = (i) => {
     const ex = routine.exercises[i];
     const done = doneOf(ex);
     const nums = new Set(done.map((d) => d.n));
     let n = 1;
     while (nums.has(n)) n++;
-    if (n > ex.setsCount || savingSet) return;
-    setSavingSet(true);
-    const { data, error } = await supabase
-      .from("progress_sets")
-      .insert({
-        user_id: userId,
-        routine_id: ex.routineId || routine.id,
-        exercise_id: ex.exerciseId,
-        item_key: ex.itemKey,
-        day_label: routine.day_label,
-        set_number: n,
-        weight_kg: ex.targetWeight ?? null,
-        reps: firstNumber(ex.targetReps),
-      })
-      .select("id")
-      .single();
-    if (error) {
-      setSavingSet(false);
-      return alert(tr("No se pudo guardar la serie: "));
-    }
+    if (n > ex.setsCount) return;
+    const key = setKey(ex);
+    const entry = { id: nextTmpId(), n, w: ex.targetWeight ?? null };
+    // 1) Se ve al instante
+    setSetsDone((m) => ({ ...m, [key]: [...(m[key] || []), entry] }));
     navigator.vibrate?.(12);
-    const next = [...done, { id: data.id, n, w: ex.targetWeight ?? null }];
-    setSetsDone((m) => ({ ...m, [setKey(ex)]: next }));
+    const next = [...done, entry];
     if (next.length >= ex.setsCount && !ex.completed) {
       const ws = next.map((d) => d.w).filter((w) => w != null).map(Number);
-      await completeExercise(i, ws.length ? Math.max(...ws) : null);
+      completeExercise(i, ws.length ? Math.max(...ws) : null);
     }
-    setSavingSet(false);
+    // 2) Se guarda por detrás
+    enqueue(async () => {
+      const { data, error } = await supabase
+        .from("progress_sets")
+        .insert({
+          user_id: userId,
+          routine_id: ex.routineId || routine.id,
+          exercise_id: ex.exerciseId,
+          item_key: ex.itemKey,
+          day_label: routine.day_label,
+          set_number: n,
+          weight_kg: ex.targetWeight ?? null,
+          reps: firstNumber(ex.targetReps),
+        })
+        .select("id")
+        .single();
+      if (error || !data) {
+        setSetsDone((m) => ({ ...m, [key]: (m[key] || []).filter((d) => d.id !== entry.id) }));
+        alert(tr("No se pudo guardar la serie: "));
+        return;
+      }
+      realIds.current.set(entry.id, data.id);
+    });
   };
 
   // Desmarca la última serie hecha del ejercicio
-  const unmarkLastSet = async (i) => {
+  const unmarkLastSet = (i) => {
     const ex = routine.exercises[i];
     const done = doneOf(ex);
-    if (!done.length || savingSet) return;
+    if (!done.length) return;
+    const key = setKey(ex);
     const last = done.reduce((a, b) => (b.n > a.n ? b : a));
-    setSavingSet(true);
-    const { error } = await supabase.from("progress_sets").delete().eq("id", last.id);
-    if (error) {
-      setSavingSet(false);
-      return alert(tr("No se pudo actualizar la serie: "));
-    }
-    setSetsDone((m) => ({ ...m, [setKey(ex)]: done.filter((d) => d.id !== last.id) }));
-    if (ex.completed) await uncompleteExercise(i);
-    setSavingSet(false);
+    setSetsDone((m) => ({ ...m, [key]: (m[key] || []).filter((d) => d.id !== last.id) }));
+    if (ex.completed) uncompleteExercise(i);
+    enqueue(async () => {
+      const id = String(last.id).startsWith("tmp-") ? realIds.current.get(last.id) : last.id;
+      if (!id) return; // nunca se llegó a guardar: no hay nada que borrar
+      const { error } = await supabase.from("progress_sets").delete().eq("id", id);
+      if (error) {
+        setSetsDone((m) => ({ ...m, [key]: [...(m[key] || []), { ...last, id }] }));
+        alert(tr("No se pudo actualizar la serie: "));
+      }
+    });
   };
 
   // Serie del bloque en la que va (la más atrasada de sus ejercicios)
@@ -201,20 +229,22 @@ export function RoutineScreen({ routine, userId, pet = null, onClose, onToggle, 
       setLoggerIndex(null);
       navigator.vibrate?.([20, 60, 30]);
     }
-    const { error } = await supabase.from("progress").insert({
-      user_id: userId,
-      routine_id: ex.routineId || routine.id,
-      exercise_id: ex.exerciseId,
-      item_key: ex.itemKey || null,
-      day_label: routine.day_label,
-      weight_kg: bestWeight,
+    await enqueue(async () => {
+      const { error } = await supabase.from("progress").insert({
+        user_id: userId,
+        routine_id: ex.routineId || routine.id,
+        exercise_id: ex.exerciseId,
+        item_key: ex.itemKey || null,
+        day_label: routine.day_label,
+        weight_kg: bestWeight,
+      });
+      if (error) {
+        alert(tr("No se pudo guardar su progreso: "));
+        onToggle(i, false);
+      } else {
+        onProgressChange();
+      }
     });
-    if (error) {
-      alert(tr("No se pudo guardar su progreso: "));
-      onToggle(i, false);
-    } else {
-      onProgressChange();
-    }
   };
 
   // Se desmarcó alguna serie → el ejercicio deja de estar hecho
@@ -229,13 +259,15 @@ export function RoutineScreen({ routine, userId, pet = null, onClose, onToggle, 
       .eq("day_label", routine.day_label)
       .gte("completed_at", currentWeekStartISO());
     deleteQuery = ex.byItem && ex.itemKey ? deleteQuery.eq("item_key", ex.itemKey) : deleteQuery.eq("exercise_id", ex.exerciseId);
-    const { error } = await deleteQuery;
-    if (error) {
-      alert(tr("No se pudo actualizar su progreso: "));
-      onToggle(i, true);
-    } else {
-      onProgressChange();
-    }
+    await enqueue(async () => {
+      const { error } = await deleteQuery;
+      if (error) {
+        alert(tr("No se pudo actualizar su progreso: "));
+        onToggle(i, true);
+      } else {
+        onProgressChange();
+      }
+    });
   };
 
   const startRest = (seconds) => startRestClock(seconds);
@@ -452,7 +484,7 @@ export function RoutineScreen({ routine, userId, pet = null, onClose, onToggle, 
         <div className="fixed inset-x-0 top-1/3 z-[61] flex justify-center px-6 pointer-events-none">
           <div className="animate-celebrate bg-panel border border-accent/30 rounded-3xl px-6 py-5 text-center shadow-[0_20px_60px_-10px_rgba(0,0,0,0.8)]">
             {pet ? (
-              <div className="pet-flip w-fit mx-auto"><div className="pet-dance"><Chameleon mood={5} size={120} /></div></div>
+              <Chameleon mood={5} size={120} party className="mx-auto" />
             ) : (
               <p className="text-3xl mb-1">🎉</p>
             )}
@@ -570,11 +602,7 @@ export function RoutineScreen({ routine, userId, pet = null, onClose, onToggle, 
           <div className="bg-card border border-accent/30 rounded-2xl p-4 mt-6 text-center">
             {pet && (
               <>
-                {justFinished ? (
-                  <div className="pet-flip w-fit mx-auto"><div className="pet-dance"><Chameleon mood={5} size={170} /></div></div>
-                ) : (
-                  <Chameleon mood={5} size={170} className="mx-auto" />
-                )}
+                <Chameleon mood={5} size={170} party={justFinished} className="mx-auto" />
                 <p className="text-ink text-base font-semibold mt-1">{tr("¡Lo logramos!")}</p>
                 <p className="text-soft text-xs mb-2">{tr("{p0} está orgulloso de usted.", { p0: pet.name || tr("Su camaleón") })}</p>
               </>
