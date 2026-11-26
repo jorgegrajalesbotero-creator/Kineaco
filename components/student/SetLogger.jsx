@@ -56,10 +56,10 @@ export function SetLogger({ exercise, routine, userId, onClose, onComplete, onUn
         .from("progress_sets")
         .select(usesRir ? "id, set_number, weight_kg, reps, rir" : "id, set_number, weight_kg, reps")
         .eq("user_id", userId)
-        .eq("routine_id", routineId)
         .eq("day_label", routine.day_label)
         .gte("completed_at", currentWeekStartISO());
-      q = byItem ? q.eq("item_key", exercise.itemKey) : q.eq("exercise_id", exercise.exerciseId);
+      // Con clave, es de ese ejercicio aunque se haya marcado en la rutina anterior (cambio en vivo del coach)
+      q = byItem ? q.eq("item_key", exercise.itemKey) : q.eq("routine_id", routineId).eq("exercise_id", exercise.exerciseId);
       const { data } = await q.order("set_number");
       const saved = data || [];
       const count = Math.max(exercise.setsCount || 1, ...saved.map((s) => s.set_number), 1);
@@ -176,10 +176,10 @@ export function SetLogger({ exercise, routine, userId, onClose, onComplete, onUn
         .from("progress")
         .update({ weight_kg: ws.length ? Math.max(...ws) : null })
         .eq("user_id", userId)
-        .eq("routine_id", routineId)
         .eq("day_label", routine.day_label)
         .gte("completed_at", currentWeekStartISO());
-      q = byItem ? q.eq("item_key", exercise.itemKey) : q.eq("exercise_id", exercise.exerciseId);
+      // Con clave, es de ese ejercicio aunque se haya marcado en la rutina anterior (cambio en vivo del coach)
+      q = byItem ? q.eq("item_key", exercise.itemKey) : q.eq("routine_id", routineId).eq("exercise_id", exercise.exerciseId);
       await q;
     }
     setDirty(new Set());

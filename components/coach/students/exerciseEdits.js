@@ -152,9 +152,10 @@ export async function ensurePrivateRoutine({ studentId, part, dayLabel }) {
 // ningún día: eso lo hace quien la pide. keyMap = clave vieja de cada ejercicio → clave en la copia.
 export async function copyRoutineForStudent({ studentId, part }) {
   const content = await loadRoutineContent(part.id);
-  const strip = (arr) => (arr || []).map((e) => ({ ...e, itemKey: null }));
-  const blocks = content.blocks.map((b) => ({ ...b, exercises: strip(b.exercises) }));
-  const list = strip(content.list);
+  // La copia CONSERVA la clave de cada ejercicio: así las series que el alumno ya marcó (o marca
+  // mientras tanto desde una pantalla sin actualizar) se siguen viendo en la copia.
+  const blocks = content.blocks;
+  const list = content.list;
   const { data: { user } } = await supabase.auth.getUser();
   const { data: r, error } = await supabase
     .from("routines")
