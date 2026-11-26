@@ -11,6 +11,7 @@ import { openClock } from "@/lib/clockStore";
 import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabaseClient";
 import { isLocked, loadSession, weekStartISO } from "@/lib/workoutSession";
+import { AccessExpiryCard } from "@/components/student/AccessExpiryCard";
 
 function greeting() {
   const h = new Date().getHours();
@@ -50,7 +51,7 @@ function ProgressRing({ done, total, size = 76 }) {
   );
 }
 
-export function HomeScreen({ userId, onNavigate, onOpenCheckin, onOpenAnnouncements, onAnnouncementRead, onOpenRoutine, onOpenPetCheckin, onOpenCalendar, fullName, avatarUrl, pet, routine, loading, selectedDay, onSelectDay, streak, onGoToNutrition, hasNutritionProfile, needsIntake, onOpenIntake, bell, pushCard }) {
+export function HomeScreen({ userId, onNavigate, onOpenCheckin, onOpenAnnouncements, onAnnouncementRead, onOpenRoutine, onOpenPetCheckin, onOpenCalendar, fullName, avatarUrl, pet, routine, loading, selectedDay, onSelectDay, streak, onGoToNutrition, hasNutritionProfile, needsIntake, onOpenIntake, bell, pushCard, accessUntil = null, onRenew = null }) {
   const extras = useHomeExtras(userId);
   const doneCount = routine ? routine.exercises.filter((e) => e.completed).length : 0;
   const total = routine ? routine.exercises.length : 0;
@@ -96,6 +97,8 @@ export function HomeScreen({ userId, onNavigate, onOpenCheckin, onOpenAnnounceme
             {bell}
           </div>
         </div>
+
+        {accessUntil && <AccessExpiryCard accessUntil={accessUntil} onRenew={onRenew} />}
 
         {pet && pet.name && !pet.mood && (
           <button onClick={onOpenPetCheckin} className="relative w-full flex items-center gap-3 bg-accent/[0.08] border border-accent/25 rounded-3xl pl-4 pr-2 py-2 mb-5 text-left animate-fade-up active:scale-[0.99] transition-transform">

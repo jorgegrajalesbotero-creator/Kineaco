@@ -5,6 +5,7 @@
 import { sameSecret, supabaseAdmin } from "@/lib/supabaseAdmin";
 import { loadSchedule, routinesForDate } from "@/lib/trainingPlan";
 import { checkinWeekStart, isCheckinDay } from "@/lib/checkin";
+import { accessReminderRow, weeklyExpiring } from "@/lib/accessNotice";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -45,18 +46,37 @@ async function noticesFor(db, student, today) {
     }
   }
 
-  if (student.access_until) {
-    const until = new Date(student.access_until);
-    const days = Math.ceil((until - today) / 86400000);
-    if (days >= 0 && days <= 5) {
-      rows.push({
-        recipient_id: uid, type: "access", link: "messages", dedupe_key: `access:${student.access_until.slice(0, 10)}`,
-        title: "Su acceso vence pronto",
-        body: `Vence el ${until.toLocaleDateString("es-CO", { day: "2-digit", month: "short", timeZone: "America/Bogota" })}. Hable con su coach para renovarlo.`,
-      });
-    }
-  }
+  // Acceso por vencer: 3 días antes y el mismo día (la app crea los mismos al abrirse)
+  const accessRow = accessReminderRow(uid, student.access_until, new Date());
+  if (accessRow) rows.push(accessRow);
   return rows;
+}
+
+// Los lunes: a cada coach, quiénes de sus alumnos vencen en los próximos 7 días.
+// Los alumnos sin coach asignado van al resumen de los administradores.
+async function weeklyAccessSummary(db, todayIso) {
+  const { data: soon, error } = await db
+    .from("profiles")
+    .select("id, full_name, coach_id, access_until")
+    .eq("role", "alumno")
+    .gt("access_until", new Date().toISOString())
+    .lt("access_until", new Date(Date.now() + 9 * 86400000).toISOString());
+  if (error) return [];
+  const list = weeklyExpiring(soon || []);
+  if (list.length === 0) return [];
+  const { data: admins } = await db.from("profiles").select("id").eq("role", "admin");
+  const byCoach = new Map();
+  const add = (id, s) => byCoach.set(id, [...(byCoach.get(id) || []), s]);
+  list.forEach((s) => {
+    if (s.coach_id) add(s.coach_id, s);
+    else (admins || []).forEach((a) => add(a.id, s));
+  });
+  const when = (d) => (d === 0 ? "hoy" : d === 1 ? "mañana" : `en ${d} días`);
+  return [...byCoach.entries()].map(([coachId, mine]) => ({
+    recipient_id: coachId, type: "access_week", link: "access", dedupe_key: `access_week:${todayIso}`,
+    title: mine.length === 1 ? "1 alumno vence esta semana" : `${mine.length} alumnos vencen esta semana`,
+    body: mine.slice(0, 6).map((s) => `${s.full_name || "Alumno"} (${when(s.days)})`).join(", ") + (mine.length > 6 ? "…" : ""),
+  }));
 }
 
 export async function GET(request) {
@@ -88,5 +108,18 @@ export async function GET(request) {
       failed++;
     }
   }
-  return Response.json({ students: (students || []).length, created, failed });
+  // Lunes en Colombia: resumen de vencimientos para cada coach
+  let summaries = 0;
+  if (today.getDay() === 1) {
+    try {
+      const rows = await weeklyAccessSummary(db, isoDate(today));
+      if (rows.length) {
+        const { data } = await db.from("notifications").upsert(rows, { onConflict: "recipient_id,dedupe_key", ignoreDuplicates: true }).select("id");
+        summaries = (data || []).length;
+      }
+    } catch {
+      failed++;
+    }
+  }
+  return Response.json({ students: (students || []).length, created, summaries, failed });
 }

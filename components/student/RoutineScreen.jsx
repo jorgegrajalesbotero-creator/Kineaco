@@ -95,14 +95,17 @@ export function RoutineScreen({ routine, userId, pet = null, onClose, onToggle, 
       .from("progress_sets")
       .select("id, routine_id, item_key, set_number, weight_kg")
       .eq("user_id", userId)
-      .in("routine_id", ids)
       .eq("day_label", routine.day_label)
       .gte("completed_at", currentWeekStartISO());
     if (error || pending.current > 0) return;
+    // Cada serie va con el ejercicio por su clave, aunque se haya marcado en la rutina anterior
+    // (el coach la cambió en vivo; la copia conserva las claves)
+    const routineOfKey = {};
+    routine.exercises.forEach((e) => { if (e.byItem && e.itemKey) routineOfKey[e.itemKey] = e.routineId || routine.id; });
     const map = {};
     (data || []).forEach((r) => {
-      if (!r.item_key) return;
-      const k = `${r.routine_id}|${r.item_key}`;
+      if (!r.item_key || !routineOfKey[r.item_key]) return;
+      const k = `${routineOfKey[r.item_key]}|${r.item_key}`;
       (map[k] = map[k] || []).push({ id: r.id, n: r.set_number, w: r.weight_kg });
     });
     setSetsDone(map);

@@ -2,7 +2,8 @@
 
 import { useState } from "react";
 import { Camera, ChevronRight, User } from "lucide-react";
-import { tr } from "@/lib/i18n";
+import { appLocale, tr } from "@/lib/i18n";
+import { colombiaDateISO } from "@/lib/accessNotice";
 import { shrinkAvatar } from "@/lib/images";
 import { supabase } from "@/lib/supabaseClient";
 import { signedAvatarUrl } from "@/lib/avatars";
@@ -13,7 +14,7 @@ import { PrivacySection } from "@/components/student/PrivacySection";
 import { ChangePassword } from "@/components/ui/ChangePassword";
 import { PushToggle } from "@/components/ui/PushNotifications";
 
-export function ProfileScreen({ fullName, email, avatarUrl, userId, onProfileUpdate, onEmailUpdate, pet, onPetRenamed, onOpenIntake, onOpenAnnouncements, isCoach, onLogout, lang, onChangeLang, healthConsent, onHealthChange }) {
+export function ProfileScreen({ fullName, email, avatarUrl, userId, onProfileUpdate, onEmailUpdate, pet, onPetRenamed, onOpenIntake, onOpenAnnouncements, isCoach, onLogout, lang, onChangeLang, healthConsent, onHealthChange, accessUntil = null }) {
   const [nameDraft, setNameDraft] = useState(fullName);
   const [emailDraft, setEmailDraft] = useState(email || "");
   const [renaming, setRenaming] = useState(false);
@@ -203,6 +204,13 @@ export function ProfileScreen({ fullName, email, avatarUrl, userId, onProfileUpd
           <span className="text-accent text-sm font-medium">{tr("Ir al panel de coach")}</span>
           <ChevronRight size={16} className="text-accent" />
         </a>
+      )}
+
+      {!isCoach && accessUntil && (
+        <div className="w-full flex items-center justify-between bg-card rounded-2xl px-4 py-3 mb-4">
+          <span className="text-ink text-sm">{tr("Acceso a la app hasta")}</span>
+          <span className="text-soft text-sm">{new Date(`${colombiaDateISO(accessUntil)}T12:00:00Z`).toLocaleDateString(appLocale(), { day: "numeric", month: "short", year: "numeric", timeZone: "UTC" })}</span>
+        </div>
       )}
 
       {onOpenIntake && (

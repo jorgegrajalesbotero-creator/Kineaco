@@ -122,6 +122,11 @@ export default function AdminPanel() {
       setTab("comunidad");
       return;
     }
+    // Resumen de los lunes: alumnos que vencen esta semana
+    if (n.link === "access") {
+      setTab("alumnos");
+      return;
+    }
     // Aviso de un alumno: abre su ficha (y la sección del aviso, si la hay)
     if (n.student_id) {
       const known = ["messages", "nutrition", "access", "photos", "progress", "checkin", "measurements", "routine"].includes(n.link);
