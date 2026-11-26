@@ -104,7 +104,7 @@ export function HomeScreen({ userId, onNavigate, onOpenCheckin, onOpenAnnounceme
               <p className="text-soft text-xs leading-snug">{tr("Está dormido. Haga su check-in de hoy para despertarlo y que lo acompañe.")}</p>
               <span className="inline-block mt-2 bg-accent text-app text-xs font-semibold rounded-full px-3 py-1">{tr("Hacer check-in")}</span>
             </div>
-            <Chameleon sleeping size={110} className="shrink-0" />
+            <Chameleon mine sleeping size={110} className="shrink-0" />
           </button>
         )}
 
@@ -114,7 +114,7 @@ export function HomeScreen({ userId, onNavigate, onOpenCheckin, onOpenAnnounceme
               <p className="text-accent text-[11px] font-medium">{pet.name || tr("Su camaleón")}</p>
               <p className="text-ink text-sm leading-snug">{tr(PET_SAYINGS[pet.mood])}</p>
             </div>
-            <Chameleon mood={pet.mood} size={118} className="shrink-0" />
+            <Chameleon mine mood={pet.mood} size={118} className="shrink-0" />
           </div>
         )}
 

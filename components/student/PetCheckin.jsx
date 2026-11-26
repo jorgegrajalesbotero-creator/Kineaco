@@ -201,7 +201,7 @@ export function PetCheckin({ userId, petName, healthConsent = true, optional = f
         <h1 className="text-ink text-xl font-semibold tracking-tight text-center mt-1">{title}</h1>
         <p className="text-soft text-sm text-center mt-1 min-h-[20px]">{say}</p>
         <div className="my-3 flex justify-center">
-          <Chameleon mood={liveMood || 4} size={230} />
+          <Chameleon mine mood={liveMood || 4} size={230} />
         </div>
         {error && <p className="text-danger text-xs bg-danger/10 border border-danger/20 rounded-xl px-3 py-2 mb-3">{error}</p>}
         {body}

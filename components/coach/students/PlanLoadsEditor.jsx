@@ -665,7 +665,7 @@ export function PlanLoadsEditor({ userId, model = "atr", dayGoals = {}, startDat
                             )}
                             {g.index != null && (
                               <button onClick={() => setBlockEdit({ kind: "timer", index: g.index, title: g.label, timer: tm })} className={`text-xs rounded-lg px-2.5 py-1 flex items-center gap-1 ${tm?.custom ? "bg-accent/15 text-accent" : "bg-field text-soft hover:text-ink"}`}>
-                                <Timer size={12} /> {tm ? timerLabel(tm.timer) : "Reloj"}
+                                <Timer size={12} /> {tm?.timer ? timerLabel(tm.timer) : tm?.off ? "Sin reloj (quitado)" : "Reloj"}
                               </button>
                             )}
                           </div>

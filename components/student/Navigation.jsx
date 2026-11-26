@@ -61,7 +61,7 @@ export function BottomNav({ active, onSelect, unreadCount }) {
   // Mensajes ya no va en la barra: es la burbuja flotante (MessagesBubble)
   const items = STUDENT_NAV_ITEMS.filter((i) => i.key !== "messages");
   return (
-    <nav className="pointer-events-auto mx-3 flex items-center gap-1 p-1.5 rounded-full bg-card/85 backdrop-blur-xl border border-white/[0.06] shadow-[0_10px_30px_rgba(0,0,0,0.5)]">
+    <nav className="pointer-events-auto mx-3 flex items-center gap-1 p-1.5 rounded-full bg-card-hover border border-white/[0.06] shadow-[0_10px_30px_rgba(0,0,0,0.5)]">
       {items.map(({ key, label, icon: Icon }) => {
         const isActive = active === key;
         return (

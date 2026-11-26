@@ -121,6 +121,36 @@ const flat = (content) => (content.mode === "bloques" ? content.blocks.flatMap((
 // (con sus observaciones, comentarios y reloj) que reemplaza a la original en ese día o en ese extra.
 export async function ensurePrivateRoutine({ studentId, part, dayLabel }) {
   if (part.student_id && String(part.student_id) === String(studentId)) return part.id;
+  const { routineId, keyMap } = await copyRoutineForStudent({ studentId, part });
+  const r = { id: routineId };
+
+  // La copia reemplaza a la original: en el extra, o en ese día de su semana base
+  if (part.isExtra && part.extraId) {
+    const { error: e } = await supabase.from("student_extras").update({ routine_id: r.id }).eq("id", part.extraId);
+    if (e) throw fail("La copia se creó, pero no se pudo poner en el extra.", e);
+  } else {
+    const { data: rows, error: e1 } = await supabase.from("routine_assignments").select("*").eq("user_id", studentId).eq("day_label", dayLabel);
+    if (e1) throw fail("La copia se creó, pero no se pudo poner en el día.", e1);
+    const swapped = (rows || []).map((x) => {
+      const copy = { ...x, routine_id: String(x.routine_id) === String(part.id) ? r.id : x.routine_id };
+      delete copy.id;
+      delete copy.created_at;
+      return copy;
+    });
+    const { error: e2 } = await supabase.from("routine_assignments").delete().eq("user_id", studentId).eq("day_label", dayLabel);
+    if (e2) throw fail("La copia se creó, pero no se pudo poner en el día.", e2);
+    const { error: e3 } = await supabase.from("routine_assignments").insert(swapped);
+    if (e3) {
+      if (rows?.length) await supabase.from("routine_assignments").insert(rows.map((x) => { const c = { ...x }; delete c.id; delete c.created_at; return c; }));
+      throw fail("La copia se creó, pero no se pudo poner en el día.", e3);
+    }
+  }
+  return { routineId: r.id, keyMap };
+}
+
+// Copia de una rutina SOLO para este alumno (con sus observaciones, comentarios y reloj). No la pone en
+// ningún día: eso lo hace quien la pide. keyMap = clave vieja de cada ejercicio → clave en la copia.
+export async function copyRoutineForStudent({ studentId, part }) {
   const content = await loadRoutineContent(part.id);
   const strip = (arr) => (arr || []).map((e) => ({ ...e, itemKey: null }));
   const blocks = content.blocks.map((b) => ({ ...b, exercises: strip(b.exercises) }));
@@ -151,28 +181,6 @@ export async function ensurePrivateRoutine({ studentId, part, dayLabel }) {
   if (exNotes.length) await supabase.from("student_exercise_notes").insert(exNotes);
   if ((rnotes.data || []).length) await supabase.from("student_routine_notes").insert(rnotes.data.map((n) => ({ ...n, user_id: studentId, routine_id: r.id })));
   if ((timers.data || []).length) await supabase.from("routine_timers").insert(timers.data.map((t) => ({ ...t, user_id: studentId, routine_id: r.id })));
-
-  // La copia reemplaza a la original: en el extra, o en ese día de su semana base
-  if (part.isExtra && part.extraId) {
-    const { error: e } = await supabase.from("student_extras").update({ routine_id: r.id }).eq("id", part.extraId);
-    if (e) throw fail("La copia se creó, pero no se pudo poner en el extra.", e);
-  } else {
-    const { data: rows, error: e1 } = await supabase.from("routine_assignments").select("*").eq("user_id", studentId).eq("day_label", dayLabel);
-    if (e1) throw fail("La copia se creó, pero no se pudo poner en el día.", e1);
-    const swapped = (rows || []).map((x) => {
-      const copy = { ...x, routine_id: String(x.routine_id) === String(part.id) ? r.id : x.routine_id };
-      delete copy.id;
-      delete copy.created_at;
-      return copy;
-    });
-    const { error: e2 } = await supabase.from("routine_assignments").delete().eq("user_id", studentId).eq("day_label", dayLabel);
-    if (e2) throw fail("La copia se creó, pero no se pudo poner en el día.", e2);
-    const { error: e3 } = await supabase.from("routine_assignments").insert(swapped);
-    if (e3) {
-      if (rows?.length) await supabase.from("routine_assignments").insert(rows.map((x) => { const c = { ...x }; delete c.id; delete c.created_at; return c; }));
-      throw fail("La copia se creó, pero no se pudo poner en el día.", e3);
-    }
-  }
   return { routineId: r.id, keyMap };
 }
 

@@ -11,8 +11,9 @@ import { useFilterState } from "@/lib/useFilterState";
 import { Calendar, ChevronRight, Dumbbell, Eye, MessageCircle, TrendingUp, User } from "lucide-react";
 import { ActionCard } from "@/components/ui/ActionCard";
 import { useBackClose } from "@/lib/backStack";
+import { recallNav, rememberNav } from "@/lib/navMemory";
 import { FilterBar } from "@/components/ui/FilterBar";
-import { StudentDetail } from "./StudentDetail";
+import { PANEL_KEYS, StudentDetail } from "./StudentDetail";
 import { planWeekOf } from "@/lib/trainingPlan";
 import { localDateString } from "@/lib/dates";
 import { Skeleton } from "@/components/ui/Skeleton";
@@ -138,11 +139,26 @@ export function StudentsView({ initialAction, onInitialActionDone }) {
     onInitialActionDone?.();
   }, [initialAction, students]);
 
+  // Si la página se recargó hace poco con la ficha de un alumno abierta, vuelve a abrirla
+  // (con el panel donde iba). Va antes de "recordar" para leerlo antes de que se borre.
+  useEffect(() => {
+    if (students.length === 0) return;
+    const id = recallNav("coach:student"); // se lee una sola vez, aunque no se use
+    const p = recallNav("coach:panel");
+    if (initialAction || open) return;
+    const target = id && students.find((s) => s.id === id);
+    if (!target) return;
+    setOpen({ student: target, initialPanel: null, restorePanel: p?.id === id && PANEL_KEYS.includes(p.panel) ? p.panel : null });
+  }, [students]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => {
+    if (!loading) rememberNav("coach:student", open?.student?.id || null);
+  }, [open, loading]);
+
   // Al volver de la ficha, la lista queda en el mismo alumno (no vuelve al primero)
   useScrollMemory(!!open);
 
   if (open) {
-    return <StudentDetail student={open.student} initialPanel={open.initialPanel} onClose={() => setOpen(null)} onChanged={loadData} />;
+    return <StudentDetail student={open.student} initialPanel={open.initialPanel} restorePanel={open.restorePanel} onClose={() => setOpen(null)} onChanged={loadData} />;
   }
 
   const me = students.find((s) => s.isSelf);

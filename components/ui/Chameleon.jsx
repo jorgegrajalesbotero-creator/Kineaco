@@ -2,6 +2,7 @@
 
 import { useEffect, useRef } from "react";
 import { PET_STATES } from "@/lib/chameleon";
+import { useMyOutfit } from "@/lib/myPet";
 import { PetAura, PetBack, PetBackground, PetBody, PetEyes, PetFeet, PetHead, PetNeck, PetWaist } from "@/components/ui/petParts";
 
 // Oscurece (p < 0) o aclara (p > 0) un color #RRGGBB
@@ -20,8 +21,10 @@ const TAIL_DOWN = "M60 100 C36 110 20 98 22 84 C24 72 38 70 42 78 C45 84 38 88 3
 // level (logros de la comunidad): 0 rama · 1 con hojas · 2 en flor · 3 rama dorada
 // party = celebración: el camaleón (sin la rama) salta, da una vuelta hacia atrás, cae en su rama y baila
 // outfit = { head, eyes, body, neck, waist, back, feet, aura, bg } (lo que tiene puesto). scene = dibujar su fondo.
-export function Chameleon({ mood = 3, sleeping = false, animate = true, size = 160, className = "", title, level = 0, party = false, outfit = null, scene = false }) {
-  const o = outfit || {};
+// mine = es la mascota del alumno que usa la app: sale con lo que tiene puesto (lib/myPet).
+export function Chameleon({ mood = 3, sleeping = false, animate = true, size = 160, className = "", title, level = 0, party = false, outfit = null, scene = false, mine = false }) {
+  const myOutfit = useMyOutfit();
+  const o = outfit || (mine ? myOutfit : null) || {};
   const k = sleeping ? 2 : PET_STATES[mood] ? mood : 3;
   const c = sleeping ? "#7D8580" : PET_STATES[k].color;
   const d = shade(c, -0.35);

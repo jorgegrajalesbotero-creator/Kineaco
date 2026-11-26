@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { Check, ChevronLeft, ChevronRight, Download, Lock, MessageCircle, MessageSquarePlus, MessageSquareText, Pencil, Play, Plus, SlidersHorizontal, SquarePen, Timer, X } from "lucide-react";
+import { Check, ChevronLeft, ChevronRight, Download, Lock, MessageCircle, MessageSquarePlus, MessageSquareText, Pencil, Play, Plus, SlidersHorizontal, SquarePen, Timer, Trash2, X } from "lucide-react";
 import { blockTypeLabel } from "@/lib/blocks";
 import { currentWeekStartISO } from "@/lib/dates";
 import { appLocale, tr } from "@/lib/i18n";
@@ -22,6 +22,7 @@ import { loadCheckout } from "@/lib/checkout";
 import { CheckoutSheet } from "./CheckoutSheet";
 import { ExerciseCommentBox } from "./ExerciseCommentBox";
 import { useBackClose } from "@/lib/backStack";
+import { DragHandle, SortableList, SortableRow } from "@/components/ui/Sortable";
 
 // Primer número de las reps sugeridas ("8-10" → 8)
 const firstNumber = (text) => {
@@ -37,8 +38,11 @@ const nextTmpId = () => `tmp-${++tmpSeq}`;
 // coachEdit = (solo con preview) el coach puede corregir peso y reps de las series que el alumno ya hizo (semana actual).
 //             El coach nunca marca ni desmarca series ni ejercicios.
 // liveTick = (solo con preview) cambia cada vez que el alumno marca algo: se recargan las series al instante
-// onEditExercise = (solo con preview) el coach edita peso, series, reps o cambia el ejercicio
-export function RoutineScreen({ routine, userId, pet = null, onClose, onToggle, onProgressChange, preview = false, onEditNote = null, onEditRoutineNote = null, onEditTimer = null, onEditExercise = null, coachEdit = false, liveTick = 0 }) {
+// onEditExercise = (solo con preview) el coach edita peso, series, reps o cambia el ejercicio: se abre tocando
+//   el ejercicio o una serie que el alumno todavía no hizo (las ya hechas se corrigen con coachEdit)
+// onDeletePart / onDeleteBlock / onMoveBlock / onRemoveTimer = (solo con preview) el coach quita una rutina del
+//   día, un bloque o un reloj, y arrastra los bloques para cambiarles el orden (solo para este alumno)
+export function RoutineScreen({ routine, userId, pet = null, onClose, onToggle, onProgressChange, preview = false, onEditNote = null, onEditRoutineNote = null, onEditTimer = null, onEditExercise = null, coachEdit = false, liveTick = 0, onDeletePart = null, onDeleteBlock = null, onMoveBlock = null, onRemoveTimer = null }) {
   const [unit] = useWeightUnit();
   const [detailIndex, setDetailIndex] = useState(null);
   const [playing, setPlaying] = useState(false); // el video solo se carga cuando el alumno toca "Ver video"
@@ -305,14 +309,16 @@ export function RoutineScreen({ routine, userId, pet = null, onClose, onToggle, 
         {Array.from({ length: ex.setsCount }, (_, k) => {
           const n = k + 1;
           const isDone = nums.has(n);
-          const clickable = !preview && !locked && !savingSet && ((isDone && n === lastDone) || (!isDone && n === nextN));
+          // Vista del coach: tocar una serie hecha corrige su peso y reps; una que falta cambia lo planeado
+          const coachTap = preview && ((isDone && coachEdit) || (!isDone && onEditExercise));
+          const clickable = coachTap || (!preview && !locked && !savingSet && ((isDone && n === lastDone) || (!isDone && n === nextN)));
           return (
             <button
               key={n}
               type="button"
               disabled={!clickable}
-              onClick={() => (isDone ? unmarkLastSet(i) : markNextSet(i))}
-              aria-label={isDone ? tr("Desmarcar serie {p0}", { p0: n }) : tr("Marcar serie {p0}", { p0: n })}
+              onClick={() => (preview ? (isDone ? setLoggerIndex(i) : onEditExercise(ex)) : isDone ? unmarkLastSet(i) : markNextSet(i))}
+              aria-label={preview ? (isDone ? `Corregir serie ${n}` : `Cambiar serie ${n}`) : isDone ? tr("Desmarcar serie {p0}", { p0: n }) : tr("Marcar serie {p0}", { p0: n })}
               className={`w-7 h-7 shrink-0 rounded-full text-[11px] font-semibold flex items-center justify-center transition-all active:scale-90 ${
                 isDone ? "bg-accent text-app" : n === nextN && !preview ? "border-2 border-accent/70 text-accent" : "border border-field-strong text-muted"
               } disabled:cursor-default`}
@@ -330,7 +336,7 @@ export function RoutineScreen({ routine, userId, pet = null, onClose, onToggle, 
 
   // Fila de un ejercicio. Si el coach le dejó una observación, se ve la marca antes de abrirlo.
   const exerciseRow = (ex, i, subtitle) => (
-    <div key={i} onClick={() => openDetail(i)} className={`flex flex-wrap items-center justify-between gap-x-2 gap-y-2.5 rounded-2xl px-4 py-3 group cursor-pointer transition duration-200 ease-out hover:scale-[1.02] hover:bg-card-hover active:scale-[0.99] ${isEnCurso(ex) ? "bg-accent/15 ring-1 ring-accent/50" : ex.completed ? "bg-card/60" : "bg-card"}`}>
+    <div key={i} onClick={() => (preview && onEditExercise ? onEditExercise(ex) : openDetail(i))} className={`flex flex-wrap items-center justify-between gap-x-2 gap-y-2.5 rounded-2xl px-4 py-3 group cursor-pointer transition duration-200 ease-out hover:scale-[1.02] hover:bg-card-hover active:scale-[0.99] ${isEnCurso(ex) ? "bg-accent/15 ring-1 ring-accent/50" : ex.completed ? "bg-card/60" : "bg-card"}`}>
       <div className="flex items-center gap-3 min-w-0 flex-1">
         <button
           onClick={(e) => { e.stopPropagation(); toggle(i); }}
@@ -362,19 +368,10 @@ export function RoutineScreen({ routine, userId, pet = null, onClose, onToggle, 
           )}
         </div>
       </div>
-      {/* Vista del coach: en el celular «Editar» y «Observación» van en su propia línea, a lo ancho,
+      {/* Vista del coach: tocar el ejercicio lo edita. «Observación» va en su propia línea en el celular,
           para que el nombre y las series del ejercicio no queden apretados */}
-      {preview && (onEditExercise || (onEditNote && ex.itemKey)) ? (
+      {preview && onEditNote && ex.itemKey ? (
         <div className="flex items-center gap-1.5 w-full sm:w-auto pl-10 sm:pl-0">
-          {onEditExercise && (
-            <button
-              onClick={(e) => { e.stopPropagation(); onEditExercise(ex); }}
-              aria-label="Editar ejercicio"
-              className="flex-1 sm:flex-none justify-center flex items-center gap-1.5 text-xs rounded-lg px-3 py-2 bg-field text-soft hover:text-ink"
-            >
-              <SlidersHorizontal size={13} /> Editar
-            </button>
-          )}
           {onEditNote && ex.itemKey && (
             <button
               onClick={(e) => { e.stopPropagation(); onEditNote(ex); }}
@@ -445,12 +442,20 @@ export function RoutineScreen({ routine, userId, pet = null, onClose, onToggle, 
 
   const timerChip = (part, b) => {
     if (preview && onEditTimer) {
+      const off = !b.timer && b.timerCustom && b.timerBase; // se lo quitó a este alumno
       return (
-        <button onClick={() => onEditTimer(part, b)} className={`w-full flex items-center gap-2 rounded-lg px-3 py-2 mb-2 text-xs text-left ${b.timer ? "bg-accent/15 text-accent" : "bg-field text-soft hover:text-ink"}`}>
-          {b.timer ? <Timer size={14} /> : <Plus size={14} />}
-          <span className="flex-1">{b.timer ? `Reloj: ${timerLabel(b.timer)}${b.timerCustom ? " (solo para este alumno)" : " (de la rutina)"}` : "Programar reloj para este alumno"}</span>
-          {b.timer && <Pencil size={12} />}
-        </button>
+        <div className={`w-full flex items-center rounded-lg mb-2 text-xs ${b.timer ? "bg-accent/15 text-accent" : "bg-field text-soft"}`}>
+          <button onClick={() => onEditTimer(part, b)} className="flex-1 min-w-0 flex items-center gap-2 px-3 py-2 text-left hover:text-ink">
+            {b.timer ? <Timer size={14} className="shrink-0" /> : <Plus size={14} className="shrink-0" />}
+            <span className="flex-1">{b.timer ? `Reloj: ${timerLabel(b.timer)}${b.timerCustom ? " (solo para este alumno)" : " (de la rutina)"}` : off ? "Reloj quitado para este alumno · tocar para volver a ponerlo" : "Programar reloj para este alumno"}</span>
+            {b.timer && <Pencil size={12} className="shrink-0" />}
+          </button>
+          {b.timer && onRemoveTimer && (
+            <button onClick={() => onRemoveTimer(part, b)} aria-label="Quitar reloj" title="Quitar reloj (solo para este alumno)" className="shrink-0 w-9 h-9 flex items-center justify-center rounded-lg hover:bg-danger/15 hover:text-danger">
+              <X size={15} />
+            </button>
+          )}
+        </div>
       );
     }
     if (!b.timer) return null;
@@ -464,6 +469,46 @@ export function RoutineScreen({ routine, userId, pet = null, onClose, onToggle, 
         <ChevronRight size={16} className="text-accent shrink-0" />
       </button>
     );
+  };
+
+  // Un bloque de la rutina. handleProps = agarradera ⋮⋮ para arrastrarlo (vista del coach)
+  const blockSection = (part, b, handleProps) => {
+                      const items = routine.exercises.map((ex, i) => ({ ex, i })).filter(({ ex }) => ex.partIndex === part.partIndex && ex.blockId === b.id);
+                      const doneCount = items.filter(({ ex }) => ex.completed).length;
+                      const round = blockRound(items);
+                      return (
+                        <section key={b.id}>
+                          <div className="flex items-end justify-between gap-3 mb-2">
+                            {handleProps && <DragHandle {...handleProps} onKeyMove={(dir) => { const at = part.blocks.indexOf(b); const to = at + dir; if (to >= 0 && to < part.blocks.length) onMoveBlock(part, at, to); }} label="Mover bloque (arrastre o use las flechas ↑ ↓)" className="self-center -ml-1" />}
+                            <div className="min-w-0 flex-1">
+                              {b.title && b.title !== blockTypeLabel(b.block_type) && (
+                                <p className="text-accent text-[10px] uppercase tracking-wider">{tr(blockTypeLabel(b.block_type))}</p>
+                              )}
+                              <h2 className="text-ink text-base font-semibold truncate">{b.title && b.title !== blockTypeLabel(b.block_type) ? b.title : tr(blockTypeLabel(b.block_type))}</h2>
+                            </div>
+                            <div className="text-right shrink-0">
+                              {round ? (
+                                <p className={`text-sm font-medium ${round.finished ? "text-accent" : "text-ink"}`}>
+                                  {round.finished ? tr("Bloque completo") : tr("Serie {p0} de {p1}", { p0: round.current, p1: round.total })}
+                                </p>
+                              ) : (
+                                b.sets && <p className="text-ink text-sm font-medium">{b.sets} {tr("series")}</p>
+                              )}
+                              {items.length > 0 && <p className="text-muted text-[11px]">{doneCount}/{items.length} {tr("hechos")}</p>}
+                            </div>
+                            {preview && onDeleteBlock && (
+                              <button onClick={() => onDeleteBlock(part, b)} aria-label="Quitar bloque" title="Quitar este bloque (solo para este alumno)" className="self-center shrink-0 w-9 h-9 rounded-lg bg-field text-soft flex items-center justify-center hover:text-danger hover:bg-danger/15">
+                                <Trash2 size={15} />
+                              </button>
+                            )}
+                          </div>
+                          {noteBox(part, b, b.notes)}
+                          {timerChip(part, b)}
+                          <div className="space-y-2">
+                            {items.map(({ ex, i }) => exerciseRow(ex, i, [ex.rowLabel, formatWeight(ex.targetWeight, unit)].filter(Boolean).join(" · ")))}
+                          </div>
+                        </section>
+                      );
   };
 
   return (
@@ -484,7 +529,7 @@ export function RoutineScreen({ routine, userId, pet = null, onClose, onToggle, 
         <div className="fixed inset-x-0 top-1/3 z-[61] flex justify-center px-6 pointer-events-none">
           <div className="animate-celebrate bg-panel border border-accent/30 rounded-3xl px-6 py-5 text-center shadow-[0_20px_60px_-10px_rgba(0,0,0,0.8)]">
             {pet ? (
-              <Chameleon mood={5} size={120} party className="mx-auto" />
+              <Chameleon mine mood={5} size={120} party className="mx-auto" />
             ) : (
               <p className="text-3xl mb-1">🎉</p>
             )}
@@ -538,7 +583,7 @@ export function RoutineScreen({ routine, userId, pet = null, onClose, onToggle, 
             const partDone = partItems.filter((ex) => ex.completed).length;
             return (
               <div key={`${part.id}-${partIdx}`}>
-                {(allParts.length > 1 || part.isExtra) && (
+                {(allParts.length > 1 || part.isExtra || (preview && onDeletePart)) && (
                   <div className="flex items-center gap-3 mb-3 pb-2 border-b border-field">
                     <span className="w-7 h-7 rounded-full bg-accent text-app text-xs font-semibold flex items-center justify-center shrink-0">{partIdx + 1}</span>
                     <div className="flex-1 min-w-0">
@@ -546,45 +591,29 @@ export function RoutineScreen({ routine, userId, pet = null, onClose, onToggle, 
                       <h2 className="text-ink text-lg font-semibold truncate">{part.title}</h2>
                       <p className="text-muted text-xs">{[part.duration_minutes ? `${part.duration_minutes} ${tr("min")}` : "", `${partDone}/${partItems.length} ${tr("hechos")}`].filter(Boolean).join(" · ")}</p>
                     </div>
+                    {preview && onDeletePart && (
+                      <button onClick={() => onDeletePart(part)} aria-label={`Quitar ${part.title}`} title="Quitar esta rutina del día (solo para este alumno)" className="shrink-0 w-9 h-9 rounded-lg bg-field text-soft flex items-center justify-center hover:text-danger hover:bg-danger/15">
+                        <Trash2 size={15} />
+                      </button>
+                    )}
                   </div>
                 )}
                 {/* Comentario del día: lo primero que lee el alumno al abrir su rutina */}
                 {noteBox(part, part, part.dayNote)}
                 {part.blocks?.length > 0 ? (
+                  preview && onMoveBlock ? (
+                    <SortableList ids={part.blocks.map((b) => `${part.partIndex ?? 0}-${b.id}`)} onMove={(from, to) => onMoveBlock(part, from, to)} className="space-y-5">
+                      {part.blocks.map((b) => (
+                        <SortableRow key={b.id} id={`${part.partIndex ?? 0}-${b.id}`}>
+                          {(handleProps) => blockSection(part, b, handleProps)}
+                        </SortableRow>
+                      ))}
+                    </SortableList>
+                  ) : (
                   <div className="space-y-5">
-                    {part.blocks.map((b) => {
-                      const items = routine.exercises.map((ex, i) => ({ ex, i })).filter(({ ex }) => ex.partIndex === part.partIndex && ex.blockId === b.id);
-                      const doneCount = items.filter(({ ex }) => ex.completed).length;
-                      const round = blockRound(items);
-                      return (
-                        <section key={b.id}>
-                          <div className="flex items-end justify-between gap-3 mb-2">
-                            <div className="min-w-0">
-                              {b.title && b.title !== blockTypeLabel(b.block_type) && (
-                                <p className="text-accent text-[10px] uppercase tracking-wider">{tr(blockTypeLabel(b.block_type))}</p>
-                              )}
-                              <h2 className="text-ink text-base font-semibold truncate">{b.title && b.title !== blockTypeLabel(b.block_type) ? b.title : tr(blockTypeLabel(b.block_type))}</h2>
-                            </div>
-                            <div className="text-right shrink-0">
-                              {round ? (
-                                <p className={`text-sm font-medium ${round.finished ? "text-accent" : "text-ink"}`}>
-                                  {round.finished ? tr("Bloque completo") : tr("Serie {p0} de {p1}", { p0: round.current, p1: round.total })}
-                                </p>
-                              ) : (
-                                b.sets && <p className="text-ink text-sm font-medium">{b.sets} {tr("series")}</p>
-                              )}
-                              {items.length > 0 && <p className="text-muted text-[11px]">{doneCount}/{items.length} {tr("hechos")}</p>}
-                            </div>
-                          </div>
-                          {noteBox(part, b, b.notes)}
-                          {timerChip(part, b)}
-                          <div className="space-y-2">
-                            {items.map(({ ex, i }) => exerciseRow(ex, i, [ex.rowLabel, formatWeight(ex.targetWeight, unit)].filter(Boolean).join(" · ")))}
-                          </div>
-                        </section>
-                      );
-                    })}
+                    {part.blocks.map((b) => blockSection(part, b, null))}
                   </div>
+                  )
                 ) : (
                   <>
                     {timerChip(part, part)}
@@ -602,7 +631,7 @@ export function RoutineScreen({ routine, userId, pet = null, onClose, onToggle, 
           <div className="bg-card border border-accent/30 rounded-2xl p-4 mt-6 text-center">
             {pet && (
               <>
-                <Chameleon mood={5} size={170} party={justFinished} className="mx-auto" />
+                <Chameleon mine mood={5} size={170} party={justFinished} className="mx-auto" />
                 <p className="text-ink text-base font-semibold mt-1">{tr("¡Lo logramos!")}</p>
                 <p className="text-soft text-xs mb-2">{tr("{p0} está orgulloso de usted.", { p0: pet.name || tr("Su camaleón") })}</p>
               </>

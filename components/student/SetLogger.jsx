@@ -341,7 +341,7 @@ export function SetLogger({ exercise, routine, userId, onClose, onComplete, onUn
             )}
             {coachMode ? null : pet && pet.mood ? (
               <div className="flex items-center justify-center gap-2 mt-2">
-                <Chameleon mood={doneCount >= rows.length && rows.length > 0 ? 5 : pet.mood} size={64} />
+                <Chameleon mine mood={doneCount >= rows.length && rows.length > 0 ? 5 : pet.mood} size={64} />
                 <p className="text-soft text-xs">
                   {doneCount >= rows.length && rows.length > 0
                     ? tr("¡Series completas! {p0} lo celebra.", { p0: pet.name || tr("Su camaleón") })

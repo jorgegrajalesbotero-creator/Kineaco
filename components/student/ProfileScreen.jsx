@@ -172,7 +172,7 @@ export function ProfileScreen({ fullName, email, avatarUrl, userId, onProfileUpd
       {pet && pet.name && (
         <div className="bg-card rounded-2xl p-4 mb-4">
           <div className="flex items-center gap-3">
-            <Chameleon mood={pet.mood || 3} size={96} className="shrink-0" />
+            <Chameleon mine mood={pet.mood || 3} size={96} className="shrink-0" />
             <div className="flex-1 min-w-0">
               <p className="text-muted text-xs">{tr("Su camaleón")}</p>
               <p className="text-ink text-base font-semibold truncate">{pet.name}</p>

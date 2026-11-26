@@ -34,6 +34,8 @@ import { ClockHost } from "@/components/student/ClockIsland";
 import { useBackClose, useBackTabs } from "@/lib/backStack";
 import { MessagesBubble } from "@/components/student/MessagesBubble";
 import { loadMyPet } from "@/lib/community";
+import { setMyOutfit, startMyOutfit, stopMyOutfit } from "@/lib/myPet";
+import { recallNav, rememberNav } from "@/lib/navMemory";
 import { itemByKey } from "@/lib/petItems";
 import { PetUnlockCelebration } from "@/components/student/PetUnlockCelebration";
 
@@ -47,6 +49,13 @@ export default function App() {
     try { document.documentElement.lang = lang; } catch { }
   }, [lang]);
   const [tab, setTab] = useState("home");
+  // Si la página se recargó hace poco (por ejemplo, el iPhone cerró la app en segundo plano),
+  // vuelve a la pestaña donde estaba y no a Inicio
+  useEffect(() => {
+    const t = recallNav("student:tab");
+    if (["home", "nutrition", "progress", "community", "profile"].includes(t)) setTab(t);
+  }, []);
+  useEffect(() => { rememberNav("student:tab", tab); }, [tab]);
   const [showRoutine, setShowRoutine] = useState(false);
   const [fullName, setFullName] = useState("");
   const [routine, setRoutine] = useState(null);
@@ -399,6 +408,7 @@ export default function App() {
     // todavía no está, se queda la de días de arriba.
     const pet = await loadMyPet(supabase);
     if (pet) {
+      setMyOutfit(pet.outfit);
       setStreak(pet.streak_now || 0);
       setBestStreak(pet.streak_best || 0);
       checkNewUnlocks(uid, pet);
@@ -445,6 +455,7 @@ export default function App() {
 
       uidRef.current = user.id;
       setUserId(user.id);
+      startMyOutfit(user.id); // la mascota sale vestida desde el primer momento
 
       const { data: profile } = await supabase
         .from("profiles")
@@ -607,6 +618,7 @@ export default function App() {
   const signOutNow = async () => {
     await removePushOnLogout(supabase); // este celular deja de recibir los avisos de esta cuenta
     await supabase.auth.signOut();
+    stopMyOutfit();
     window.location.href = "/login";
   };
 

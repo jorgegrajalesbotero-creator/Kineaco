@@ -6,6 +6,7 @@ import { removePushOnLogout, syncPush, useOpenNotification } from "@/lib/push";
 import { PushPromptCard } from "@/components/ui/PushNotifications";
 import { supabase } from "@/lib/supabaseClient";
 import { useBackTabs } from "@/lib/backStack";
+import { recallNav, rememberNav } from "@/lib/navMemory";
 import { CommandPalette } from "@/components/coach/CommandPalette";
 import { AnnouncementsView } from "@/components/coach/AnnouncementsView";
 import { CommunityView } from "@/components/coach/CommunityView";
@@ -23,15 +24,23 @@ import { BrandMark } from "@/components/ui/BrandMark";
 export default function AdminPanel() {
   const [tab, setTab] = useState("alumnos");
   useBackTabs(tab, setTab); // "atrás" del celular vuelve a la sección anterior
-  // Llegó con /admin?tab=mensajes (por ejemplo, desde la burbuja de Mensajes de su vista de alumno)
+  // Llegó con /admin?tab=mensajes (por ejemplo, desde la burbuja de Mensajes de su vista de alumno).
+  // Si no, y la página se recargó hace poco, vuelve a la sección donde estaba (no siempre a Alumnos).
   useEffect(() => {
     const t = new URLSearchParams(window.location.search).get("tab");
     const allowed = ["mensajes", "alumnos", "rutinas", "ejercicios", "programas", "anuncios", "comunidad", "reporte", "perfil"];
+    const remembered = recallNav("coach:tab");
     if (t && allowed.includes(t)) {
       setTab(t);
       window.history.replaceState(window.history.state, "", "/admin");
+    } else if (allowed.includes(remembered)) {
+      setTab(remembered);
     }
   }, []);
+  useEffect(() => {
+    rememberNav("coach:tab", tab);
+    if (tab !== "alumnos") rememberNav("coach:student", null); // la ficha abierta solo se recuerda estando en Alumnos
+  }, [tab]);
   // Buscador general (Ctrl + K) y lo que hay que abrir al llegar a una sección
   const [paletteOpen, setPaletteOpen] = useState(false);
   const [pendingOpen, setPendingOpen] = useState(null); // { kind: "routine" | "exercise", id }
@@ -113,10 +122,13 @@ export default function AdminPanel() {
       setTab("comunidad");
       return;
     }
-    if (n.student_id && ["messages", "nutrition", "access", "photos", "progress", "checkin", "measurements", "routine"].includes(n.link)) {
-      setPendingStudentAction({ id: n.student_id, action: n.link });
+    // Aviso de un alumno: abre su ficha (y la sección del aviso, si la hay)
+    if (n.student_id) {
+      const known = ["messages", "nutrition", "access", "photos", "progress", "checkin", "measurements", "routine"].includes(n.link);
+      setPendingStudentAction({ id: n.student_id, action: known ? n.link : null });
+      setTab("alumnos");
     }
-    setTab("alumnos");
+    // Sin alumno: se queda donde está (antes saltaba siempre a Alumnos)
   };
 
   // Al tocar una notificación en la barra del celular, abre el aviso en el panel
