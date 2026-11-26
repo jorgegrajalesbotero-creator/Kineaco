@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { useScrollMemory } from "@/lib/useScrollMemory";
 import { useBackClose } from "@/lib/backStack";
+import { rememberNav } from "@/lib/navMemory";
 import Link from "next/link";
 import { Activity, ArrowLeft, Calendar, Camera, ChevronDown, ChevronRight, ClipboardCheck, Download, Dumbbell, Eye, TrendingUp, Lock, MessageCircle, PlusCircle, Ruler, UserCog, Utensils } from "lucide-react";
 import { supabase } from "@/lib/supabaseClient";
@@ -42,6 +43,8 @@ const PANELS = {
   exercises: ExerciseHistoryPanel,
 };
 
+export const PANEL_KEYS = Object.keys(PANELS);
+
 // Grupos de la ficha, por niveles (se despliega solo el que se necesita).
 // "Ver su rutina", Mensajes, PDF y el check-in (camaleón) van arriba, así que no se repiten aquí.
 const GROUPS = [
@@ -52,8 +55,9 @@ const GROUPS = [
 ];
 
 // Ficha de un alumno, por niveles: camaleón (check-in) → ver su rutina → Mensajes y PDF → grupos desplegables
-export function StudentDetail({ student, onClose, onChanged, initialPanel = null }) {
-  const [panel, setPanel] = useState(initialPanel);
+export function StudentDetail({ student, onClose, onChanged, initialPanel = null, restorePanel = null }) {
+  const [panel, setPanel] = useState(initialPanel || restorePanel);
+  useEffect(() => { rememberNav("coach:panel", panel ? { id: student.id, panel } : null); }, [panel, student.id]);
   useBackClose(!!panel && panel !== initialPanel, () => setPanel(initialPanel)); // "atrás" vuelve a la ficha
   const [pdfBusy, setPdfBusy] = useState(false);
   const [showPdf, pdfPreview] = usePdfPreview();

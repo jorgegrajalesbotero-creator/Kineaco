@@ -21,6 +21,11 @@ import { saveStudentTimer } from "@/lib/routineTimers";
 import { RoutineNoteEditor } from "./RoutineNoteEditor";
 import { ROUTINE_NOTE_INDEX, saveStudentNote } from "@/lib/routineNotes";
 import { blockTypeLabel } from "@/lib/blocks";
+import { localDateString } from "@/lib/dates";
+import { arrayMove } from "@/components/ui/Sortable";
+import { movedOrder } from "@/lib/previewEdits";
+import { deleteBlock, deletePart, removeTimer, reorderBlocks } from "./blockEdits";
+import { ScopeAskSheet } from "./ScopeAskSheet";
 
 const DAY_SHORT = ["L", "M", "X", "J", "V", "S", "D"];
 const fmtDay = (d) => d.toLocaleDateString("es-CO", { day: "numeric", month: "short" });
@@ -44,6 +49,8 @@ export function RoutinePreviewPanel({ student, onClose, onOpenPanel }) {
   const [session, setSession] = useState(null); // ¿el alumno ya finalizó este día?
   const [checkout, setCheckout] = useState(null); // check-out del alumno ese día (molestias, esfuerzo, comentario)
   const [sessionBusy, setSessionBusy] = useState(false);
+  const [ask, setAsk] = useState(null); // pregunta antes de quitar o mover: { title, message, scoped, confirmLabel, danger, action, cancel }
+  const [editBusy, setEditBusy] = useState(false);
   // En vivo: cuando el alumno marca una serie, un ejercicio o finaliza, la vista se actualiza sola
   const [liveTick, setLiveTick] = useState(0);
   const [liveOn, setLiveOn] = useState(false);
@@ -202,11 +209,74 @@ export function RoutinePreviewPanel({ student, onClose, onOpenPanel }) {
     return true;
   };
 
+  // ---------- Quitar y mover bloques, relojes y rutinas del día (solo para este alumno) ----------
+  const dayInfo = week.days.find((d) => d.label === day) || null;
+  const editCtx = (part, scope) => ({ studentId: student.id, part, dayLabel: day, plan: dayInfo?.plan || null, planWeek: dayInfo?.planWeek || null, scope, schedule });
+  // Guarda, y vuelve a leer todo (si algo falla, la vista queda como está guardado de verdad)
+  const runEdit = async (fn) => {
+    setEditBusy(true);
+    try {
+      await fn();
+    } catch (e) {
+      alert(e?.message || "No se pudo guardar el cambio.");
+    }
+    await loadWeekSchedule();
+    setEditBusy(false);
+  };
+  // whole = se quita la rutina entera del día (en un extra, solo de este día de la semana)
+  const scopeNote = (part, whole = false) =>
+    part.isExtra ? (whole ? "Es un extra: se quita de este día de la semana." : "Es un extra: el cambio vale para todos los días de ese extra.")
+      : dayInfo?.plan ? `Va a su planeación (semana ${dayInfo.planWeek}). La rutina de la biblioteca no cambia.`
+        : "No tiene planeación: el cambio queda en su semana base (todas las semanas). La rutina de la biblioteca no cambia.";
+  const isScoped = (part) => part.isExtra || !!dayInfo?.plan;
+
+  const askDeletePart = (part) => setAsk({
+    title: `¿Quitar «${part.title}» del ${day}?`,
+    message: scopeNote(part, true),
+    scoped: isScoped(part),
+    action: (scope) => runEdit(() => deletePart({ ...editCtx(part, scope), mondayISO: localDateString(monday) })),
+  });
+
+  const askDeleteBlock = (part, b) => {
+    if ((part.blocks || []).length <= 1) return askDeletePart(part); // era el único bloque: se quita la rutina
+    const name = b.title || blockTypeLabel(b.block_type);
+    setAsk({
+      title: `¿Quitar el bloque «${name}»?`,
+      message: `Se quita con sus ejercicios, solo para este alumno. ${scopeNote(part)}`,
+      scoped: isScoped(part) && !part.isExtra,
+      action: (scope) => runEdit(() => deleteBlock(editCtx(part, scope), b.blockIndex)),
+    });
+  };
+
+  // Arrastrar un bloque: se ve movido al instante y, si hay planeación, se pregunta hasta cuándo
+  const moveBlock = (part, from, to) => {
+    if (editBusy || from === to) return;
+    const order = movedOrder(part.blocks.map((b) => b.blockIndex), from, to);
+    setRoutine((r) => {
+      const blocks = arrayMove(part.blocks, from, to);
+      if (!r.parts) return cloneWith(r, { blocks });
+      return cloneWith(r, { parts: r.parts.map((p) => ((p.partIndex ?? 0) === (part.partIndex ?? 0) ? cloneWith(p, { blocks }) : p)) });
+    });
+    const save = (scope) => runEdit(() => reorderBlocks(editCtx(part, scope), order));
+    if (isScoped(part) && !part.isExtra) {
+      setAsk({ title: "¿Hasta cuándo va este orden?", message: scopeNote(part), scoped: true, danger: false, action: save, cancel: () => loadRoutine(schedule, day, weekOffset) });
+    } else {
+      save("all");
+    }
+  };
+
+  const askRemoveTimer = (part, b) => setAsk({
+    title: "¿Quitar el reloj de este bloque?",
+    message: b.timerBase ? "Se le quita solo a este alumno; la rutina lo conserva para los demás." : "Es un reloj solo de este alumno.",
+    scoped: false,
+    action: () => runEdit(() => removeTimer(student.id, part, b)),
+  });
+
   return (
     <PanelLayout title="Rutina como la ve el alumno" subtitle={student.isSelf ? "Mi entrenamiento" : student.name} onClose={onClose} width="max-w-2xl">
       <p className="text-muted text-xs mb-4 flex items-start gap-2">
         <Eye size={14} className="shrink-0 mt-0.5" />
-        <span>Así le aparece al alumno (con su plan, cargas y cambios de esa semana). Desde aquí podés editar todo: «Editar» cambia peso, series, reps o el ejercicio (solo esta semana o desde esta semana); «Observación», los comentarios y el reloj son solo para este alumno.</span>
+        <span>Así le aparece al alumno (con su plan, cargas y cambios de esa semana). Desde aquí podés editar todo: tocá un ejercicio o una de sus series para cambiar peso, series, reps o el ejercicio; ⋮⋮ arrastra un bloque y la papelera lo quita. «Observación», los comentarios y el reloj son solo para este alumno.</span>
       </p>
 
       <div className="flex flex-wrap gap-2 mb-4">
@@ -294,11 +364,12 @@ export function RoutinePreviewPanel({ student, onClose, onOpenPanel }) {
             <button onClick={() => setBulkOpen(true)} className="w-full bg-card text-ink text-sm rounded-xl px-4 py-3 mb-3 flex items-center gap-2 hover:bg-field">
               <Layers size={15} className="text-accent" />
               <span className="flex-1 text-left">Cambiar series de todos los ejercicios</span>
-              <span className="text-muted text-xs">Para uno solo: «Editar»</span>
+              <span className="text-muted text-xs">Para uno solo: tocá el ejercicio</span>
             </button>
           )}
           {noteCount > 0 && <p className="text-accent text-xs mb-2">{noteCount} ejercicio{noteCount > 1 ? "s" : ""} con observación este día</p>}
-          <div className="rounded-2xl border border-white/[0.06] overflow-hidden">
+          {editBusy && <p className="text-accent text-xs mb-2">Guardando el cambio...</p>}
+          <div className={`rounded-2xl border border-white/[0.06] overflow-hidden ${editBusy ? "opacity-60 pointer-events-none" : ""}`}>
             <RoutineScreen
               key={`${day}-${weekOffset}`}
               routine={routine}
@@ -308,6 +379,10 @@ export function RoutinePreviewPanel({ student, onClose, onOpenPanel }) {
               onEditExercise={setEditingEx}
               onEditRoutineNote={(part, block) => setEditingNote({ part, block })}
               onEditTimer={(part, block) => setEditingTimer({ part, block })}
+              onDeletePart={askDeletePart}
+              onDeleteBlock={askDeleteBlock}
+              onMoveBlock={moveBlock}
+              onRemoveTimer={askRemoveTimer}
               coachEdit={weekOffset === 0}
               liveTick={liveTick}
               onClose={onClose}
@@ -318,6 +393,17 @@ export function RoutinePreviewPanel({ student, onClose, onOpenPanel }) {
         </>
       )}
 
+      {ask && (
+        <ScopeAskSheet
+          title={ask.title}
+          message={ask.message}
+          scoped={ask.scoped}
+          danger={ask.danger !== false}
+          confirmLabel={ask.danger === false ? "Guardar" : "Sí, quitar"}
+          onAnswer={(scope) => { const a = ask; setAsk(null); a.action(scope); }}
+          onCancel={() => { const a = ask; setAsk(null); a.cancel?.(); }}
+        />
+      )}
       {editingTimer && (
         <TimerOverrideEditor
           blockTitle={editingTimer.block.title || blockTypeLabel(editingTimer.block.block_type)}

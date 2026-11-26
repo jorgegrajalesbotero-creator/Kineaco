@@ -300,7 +300,7 @@ export function ExtrasPanel({ student, onClose, onOpenPanel }) {
             const isPrivate = !!x.routines?.student_id;
             const blockTypes = [...new Set((x.routines?.routine_blocks || []).sort((a, b) => a.order_index - b.order_index).map((b) => blockTypeLabel(b.block_type)))];
             const tmap = timersFor(timers, x.routine_id, student.id);
-            const timerTexts = Object.values(tmap).map((t) => timerLabel(t.timer));
+            const timerTexts = Object.values(tmap).filter((t) => t.timer).map((t) => timerLabel(t.timer));
             return (
               <ActionCard key={x.id} onOpen={() => startEdit(x)} ariaLabel="Abrir extra" className="bg-card rounded-xl px-4 py-3"
                 actions={[{ label: "Abrir y editar", icon: Pencil, onClick: () => startEdit(x) }, { label: "Eliminar", icon: Trash2, danger: true, onClick: () => remove(x) }]}

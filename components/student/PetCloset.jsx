@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Check, Lock, Sparkles, X } from "lucide-react";
 import { supabase } from "@/lib/supabaseClient";
 import { tr } from "@/lib/i18n";
@@ -8,15 +8,20 @@ import { useBackClose } from "@/lib/backStack";
 import { Chameleon } from "@/components/ui/Chameleon";
 import { PET_LEVELS, saveOutfit } from "@/lib/community";
 import { PET_ITEMS, PET_SLOTS, cleanOutfit, needText, progressText } from "@/lib/petItems";
+import { setMyOutfit } from "@/lib/myPet";
 
 // Vestidor de la mascota: fondo, cabeza, gafas, ropa, medalla, cinturón, espalda, tenis y aura.
-// Lo bloqueado muestra cuánto falta. Al guardar, la base revisa que todo esté desbloqueado.
+// Lo bloqueado muestra cuánto falta. Lo que se pone se guarda solo (sin botón): la base revisa
+// que todo esté desbloqueado.
 export function PetCloset({ pet, petName, mood = 4, level = 0, onClose, onSaved }) {
   useBackClose(true, onClose);
   const unlocked = new Set(pet?.unlocked || []);
   const [outfit, setOutfit] = useState(() => cleanOutfit(pet?.outfit, pet?.unlocked));
   const [slot, setSlot] = useState("bg");
-  const [saving, setSaving] = useState(false);
+  const [status, setStatus] = useState(""); // "" · "saving" · "saved" · "error"
+  const pending = useRef(null);
+  const timer = useRef(null);
+  const lastSaved = useRef(cleanOutfit(pet?.outfit, pet?.unlocked));
   const [preview, setPreview] = useState(0); // al ponerse algo, el camaleón celebra
 
   const slots = PET_SLOTS.filter((s) => PET_ITEMS.some((i) => i.slot === s.key));
@@ -25,23 +30,41 @@ export function PetCloset({ pet, petName, mood = 4, level = 0, onClose, onSaved 
   const total = PET_ITEMS.filter((i) => i.metric).length;
   const have = PET_ITEMS.filter((i) => i.metric && unlocked.has(i.key)).length;
 
-  const wear = (item) => {
-    if (!unlocked.has(item.key)) return;
-    setOutfit((o) => {
-      const next = { ...o };
-      if (next[item.slot] === item.key && item.slot !== "bg") delete next[item.slot];
-      else next[item.slot] = item.key;
-      return next;
-    });
-    setPreview((n) => n + 1);
+  // Guarda lo último que se puso. Si se tocan varias prendas seguidas, se guarda una sola vez.
+  const flush = async () => {
+    clearTimeout(timer.current);
+    const next = pending.current;
+    if (!next) return;
+    pending.current = null;
+    setStatus("saving");
+    const { data, error } = await saveOutfit(supabase, next);
+    if (error) {
+      // No se pudo: vuelve a lo último guardado para no mostrar algo que no quedó
+      setStatus("error");
+      setMyOutfit(lastSaved.current);
+      return;
+    }
+    const saved = data || next;
+    lastSaved.current = saved;
+    setStatus("saved");
+    onSaved?.(saved);
   };
 
-  const save = async () => {
-    setSaving(true);
-    const { data, error } = await saveOutfit(supabase, outfit);
-    setSaving(false);
-    if (error) return alert(tr("No se pudo guardar. Intente de nuevo."));
-    onSaved?.(data || outfit);
+  // Al cerrar el vestidor con algo pendiente, se guarda igual
+  useEffect(() => () => { flush(); }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const wear = (item) => {
+    if (!unlocked.has(item.key)) return;
+    const next = { ...outfit };
+    if (next[item.slot] === item.key && item.slot !== "bg") delete next[item.slot];
+    else next[item.slot] = item.key;
+    setOutfit(next);
+    setMyOutfit(next); // se ve puesto en toda la app de una vez
+    setPreview((n) => n + 1);
+    pending.current = next;
+    setStatus("saving");
+    clearTimeout(timer.current);
+    timer.current = setTimeout(flush, 600);
   };
 
   return (
@@ -126,9 +149,11 @@ export function PetCloset({ pet, petName, mood = 4, level = 0, onClose, onSaved 
             </div>
           </div>
 
-          <div className="flex gap-2 mt-5">
-            <button onClick={save} disabled={saving} className="flex-1 bg-accent text-app text-sm font-semibold rounded-xl py-3 disabled:opacity-60">{saving ? tr("Guardando...") : tr("Guardar")}</button>
-            <button onClick={onClose} className="bg-field text-soft text-sm rounded-xl px-4 py-3">{tr("Cancelar")}</button>
+          <div className="flex items-center gap-3 mt-5">
+            <p role="status" className={`flex-1 text-xs ${status === "error" ? "text-danger" : "text-muted"}`}>
+              {status === "saving" ? tr("Guardando...") : status === "saved" ? tr("Guardado automáticamente") : status === "error" ? tr("No se pudo guardar. Intente de nuevo.") : tr("Lo que le ponga se guarda solo.")}
+            </p>
+            <button onClick={onClose} className="bg-accent text-app text-sm font-semibold rounded-xl px-6 py-3">{tr("Listo")}</button>
           </div>
         </div>
       </div>

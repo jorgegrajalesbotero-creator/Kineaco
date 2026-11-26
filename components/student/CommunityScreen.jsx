@@ -11,6 +11,7 @@ import { Skeleton } from "@/components/ui/Skeleton";
 import { HIGHLIGHT_LABEL, PET_LEVELS, REACTIONS, challengePct, createPost, deletePost, loadChallenges, loadFeed, loadMembership, loadMyPet, loadPosts, react, setHighlight, setMembership, todayExercises } from "@/lib/community";
 import { PET_ITEMS, cleanOutfit, progressText } from "@/lib/petItems";
 import { PetCloset } from "@/components/student/PetCloset";
+import { setMyOutfit } from "@/lib/myPet";
 import { ChallengeManager } from "@/components/coach/ChallengeManager";
 
 // Comunidad de su coach: mascotas, ejercicio destacado, constancia, retos y reacciones con un toque.
@@ -47,6 +48,7 @@ function CommunityBody({ userId, coachMode = false, isStaff = false, header = nu
     if (m.missing || (!m.member?.visible && !staff)) { setFeed([]); return; }
     const [f, c, t, p, pet] = await Promise.all([loadFeed(supabase), loadChallenges(supabase), todayExercises(supabase, userId), loadPosts(supabase), loadMyPet(supabase)]);
     setMyPet(pet);
+    if (pet && !coachMode) setMyOutfit(pet.outfit);
     // Las fotos están en un bucket privado: se guarda la ruta y aquí se firma para poder mostrarla
     const urls = await signedAvatarUrls(f.members.map((x) => x.avatar_url));
     setFeed(f.members.map((x, i) => ({ ...x, avatar_url: urls[i] || null })));
@@ -95,7 +97,7 @@ function CommunityBody({ userId, coachMode = false, isStaff = false, header = nu
       <div className="p-4 md:p-8 max-w-xl mx-auto">
         {header}
         <div className="bg-card rounded-3xl p-5 text-center">
-          <Chameleon mood={4} size={150} className="mx-auto" />
+          <Chameleon mine mood={4} size={150} className="mx-auto" />
           <h2 className="text-ink text-lg font-semibold mt-2">{tr("La comunidad de su coach")}</h2>
           <p className="text-soft text-sm mt-1">{tr("Vea cómo van los demás, anímelos con un toque y sumen juntos en los retos.")}</p>
           <div className="text-left bg-white/[0.03] rounded-2xl p-4 mt-4 space-y-2">
@@ -223,7 +225,7 @@ function CommunityBody({ userId, coachMode = false, isStaff = false, header = nu
       {closetOpen && myPet && (
         <PetCloset pet={myPet} petName={me?.pet_name} mood={me?.pet_mood || 4} level={me?.level || 0}
           onClose={() => setClosetOpen(false)}
-          onSaved={(outfit) => { setMyPet((p) => ({ ...p, outfit })); setClosetOpen(false); }} />
+          onSaved={(outfit) => setMyPet((p) => ({ ...p, outfit }))} />
       )}
     </div>
   );
