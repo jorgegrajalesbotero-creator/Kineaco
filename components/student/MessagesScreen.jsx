@@ -8,11 +8,11 @@ import { Skeleton } from "@/components/ui/Skeleton";
 import { X } from "lucide-react";
 
 // onClose: cuando se abre como ventana (burbuja flotante) muestra la X para cerrarla
-export function MessagesScreen({ userId, onMessagesRead, onClose }) {
+export function MessagesScreen({ userId, onMessagesRead, onClose, initialText = "" }) {
   const [topic, setTopic] = useState("general");
   const [messages, setMessages] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [newMessage, setNewMessage] = useState("");
+  const [newMessage, setNewMessage] = useState(initialText);
   const [sending, setSending] = useState(false);
 
   const topics = [

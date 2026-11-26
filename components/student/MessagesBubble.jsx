@@ -8,7 +8,8 @@ import { MessagesScreen } from "@/components/student/MessagesScreen";
 // Mensajes con el coach como burbuja flotante (abajo a la derecha, encima de la barra de abajo).
 // Al tocarla se abre el chat en una ventana; "atrás" o la X la cierran.
 // El coach en su vista de alumno no se escribe a sí mismo: la burbuja lo lleva a su bandeja de Mensajes.
-export function MessagesBubble({ userId, unread = 0, open, onOpenChange, onRead, isCoach = false, hidden = false }) {
+// draft = texto listo para enviar al abrir (por ejemplo, para pedir la renovación del acceso)
+export function MessagesBubble({ userId, unread = 0, open, onOpenChange, onRead, isCoach = false, hidden = false, draft = "" }) {
   useBackClose(open, () => onOpenChange(false));
 
   const badge = unread > 0 && (
@@ -34,7 +35,7 @@ export function MessagesBubble({ userId, unread = 0, open, onOpenChange, onRead,
         <div className="fixed inset-0 z-[75] md:bg-black/50 flex md:items-end md:justify-end md:p-6" onClick={() => onOpenChange(false)}>
           <div role="dialog" aria-label={tr("Mensajes")} onClick={(e) => e.stopPropagation()}
             className="w-full h-full md:w-[400px] md:h-[min(640px,85dvh)] bg-app md:bg-panel md:border md:border-white/[0.08] md:rounded-2xl flex flex-col overflow-hidden pt-[env(safe-area-inset-top)] md:pt-0 pb-[env(safe-area-inset-bottom)] md:pb-0 animate-fade-in shadow-[0_30px_60px_-20px_rgba(0,0,0,0.9)]">
-            <MessagesScreen userId={userId} onMessagesRead={onRead} onClose={() => onOpenChange(false)} />
+            <MessagesScreen userId={userId} onMessagesRead={onRead} onClose={() => onOpenChange(false)} initialText={draft} />
           </div>
         </div>
       )}

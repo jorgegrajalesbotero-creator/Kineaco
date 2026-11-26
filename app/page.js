@@ -36,6 +36,7 @@ import { MessagesBubble } from "@/components/student/MessagesBubble";
 import { loadMyPet } from "@/lib/community";
 import { setMyOutfit, startMyOutfit, stopMyOutfit } from "@/lib/myPet";
 import { recallNav, rememberNav } from "@/lib/navMemory";
+import { accessReminderRow } from "@/lib/accessNotice";
 import { itemByKey } from "@/lib/petItems";
 import { PetUnlockCelebration } from "@/components/student/PetUnlockCelebration";
 
@@ -90,6 +91,8 @@ export default function App() {
   const [showMeasure, setShowMeasure] = useState(false);
   const [showAnnouncements, setShowAnnouncements] = useState(false);
   const [chatOpen, setChatOpen] = useState(false); // mensajes con el coach (burbuja flotante)
+  const [chatDraft, setChatDraft] = useState(""); // texto listo al abrir los mensajes (renovar el acceso)
+  const [accessUntil, setAccessUntil] = useState(null);
   // La racha y la actividad se recalculan UNA vez al salir de la rutina (no en cada ejercicio: eso la tildaba)
   const progressDirty = useRef(false);
   const [hasNutritionProfile, setHasNutritionProfile] = useState(false);
@@ -158,17 +161,9 @@ export default function App() {
       }
     }
 
-    if (profile?.access_until) {
-      const until = new Date(profile.access_until);
-      const days = Math.ceil((until - now) / 86400000);
-      if (days >= 0 && days <= 5) {
-        rows.push({
-          recipient_id: uid, type: "access", link: "messages", dedupe_key: `access:${profile.access_until.slice(0, 10)}`,
-          title: "Su acceso vence pronto",
-          body: `Vence el ${until.toLocaleDateString("es-CO", { day: "2-digit", month: "short" })}. Hable con su coach para renovarlo.`,
-        });
-      }
-    }
+    // Acceso por vencer: 3 días antes y el mismo día (ver lib/accessNotice.js; el cron crea los mismos)
+    const accessRow = profile?.access_until ? accessReminderRow(uid, profile.access_until, now) : null;
+    if (accessRow) rows.push(accessRow);
 
     const { data: lastPhoto } = await supabase
       .from("progress_photo_sets")
@@ -238,6 +233,9 @@ export default function App() {
       const badge = computeBadges({}).find((b) => b.key === part);
       if (!badge) return { title: tr(n.title), body: n.body ? tr(n.body) : n.body };
       return { title: tr("¡Ganó la insignia \"{p0}\"!", { p0: badge ? tr(badge.title) : "" }), body: tr("Véala en Progreso → Logros.") };
+    }
+    if (n.type === "access" && part && (n.dedupe_key || "").endsWith(":0")) {
+      return { title: tr("Su acceso vence hoy"), body: tr("Hoy es su último día. Escríbale a su coach para renovarlo.") };
     }
     if (n.type === "access" && part) {
       const date = new Date(part + "T12:00:00").toLocaleDateString(appLocale(), { day: "2-digit", month: "short" });
@@ -502,6 +500,7 @@ export default function App() {
       const until = profile?.access_until ? new Date(profile.access_until) : null;
       const blocked = !isStaff && (!until || until < new Date());
       setAccessBlocked(blocked);
+      setAccessUntil(isStaff ? null : profile?.access_until || null);
       setIsCoach(isStaff);
 
       if (blocked) {
@@ -694,6 +693,8 @@ export default function App() {
         needsIntake={!hasIntake}
         onOpenIntake={() => setEditingIntake(true)}
         pushCard={<PushPromptCard userId={userId} t={tr} />}
+        accessUntil={accessUntil}
+        onRenew={() => { setChatDraft(tr("Hola, quiero renovar mi acceso a la app.")); setChatOpen(true); }}
         bell={<NotificationBell supabase={supabase} userId={userId} onNavigate={openFromNotification} refreshKey={notifKey} t={tr} locale={appLocale()} format={formatNotice} />}
       />
     );
@@ -715,6 +716,7 @@ export default function App() {
         onOpenIntake={() => setEditingIntake(true)}
         onOpenAnnouncements={() => setShowAnnouncements(true)}
         isCoach={isCoach}
+        accessUntil={accessUntil}
         onLogout={signOutNow}
         lang={lang}
         onChangeLang={changeLanguage}
@@ -814,7 +816,8 @@ export default function App() {
             userId={userId}
             unread={unreadMessageCount}
             open={chatOpen}
-            onOpenChange={setChatOpen}
+            onOpenChange={(v) => { setChatOpen(v); if (!v) setChatDraft(""); }}
+            draft={chatDraft}
             onRead={() => { setUnreadMessageCount(0); setNotifKey((k) => k + 1); }}
             isCoach={isCoach}
             hidden={showRoutine || showCheckin || showCalendar || showMeasure || showAnnouncements || tab === "messages"}
