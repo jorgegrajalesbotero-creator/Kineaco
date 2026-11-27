@@ -9,6 +9,7 @@ import { Info } from "lucide-react";
 //   <InfoTip text="Lo que antes era un párrafo de ayuda" />
 export function InfoTip({ text, label = "Más información", className = "", size = 14 }) {
   const btn = useRef(null);
+  const bubble = useRef(null);
   const [pos, setPos] = useState(null); // { top, left, up }
 
   const toggle = (e) => {
@@ -24,7 +25,7 @@ export function InfoTip({ text, label = "Más información", className = "", siz
 
   useEffect(() => {
     if (!pos) return undefined;
-    const close = (e) => { if (!btn.current?.contains(e.target)) setPos(null); };
+    const close = (e) => { if (!btn.current?.contains(e.target) && !bubble.current?.contains(e.target)) setPos(null); };
     const onKey = (e) => { if (e.key === "Escape") { e.preventDefault(); setPos(null); } };
     const onScroll = () => setPos(null);
     document.addEventListener("pointerdown", close, true);
@@ -45,7 +46,7 @@ export function InfoTip({ text, label = "Más información", className = "", siz
         <Info size={size} />
       </button>
       {pos && typeof document !== "undefined" && createPortal(
-        <div role="tooltip" onPointerDown={(e) => e.stopPropagation()}
+        <div ref={bubble} role="tooltip"
           style={{ position: "fixed", left: pos.left, width: pos.width, top: pos.top, transform: pos.up ? "translateY(-100%)" : undefined }}
           className="z-[500] bg-panel border border-white/[0.1] text-ink text-xs leading-relaxed rounded-xl px-3 py-2.5 shadow-[0_18px_40px_-12px_rgba(0,0,0,0.9)] animate-fade-in whitespace-pre-line">
           {text}

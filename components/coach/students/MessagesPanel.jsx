@@ -5,6 +5,8 @@ import { supabase } from "@/lib/supabaseClient";
 import { fetchAllRows } from "@/lib/fetchAll";
 import { PanelLayout } from "./PanelLayout";
 import { Skeleton } from "@/components/ui/Skeleton";
+import { Check, CheckCheck } from "lucide-react";
+import { chatWhen, firstName } from "@/lib/chatMeta";
 
 // Chat con el alumno, separado por temas
 // initialTopic: tema con el que abre (la bandeja abre en el tema del último mensaje sin leer).
@@ -16,6 +18,9 @@ export function MessagesPanel({ student, onClose, onChanged, initialTopic = "gen
   const [loadingMessages, setLoadingMessages] = useState(true);
   const [newMessage, setNewMessage] = useState("");
   const [sendingMessage, setSendingMessage] = useState(false);
+  const [names, setNames] = useState({}); // quién del equipo escribió cada mensaje
+  const [myId, setMyId] = useState(null);
+  useEffect(() => { supabase.auth.getUser().then(({ data }) => setMyId(data?.user?.id || null)); }, []);
 
   const topics = [
     { key: "general", label: "General" },
@@ -29,13 +34,18 @@ export function MessagesPanel({ student, onClose, onChanged, initialTopic = "gen
     const data = await fetchAllRows(() =>
       supabase
         .from("messages")
-        .select("id, sender_id, topic, content, created_at")
+        .select("id, sender_id, topic, content, created_at, read_by_alumno")
         .eq("user_id", student.id)
         .eq("topic", topic)
         .order("created_at", { ascending: true })
     );
     setMessages(data);
     setLoadingMessages(false);
+    const ids = [...new Set(data.map((m) => m.sender_id).filter((id) => id && id !== student.id))].filter((id) => !(id in names));
+    if (ids.length) {
+      const { data: ps } = await supabase.from("profiles").select("id, full_name").in("id", ids);
+      setNames((n) => ({ ...n, ...Object.fromEntries((ps || []).map((p) => [p.id, firstName(p.full_name)])) }));
+    }
   };
 
   // Al abrir: marca como leídos los mensajes del alumno y su aviso en la campana
@@ -125,10 +135,17 @@ export function MessagesPanel({ student, onClose, onChanged, initialTopic = "gen
           messages.map((m) => {
             const fromStudent = m.sender_id === student.id;
             return (
-              <div key={m.id} className={`max-w-[75%] rounded-xl px-3 py-2 text-sm ${fromStudent ? "self-start bg-field text-ink" : "self-end bg-accent text-app"}`}>
-                {m.content}
-                <p className={`text-[10px] mt-1 ${fromStudent ? "text-muted" : "text-app/60"}`}>
-                  {new Date(m.created_at).toLocaleString("es-CO", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" })}
+              <div key={m.id} className={`max-w-[80%] rounded-xl px-3 py-2 text-sm ${fromStudent ? "self-start bg-field text-ink" : "self-end bg-accent text-app"}`}>
+                {/* Quién lo escribió: el alumno, o quién del equipo (si no fue usted) */}
+                {fromStudent
+                  ? <p className="text-accent text-[11px] font-semibold mb-0.5">{firstName(student.name) || "Alumno"}</p>
+                  : m.sender_id !== myId && names[m.sender_id] && <p className="text-app/70 text-[11px] font-semibold mb-0.5">{names[m.sender_id]}</p>}
+                <span className="whitespace-pre-wrap break-words">{m.content}</span>
+                <p className={`text-[10px] mt-1 flex items-center justify-end gap-1 ${fromStudent ? "text-muted" : "text-app/70"}`}>
+                  {chatWhen(m.created_at)}
+                  {!fromStudent && (m.read_by_alumno
+                    ? <span className="inline-flex items-center gap-0.5 font-semibold"><CheckCheck size={12} /> Visto</span>
+                    : <span className="inline-flex items-center gap-0.5"><Check size={12} /> Enviado</span>)}
                 </p>
               </div>
             );

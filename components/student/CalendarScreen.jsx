@@ -12,6 +12,7 @@ import { usePdfPreview } from "@/components/ui/PdfPreview";
 import { formatWeight, useWeightUnit } from "@/lib/weightUnits";
 
 import { InfoNote } from "@/components/ui/InfoTip";
+import { repsLabel } from "@/lib/repsLabel";
 const card = "rounded-2xl bg-gradient-to-b from-card to-deep border border-white/[0.06]";
 
 // Calendario del alumno: el mes con los días de entreno (del plan o de sus días fijos), lo que ya hizo y el detalle de cada día
@@ -220,13 +221,13 @@ export function CalendarScreen({ userId, studentName, healthConsent, onClose, on
                             {b.title || tr(blockTypeLabel(b.block_type))}{Number(b.sets) > 0 ? ` · ${tr("{p0} series", { p0: b.sets })}` : ""}
                           </p>
                           {b.exercises.map((ex, i) => (
-                            <p key={i} className="text-soft text-xs mt-1">• {ex.name}{ex.reps ? ` — ${tr("{p0} reps", { p0: ex.reps })}` : ""}{ex.kg != null ? ` · ${formatWeight(ex.kg, unit)}` : ""}</p>
+                            <p key={i} className="text-soft text-xs mt-1">• {ex.name}{ex.reps ? ` — ${repsLabel(ex.reps, tr)}` : ""}{ex.kg != null ? ` · ${formatWeight(ex.kg, unit)}` : ""}</p>
                           ))}
                         </div>
                       ))
                     ) : (
                       r.list.map((ex, i) => (
-                        <p key={i} className="text-soft text-xs mt-1">• {ex.name}{Number(ex.sets) > 0 ? ` — ${ex.sets} × ${ex.reps || "—"}` : ex.reps ? ` — ${tr("{p0} reps", { p0: ex.reps })}` : ""}{ex.kg != null ? ` · ${formatWeight(ex.kg, unit)}` : ""}</p>
+                        <p key={i} className="text-soft text-xs mt-1">• {ex.name}{Number(ex.sets) > 0 ? ` — ${ex.sets} × ${ex.reps || "—"}` : ex.reps ? ` — ${repsLabel(ex.reps, tr)}` : ""}{ex.kg != null ? ` · ${formatWeight(ex.kg, unit)}` : ""}</p>
                       ))
                     )
                   ) : (

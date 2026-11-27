@@ -11,6 +11,7 @@ import { formatWeight, useWeightUnit } from "@/lib/weightUnits";
 import { Chameleon } from "@/components/ui/Chameleon";
 import { ExerciseCommentBox } from "./ExerciseCommentBox";
 import { useBackClose } from "@/lib/backStack";
+import { repsLabel } from "@/lib/repsLabel";
 
 // Primer número de las reps sugeridas ("8-10" → 8) para "Marcar todas como sugeridas"
 const firstNumber = (text) => {
@@ -203,7 +204,7 @@ export function SetLogger({ exercise, routine, userId, onClose, onComplete, onUn
         <p className="text-soft text-xs mb-4">
           {[
             exercise.setsCount ? tr("{p0} series", { p0: exercise.setsCount }) : "",
-            exercise.targetReps ? tr("{p0} reps", { p0: exercise.targetReps }) : "",
+            exercise.targetReps ? repsLabel(exercise.targetReps, tr) : "",
             formatWeight(exercise.targetWeight, unit),
             usesRir ? tr("RIR {p0}", { p0: targetRir.replace(".", ",") }) : "",
           ].filter(Boolean).join(" · ") || tr("Registre lo que hizo en cada serie.")}
