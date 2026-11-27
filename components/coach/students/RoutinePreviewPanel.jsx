@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { Activity, Calendar, ChevronLeft, ChevronRight, Eye, Layers, Lock, LockOpen, PlusCircle } from "lucide-react";
+import { Activity, Calendar, ChevronLeft, ChevronRight, Copy, Eye, Layers, Lock, LockOpen, PlusCircle } from "lucide-react";
 import { supabase } from "@/lib/supabaseClient";
 import { WEEK_DAYS, todayDayLabel } from "@/lib/dates";
 import { addDays, loadSchedule, mondayOf, routinesForDate } from "@/lib/trainingPlan";
@@ -19,12 +19,14 @@ import { loadCheckout } from "@/lib/checkout";
 import { TimerOverrideEditor } from "./TimerOverrideEditor";
 import { saveStudentTimer } from "@/lib/routineTimers";
 import { RoutineNoteEditor } from "./RoutineNoteEditor";
-import { ROUTINE_NOTE_INDEX, saveStudentNote } from "@/lib/routineNotes";
+import { NOTE_OFF, ROUTINE_NOTE_INDEX, saveStudentNote } from "@/lib/routineNotes";
 import { blockTypeLabel } from "@/lib/blocks";
 import { localDateString } from "@/lib/dates";
 import { arrayMove } from "@/components/ui/Sortable";
 import { movedOrder } from "@/lib/previewEdits";
-import { deleteBlock, deletePart, removeTimer, reorderBlocks } from "./blockEdits";
+import { addBlock, copyDay, deleteBlock, deletePart, duplicateBlock, removeRoutineNote, removeTimer, reorderBlocks } from "./blockEdits";
+import { AddBlockSheet, CopyDaySheet } from "./PreviewSheets";
+import { useUndo } from "@/components/ui/UndoToast";
 import { ScopeAskSheet } from "./ScopeAskSheet";
 
 const DAY_SHORT = ["L", "M", "X", "J", "V", "S", "D"];
@@ -51,6 +53,10 @@ export function RoutinePreviewPanel({ student, onClose, onOpenPanel }) {
   const [sessionBusy, setSessionBusy] = useState(false);
   const [ask, setAsk] = useState(null); // pregunta antes de quitar o mover: { title, message, scoped, confirmLabel, danger, action, cancel }
   const [editBusy, setEditBusy] = useState(false);
+  const [addingEx, setAddingEx] = useState(null); // "+ Agregar ejercicio": el último del bloque (va después)
+  const [addingBlock, setAddingBlock] = useState(null); // "+ Agregar bloque": la rutina del día
+  const [copyOpen, setCopyOpen] = useState(false); // "Copiar este día a…"
+  const { offer: offerUndo, toast: undoToast } = useUndo(8000); // "Se quitó … · Deshacer"
   // En vivo: cuando el alumno marca una serie, un ejercicio o finaliza, la vista se actualiza sola
   const [liveTick, setLiveTick] = useState(0);
   const [liveOn, setLiveOn] = useState(false);
@@ -212,16 +218,19 @@ export function RoutinePreviewPanel({ student, onClose, onOpenPanel }) {
   // ---------- Quitar y mover bloques, relojes y rutinas del día (solo para este alumno) ----------
   const dayInfo = week.days.find((d) => d.label === day) || null;
   const editCtx = (part, scope) => ({ studentId: student.id, part, dayLabel: day, plan: dayInfo?.plan || null, planWeek: dayInfo?.planWeek || null, scope, schedule });
-  // Guarda, y vuelve a leer todo (si algo falla, la vista queda como está guardado de verdad)
-  const runEdit = async (fn) => {
+  // Guarda, y vuelve a leer todo (si algo falla, la vista queda como está guardado de verdad).
+  // undoLabel = si el cambio se puede deshacer, el aviso que se muestra unos segundos con "Deshacer".
+  const runEdit = async (fn, undoLabel = null) => {
     setEditBusy(true);
+    let res = null;
     try {
-      await fn();
+      res = await fn();
     } catch (e) {
       alert(e?.message || "No se pudo guardar el cambio.");
     }
     await loadWeekSchedule();
     setEditBusy(false);
+    if (undoLabel && typeof res?.undo === "function") offerUndo(undoLabel, () => runEdit(res.undo));
   };
   // whole = se quita la rutina entera del día (en un extra, solo de este día de la semana)
   const scopeNote = (part, whole = false) =>
@@ -234,7 +243,7 @@ export function RoutinePreviewPanel({ student, onClose, onOpenPanel }) {
     title: `¿Quitar «${part.title}» del ${day}?`,
     message: scopeNote(part, true),
     scoped: isScoped(part),
-    action: (scope) => runEdit(() => deletePart({ ...editCtx(part, scope), mondayISO: localDateString(monday) })),
+    action: (scope) => runEdit(() => deletePart({ ...editCtx(part, scope), mondayISO: localDateString(monday) }), `Se quitó «${part.title}»`),
   });
 
   const askDeleteBlock = (part, b) => {
@@ -244,7 +253,7 @@ export function RoutinePreviewPanel({ student, onClose, onOpenPanel }) {
       title: `¿Quitar el bloque «${name}»?`,
       message: `Se quita con sus ejercicios, solo para este alumno. ${scopeNote(part)}`,
       scoped: isScoped(part) && !part.isExtra,
-      action: (scope) => runEdit(() => deleteBlock(editCtx(part, scope), b.blockIndex)),
+      action: (scope) => runEdit(() => deleteBlock(editCtx(part, scope), b.blockIndex), `Se quitó el bloque «${name}»`),
     });
   };
 
@@ -257,7 +266,7 @@ export function RoutinePreviewPanel({ student, onClose, onOpenPanel }) {
       if (!r.parts) return cloneWith(r, { blocks });
       return cloneWith(r, { parts: r.parts.map((p) => ((p.partIndex ?? 0) === (part.partIndex ?? 0) ? cloneWith(p, { blocks }) : p)) });
     });
-    const save = (scope) => runEdit(() => reorderBlocks(editCtx(part, scope), order));
+    const save = (scope) => runEdit(() => reorderBlocks(editCtx(part, scope), order), "Se cambió el orden de los bloques");
     if (isScoped(part) && !part.isExtra) {
       setAsk({ title: "¿Hasta cuándo va este orden?", message: scopeNote(part), scoped: true, danger: false, action: save, cancel: () => loadRoutine(schedule, day, weekOffset) });
     } else {
@@ -265,11 +274,68 @@ export function RoutinePreviewPanel({ student, onClose, onOpenPanel }) {
     }
   };
 
+  // Quitar un comentario (del día o de un bloque) solo para este alumno. Si venía de la rutina, se le apaga.
+  const askDeleteRoutineNote = (part, b) => {
+    const delDia = b === part;
+    setAsk({
+      title: delDia ? "¿Quitar el comentario del día?" : "¿Quitar el comentario de este bloque?",
+      message: !delDia && b.notesBase ? "Se le quita solo a este alumno; la rutina lo conserva para los demás." : "Es un comentario solo de este alumno.",
+      scoped: false,
+      action: () => runEdit(
+        () => removeRoutineNote(student.id, part, delDia ? ROUTINE_NOTE_INDEX : b.blockIndex, !delDia && b.notesBase ? NOTE_OFF : ""),
+        "Se quitó el comentario",
+      ),
+    });
+  };
+
+  // Borrar la observación de un ejercicio
+  const askDeleteNote = (ex) => setAsk({
+    title: `¿Borrar la observación de «${ex.name}»?`,
+    message: "El alumno deja de verla.",
+    scoped: false,
+    action: () => runEdit(async () => {
+      const target = { userId: student.id, routineId: ex.routineId || routine.id, itemKey: ex.itemKey, exerciseId: ex.exerciseId };
+      const before = ex.note || "";
+      const { error } = await saveExerciseNote(supabase, { ...target, note: "" });
+      if (error) throw new Error("No se pudo borrar la observación.");
+      return { undo: async () => { const r = await saveExerciseNote(supabase, { ...target, note: before }); if (r.error) throw new Error("No se pudo deshacer."); } };
+    }, "Se borró la observación"),
+  });
+
+  // Duplicar un bloque justo debajo (solo para este alumno)
+  const askDuplicateBlock = (part, b) => {
+    const name = b.title || blockTypeLabel(b.block_type);
+    const go = (scope) => runEdit(() => duplicateBlock(editCtx(part, scope), b.blockIndex), `Se duplicó el bloque «${name}»`);
+    if (isScoped(part) && !part.isExtra) setAsk({ title: `¿Duplicar «${name}»?`, message: scopeNote(part), scoped: true, danger: false, action: go });
+    else go("all");
+  };
+
+  // "Copiar este día a…": los otros días de esta semana y, con planeación, el mismo día de la semana siguiente
+  const nonExtraCount = (date) => {
+    if (!schedule) return 0;
+    return routinesForDate(schedule.plans, schedule.fixed, date, []).items.length;
+  };
+  const dayIndex = WEEK_DAYS.indexOf(day);
+  const copyTargets = schedule ? [
+    ...WEEK_DAYS.map((label, i) => ({ key: label, label, day: label, week: dayInfo?.planWeek || null, hasRoutines: nonExtraCount(addDays(monday, i)) > 0 })).filter((t) => t.day !== day),
+    ...(dayInfo?.plan && dayInfo.planWeek < dayInfo.plan.weeks
+      ? [{ key: "next", label: `${day} de la semana siguiente`, day, week: dayInfo.planWeek + 1, wide: true, hasRoutines: nonExtraCount(addDays(monday, dayIndex + 7)) > 0 }]
+      : []),
+  ] : [];
+  const canCopyDay = schedule && dayIndex >= 0 && nonExtraCount(addDays(monday, dayIndex)) > 0;
+  const doCopyDay = async (target, mode) => {
+    await runEdit(
+      () => copyDay({ studentId: student.id, plan: dayInfo?.plan || null, from: { week: dayInfo?.planWeek || null, day }, to: { week: target.week, day: target.day }, mode }),
+      `Se copió el ${day.toLowerCase()} al ${target.label.toLowerCase()}`,
+    );
+    return true;
+  };
+
   const askRemoveTimer = (part, b) => setAsk({
     title: "¿Quitar el reloj de este bloque?",
     message: b.timerBase ? "Se le quita solo a este alumno; la rutina lo conserva para los demás." : "Es un reloj solo de este alumno.",
     scoped: false,
-    action: () => runEdit(() => removeTimer(student.id, part, b)),
+    action: () => runEdit(() => removeTimer(student.id, part, b), "Se quitó el reloj"),
   });
 
   return (
@@ -368,6 +434,13 @@ export function RoutinePreviewPanel({ student, onClose, onOpenPanel }) {
             </button>
           )}
           {noteCount > 0 && <p className="text-accent text-xs mb-2">{noteCount} ejercicio{noteCount > 1 ? "s" : ""} con observación este día</p>}
+          {canCopyDay && (
+            <button onClick={() => setCopyOpen(true)} className="w-full bg-card text-ink text-sm rounded-xl px-4 py-3 mb-3 flex items-center gap-2 hover:bg-field">
+              <Copy size={15} className="text-accent" />
+              <span className="flex-1 text-left">Copiar este día a…</span>
+              <span className="text-muted text-xs">otro día o la semana siguiente</span>
+            </button>
+          )}
           {editBusy && <p className="text-accent text-xs mb-2">Guardando el cambio...</p>}
           <div className={`rounded-2xl border border-white/[0.06] overflow-hidden ${editBusy ? "opacity-60 pointer-events-none" : ""}`}>
             <RoutineScreen
@@ -383,6 +456,11 @@ export function RoutinePreviewPanel({ student, onClose, onOpenPanel }) {
               onDeleteBlock={askDeleteBlock}
               onMoveBlock={moveBlock}
               onRemoveTimer={askRemoveTimer}
+              onDeleteRoutineNote={askDeleteRoutineNote}
+              onDeleteNote={askDeleteNote}
+              onAddExercise={setAddingEx}
+              onAddBlock={setAddingBlock}
+              onDuplicateBlock={askDuplicateBlock}
               coachEdit={weekOffset === 0}
               liveTick={liveTick}
               onClose={onClose}
@@ -393,6 +471,33 @@ export function RoutinePreviewPanel({ student, onClose, onOpenPanel }) {
         </>
       )}
 
+      {undoToast}
+      {copyOpen && <CopyDaySheet dayLabel={day} targets={copyTargets} onCopy={doCopyDay} onClose={() => setCopyOpen(false)} />}
+      {addingBlock && (
+        <AddBlockSheet
+          routineTitle={addingBlock.title}
+          scoped={isScoped(addingBlock) && !addingBlock.isExtra}
+          onSave={async (block, scope) => {
+            const part = addingBlock;
+            await runEdit(() => addBlock(editCtx(part, isScoped(part) && !part.isExtra ? scope : "all"), block), `Se agregó el bloque «${block.title}»`);
+            return true;
+          }}
+          onClose={() => setAddingBlock(null)}
+        />
+      )}
+      {addingEx && routine && (
+        <ExerciseEditSheet
+          addOnly
+          student={student}
+          routine={routine}
+          exercise={addingEx}
+          plan={dayInfo?.plan || null}
+          planWeek={dayInfo?.planWeek || null}
+          dayLabel={day}
+          onClose={() => setAddingEx(null)}
+          onSaved={async () => { await loadWeekSchedule(); }}
+        />
+      )}
       {ask && (
         <ScopeAskSheet
           title={ask.title}
@@ -424,6 +529,7 @@ export function RoutinePreviewPanel({ student, onClose, onOpenPanel }) {
           initial={editingNote.block === editingNote.part ? editingNote.part.dayNote || "" : (editingNote.block.notesCustom ? editingNote.block.notes : "")}
           base={editingNote.block === editingNote.part ? "" : editingNote.block.notesBase || ""}
           isCustom={editingNote.block === editingNote.part ? !!editingNote.part.dayNote : !!editingNote.block.notesCustom}
+          isOff={editingNote.block !== editingNote.part && !!editingNote.block.notesOff}
           onSave={saveRoutineNote}
           onClose={() => setEditingNote(null)}
         />

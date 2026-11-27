@@ -2,13 +2,14 @@
 
 import { useState } from "react";
 import { MessageSquare, X } from "lucide-react";
-import { ROUTINE_NOTE_MAX } from "@/lib/routineNotes";
+import { NOTE_OFF, ROUTINE_NOTE_MAX } from "@/lib/routineNotes";
 import { useBackClose } from "@/lib/backStack";
 
 // Ventana para escribir un comentario SOLO para un alumno: el de un bloque o el del día entero.
 // base = lo que trae la rutina (si tiene). onSave(texto) devuelve true si salió bien;
-// con el texto vacío se borra el comentario del alumno y vuelve el de la rutina.
-export function RoutineNoteEditor({ title, routineTitle, initial = "", base = "", isCustom = false, onSave, onClose }) {
+// con el texto vacío se borra el comentario del alumno y vuelve el de la rutina; con NOTE_OFF se le
+// quita a este alumno el de la rutina. isOff = ya se lo habían quitado.
+export function RoutineNoteEditor({ title, routineTitle, initial = "", base = "", isCustom = false, isOff = false, onSave, onClose }) {
   useBackClose(true, onClose); // "atrás" del celular cierra esta ventana (no la pantalla de atrás)
   const [text, setText] = useState(initial);
   const [busy, setBusy] = useState(false);
@@ -54,6 +55,11 @@ export function RoutineNoteEditor({ title, routineTitle, initial = "", base = ""
         <p className="text-muted text-[11px] text-right mt-1 tabular-nums">{text.length}/{ROUTINE_NOTE_MAX}</p>
 
         <div className="flex flex-col-reverse sm:flex-row gap-2 mt-3">
+          {base && !isOff && (
+            <button onClick={() => save(NOTE_OFF)} disabled={busy} className="sm:flex-1 bg-field text-soft text-sm rounded-xl py-3 hover:text-danger disabled:opacity-60">
+              Quitar comentario a este alumno
+            </button>
+          )}
           {isCustom && (
             <button onClick={() => save("")} disabled={busy} className="sm:flex-1 bg-field text-soft text-sm rounded-xl py-3 disabled:opacity-60">
               {base ? "Volver al de la rutina" : "Quitar comentario"}
