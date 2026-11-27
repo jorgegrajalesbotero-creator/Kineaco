@@ -42,7 +42,7 @@ const nextTmpId = () => `tmp-${++tmpSeq}`;
 //   el ejercicio o una serie que el alumno todavía no hizo (las ya hechas se corrigen con coachEdit)
 // onDeletePart / onDeleteBlock / onMoveBlock / onRemoveTimer = (solo con preview) el coach quita una rutina del
 //   día, un bloque o un reloj, y arrastra los bloques para cambiarles el orden (solo para este alumno)
-export function RoutineScreen({ routine, userId, pet = null, onClose, onToggle, onProgressChange, preview = false, onEditNote = null, onEditRoutineNote = null, onEditTimer = null, onEditExercise = null, coachEdit = false, liveTick = 0, onDeletePart = null, onDeleteBlock = null, onMoveBlock = null, onRemoveTimer = null }) {
+export function RoutineScreen({ routine, userId, pet = null, onClose, onToggle, onProgressChange, preview = false, onEditNote = null, onEditRoutineNote = null, onEditTimer = null, onEditExercise = null, coachEdit = false, liveTick = 0, onDeletePart = null, onDeleteBlock = null, onMoveBlock = null, onRemoveTimer = null, onDeleteRoutineNote = null, onDeleteNote = null }) {
   const [unit] = useWeightUnit();
   const [detailIndex, setDetailIndex] = useState(null);
   const [playing, setPlaying] = useState(false); // el video solo se carga cuando el alumno toca "Ver video"
@@ -302,7 +302,8 @@ export function RoutineScreen({ routine, userId, pet = null, onClose, onToggle, 
 
   // Puntos de series (rutinas por bloques): tocar el siguiente marca esa serie; tocar el último hecho lo desmarca
   const setDots = (ex, i) => {
-    const done = doneOf(ex);
+    // En "lista simple" no se marca por series: en la vista del coach se dibujan igual para tocarlas
+    const done = bySet(ex) ? doneOf(ex) : ex.completed ? Array.from({ length: ex.setsCount }, (_, k) => ({ n: k + 1 })) : [];
     const nums = new Set(done.map((d) => d.n));
     const lastDone = done.length ? Math.max(...done.map((d) => d.n)) : 0;
     let nextN = 1;
@@ -357,7 +358,7 @@ export function RoutineScreen({ routine, userId, pet = null, onClose, onToggle, 
           <p className={`text-sm ${isEnCurso(ex) ? "text-accent font-semibold" : ex.completed ? "text-muted line-through" : "text-ink"}`}>{ex.name}</p>
           {isEnCurso(ex) && <p className="text-accent text-[11px] font-medium">{tr("En curso")}</p>}
           {subtitle && <p className="text-muted text-xs">{subtitle}</p>}
-          {bySet(ex) && setDots(ex, i)}
+          {(bySet(ex) || (preview && onEditExercise && ex.setsCount > 0)) && setDots(ex, i)}
           {ex.note && (
             <p className="inline-flex items-center gap-1 text-accent text-[11px] font-medium mt-0.5">
               <MessageSquareText size={12} /> {tr("Tiene observación de su coach")}
@@ -381,6 +382,12 @@ export function RoutineScreen({ routine, userId, pet = null, onClose, onToggle, 
               className={`flex-1 sm:flex-none justify-center flex items-center gap-1.5 text-xs rounded-lg px-3 py-2 ${ex.note ? "bg-accent/15 text-accent" : "bg-field text-soft hover:text-ink"}`}
             >
               {ex.note ? <Pencil size={13} /> : <MessageSquarePlus size={13} />} Observación
+            </button>
+          )}
+          {ex.note && onDeleteNote && (
+            <button onClick={(e) => { e.stopPropagation(); onDeleteNote(ex); }} aria-label="Borrar observación" title="Borrar observación"
+              className="shrink-0 w-9 h-9 rounded-lg bg-field text-soft flex items-center justify-center hover:text-danger hover:bg-danger/15">
+              <Trash2 size={13} />
             </button>
           )}
         </div>
@@ -427,19 +434,27 @@ export function RoutineScreen({ routine, userId, pet = null, onClose, onToggle, 
       );
     }
     return (
+      <div className="relative">
+      {texto && onDeleteRoutineNote && (
+        <button onClick={() => onDeleteRoutineNote(part, b)} aria-label="Quitar comentario" title="Quitar este comentario (solo para este alumno)"
+          className="absolute right-1.5 top-1.5 z-10 w-8 h-8 rounded-lg flex items-center justify-center text-soft hover:text-danger hover:bg-danger/15">
+          <Trash2 size={14} />
+        </button>
+      )}
       <button
         onClick={() => onEditRoutineNote(part, b)}
-        className={`${caja} transition-colors ${texto ? "bg-accent/10 border border-accent/30" : "bg-field text-soft hover:text-ink"}`}
+        className={`${caja} transition-colors ${texto ? "bg-accent/10 border border-accent/30 pr-11" : "bg-field text-soft hover:text-ink"}`}
       >
         <span className={`text-xs font-semibold flex items-center gap-1.5 ${texto ? "text-accent" : "text-soft"}`}>
           <MessageSquareText size={14} />
           {texto
             ? `${esDelDia ? "Comentario del día" : "Indicaciones del bloque"}${b.notesCustom ? " (solo para este alumno)" : " (de la rutina)"}`
             : `Escribir ${esDelDia ? "un comentario del día" : "indicaciones"} para este alumno`}
-          <Pencil size={12} className="ml-auto shrink-0" />
+          {!texto && <Pencil size={12} className="ml-auto shrink-0" />}
         </span>
         {texto && <span className="block text-ink text-sm whitespace-pre-wrap break-words mt-1">{texto}</span>}
       </button>
+      </div>
     );
   };
 

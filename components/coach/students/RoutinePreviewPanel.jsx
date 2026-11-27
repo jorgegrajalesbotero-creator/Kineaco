@@ -19,7 +19,7 @@ import { loadCheckout } from "@/lib/checkout";
 import { TimerOverrideEditor } from "./TimerOverrideEditor";
 import { saveStudentTimer } from "@/lib/routineTimers";
 import { RoutineNoteEditor } from "./RoutineNoteEditor";
-import { ROUTINE_NOTE_INDEX, saveStudentNote } from "@/lib/routineNotes";
+import { NOTE_OFF, ROUTINE_NOTE_INDEX, saveStudentNote } from "@/lib/routineNotes";
 import { blockTypeLabel } from "@/lib/blocks";
 import { localDateString } from "@/lib/dates";
 import { arrayMove } from "@/components/ui/Sortable";
@@ -265,6 +265,32 @@ export function RoutinePreviewPanel({ student, onClose, onOpenPanel }) {
     }
   };
 
+  // Quitar un comentario (del día o de un bloque) solo para este alumno. Si venía de la rutina, se le apaga.
+  const askDeleteRoutineNote = (part, b) => {
+    const delDia = b === part;
+    setAsk({
+      title: delDia ? "¿Quitar el comentario del día?" : "¿Quitar el comentario de este bloque?",
+      message: !delDia && b.notesBase ? "Se le quita solo a este alumno; la rutina lo conserva para los demás." : "Es un comentario solo de este alumno.",
+      scoped: false,
+      action: () => runEdit(async () => {
+        const index = delDia ? ROUTINE_NOTE_INDEX : b.blockIndex;
+        const error = await saveStudentNote(supabase, student.id, part.id, index, !delDia && b.notesBase ? NOTE_OFF : "");
+        if (error) throw new Error("No se pudo quitar el comentario.");
+      }),
+    });
+  };
+
+  // Borrar la observación de un ejercicio
+  const askDeleteNote = (ex) => setAsk({
+    title: `¿Borrar la observación de «${ex.name}»?`,
+    message: "El alumno deja de verla.",
+    scoped: false,
+    action: () => runEdit(async () => {
+      const { error } = await saveExerciseNote(supabase, { userId: student.id, routineId: ex.routineId || routine.id, itemKey: ex.itemKey, exerciseId: ex.exerciseId, note: "" });
+      if (error) throw new Error("No se pudo borrar la observación.");
+    }),
+  });
+
   const askRemoveTimer = (part, b) => setAsk({
     title: "¿Quitar el reloj de este bloque?",
     message: b.timerBase ? "Se le quita solo a este alumno; la rutina lo conserva para los demás." : "Es un reloj solo de este alumno.",
@@ -383,6 +409,8 @@ export function RoutinePreviewPanel({ student, onClose, onOpenPanel }) {
               onDeleteBlock={askDeleteBlock}
               onMoveBlock={moveBlock}
               onRemoveTimer={askRemoveTimer}
+              onDeleteRoutineNote={askDeleteRoutineNote}
+              onDeleteNote={askDeleteNote}
               coachEdit={weekOffset === 0}
               liveTick={liveTick}
               onClose={onClose}
@@ -424,6 +452,7 @@ export function RoutinePreviewPanel({ student, onClose, onOpenPanel }) {
           initial={editingNote.block === editingNote.part ? editingNote.part.dayNote || "" : (editingNote.block.notesCustom ? editingNote.block.notes : "")}
           base={editingNote.block === editingNote.part ? "" : editingNote.block.notesBase || ""}
           isCustom={editingNote.block === editingNote.part ? !!editingNote.part.dayNote : !!editingNote.block.notesCustom}
+          isOff={editingNote.block !== editingNote.part && !!editingNote.block.notesOff}
           onSave={saveRoutineNote}
           onClose={() => setEditingNote(null)}
         />

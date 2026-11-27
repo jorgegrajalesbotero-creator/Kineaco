@@ -12,7 +12,7 @@ import { supabase } from "@/lib/supabaseClient";
 import { ExerciseNoteEditor } from "./ExerciseNoteEditor";
 import { RoutineNoteEditor } from "./RoutineNoteEditor";
 import { TimerOverrideEditor } from "./TimerOverrideEditor";
-import { ROUTINE_NOTE_INDEX, loadRoutineNotes, notesFor, saveStudentNote } from "@/lib/routineNotes";
+import { ROUTINE_NOTE_INDEX, loadRoutineNotes, notesFor, offNotesFor, saveStudentNote } from "@/lib/routineNotes";
 import { LIST_TIMER_INDEX, loadTimers, saveStudentTimer, timersFor } from "@/lib/routineTimers";
 import { timerLabel } from "@/lib/clock";
 import { blockTypeLabel } from "@/lib/blocks";
@@ -650,8 +650,9 @@ export function PlanLoadsEditor({ userId, model = "atr", dayGoals = {}, startDat
               <div key={g.key}>
                 {(() => {
                   const own = notesFor(routineNotes, routineId);
+                  const off = offNotesFor(routineNotes, routineId);
                   const tm = g.index != null ? timersFor(timerRows, routineId, userId)[g.index] : null;
-                  const note = g.block ? own[g.index] || g.block.notes || "" : "";
+                  const note = g.block ? (off.has(g.index) ? "" : own[g.index] || g.block.notes || "") : "";
                   return (
                     <div className="mb-2">
                       <div className="flex flex-wrap items-center justify-between gap-2">
@@ -659,7 +660,7 @@ export function PlanLoadsEditor({ userId, model = "atr", dayGoals = {}, startDat
                         {userId && (
                           <div className="flex gap-1.5">
                             {g.block && (
-                              <button onClick={() => setBlockEdit({ kind: "note", index: g.index, title: g.label, block: g.block })} className={`text-xs rounded-lg px-2.5 py-1 flex items-center gap-1 ${own[g.index] ? "bg-accent/15 text-accent" : "bg-field text-soft hover:text-ink"}`}>
+                              <button onClick={() => setBlockEdit({ kind: "note", index: g.index, title: g.label, block: g.block })} className={`text-xs rounded-lg px-2.5 py-1 flex items-center gap-1 ${own[g.index] || off.has(g.index) ? "bg-accent/15 text-accent" : "bg-field text-soft hover:text-ink"}`}>
                                 <MessageSquareText size={12} /> Comentario
                               </button>
                             )}
@@ -701,7 +702,8 @@ export function PlanLoadsEditor({ userId, model = "atr", dayGoals = {}, startDat
           routineTitle={routine?.title}
           initial={notesFor(routineNotes, routineId)[blockEdit.index] || ""}
           base={blockEdit.block?.notes || ""}
-          isCustom={!!notesFor(routineNotes, routineId)[blockEdit.index]}
+          isCustom={!!notesFor(routineNotes, routineId)[blockEdit.index] || offNotesFor(routineNotes, routineId).has(blockEdit.index)}
+          isOff={offNotesFor(routineNotes, routineId).has(blockEdit.index)}
           onSave={saveBlockNote}
           onClose={() => setBlockEdit(null)}
         />
