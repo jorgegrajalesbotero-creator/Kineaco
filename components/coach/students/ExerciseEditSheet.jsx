@@ -20,7 +20,9 @@ const num = (v) => {
 // Editar un ejercicio desde "Ver su rutina": peso, series, reps, sustituir, quitar, agregar después
 // (con la opción de crear un ejercicio nuevo). Con planeación se elige si vale solo esta semana o
 // desde esta semana en adelante; sin planeación (semana base) o en un extra, se edita solo para este alumno.
-export function ExerciseEditSheet({ student, routine, exercise, plan, planWeek, dayLabel, onClose, onSaved }) {
+// addOnly = se abrió con "+ Agregar ejercicio" al final de un bloque: solo se elige el ejercicio nuevo,
+// que entra después de `exercise` (el último del bloque).
+export function ExerciseEditSheet({ student, routine, exercise, plan, planWeek, dayLabel, onClose, onSaved, addOnly = false }) {
   useBackClose(true, onClose); // "atrás" del celular cierra esta ventana (no la pantalla de atrás)
   const [unit] = useWeightUnit();
   const part = (routine?.parts || [])[exercise.partIndex ?? 0] || routine;
@@ -38,7 +40,7 @@ export function ExerciseEditSheet({ student, routine, exercise, plan, planWeek, 
   const [sets, setSets] = useState(initial.sets);
   const [reps, setReps] = useState(initial.reps);
   const [scope, setScope] = useState("week"); // week | from
-  const [action, setAction] = useState(null); // null | replace | remove | add
+  const [action, setAction] = useState(addOnly ? "add" : null); // null | replace | remove | add
   const [exId, setExId] = useState(null);
   const [newName, setNewName] = useState("");
   const [newGroup, setNewGroup] = useState("");
@@ -137,8 +139,8 @@ export function ExerciseEditSheet({ student, routine, exercise, plan, planWeek, 
       <div className="bg-deep border border-white/[0.06] w-full max-w-md rounded-t-2xl md:rounded-2xl p-5 pb-[calc(1.25rem+env(safe-area-inset-bottom))] md:pb-5 max-h-[90dvh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
         <div className="flex items-start justify-between gap-3 mb-3">
           <div className="min-w-0">
-            <p className="text-accent text-xs font-semibold flex items-center gap-1.5"><SlidersHorizontal size={14} /> Editar ejercicio</p>
-            <h2 className="text-ink text-lg font-semibold leading-tight mt-1">{exercise.name}</h2>
+            <p className="text-accent text-xs font-semibold flex items-center gap-1.5">{addOnly ? <><Plus size={14} /> Agregar ejercicio</> : <><SlidersHorizontal size={14} /> Editar ejercicio</>}</p>
+            <h2 className="text-ink text-lg font-semibold leading-tight mt-1">{addOnly ? `Después de «${exercise.name}»` : exercise.name}</h2>
             <p className="text-muted text-xs truncate">{part?.title} · {context}</p>
           </div>
           <button onClick={onClose} aria-label="Cerrar" className="text-muted shrink-0"><X size={20} /></button>
@@ -160,7 +162,7 @@ export function ExerciseEditSheet({ student, routine, exercise, plan, planWeek, 
           </p>
         )}
 
-        {action !== "remove" && (
+        {action !== "remove" && !addOnly && (
           <div className="grid grid-cols-3 gap-2 mb-1">
             <label className="block">
               <span className="text-muted text-[11px]">Peso ({unit})</span>
@@ -176,11 +178,11 @@ export function ExerciseEditSheet({ student, routine, exercise, plan, planWeek, 
             </label>
           </div>
         )}
-        {block && !inPlan && action !== "remove" && <p className="text-muted text-[11px] mb-1">Las series de un bloque son las mismas para todos sus ejercicios.</p>}
+        {block && !inPlan && action !== "remove" && !addOnly && <p className="text-muted text-[11px] mb-1">Las series de un bloque son las mismas para todos sus ejercicios.</p>}
 
         <div className="mt-4">
-          <p className="text-soft text-xs mb-1.5">Cambiar el ejercicio</p>
-          {!canChangeExercise ? (
+          {!addOnly && <p className="text-soft text-xs mb-1.5">Cambiar el ejercicio</p>}
+          {addOnly ? null : !canChangeExercise ? (
             <p className="text-muted text-[11px]">Este ejercicio no tiene clave fija: guardá la rutina una vez (Rutinas → editar → guardar) para poder cambiarlo aquí.</p>
           ) : (
             <div className="flex gap-1.5">

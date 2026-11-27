@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { Check, ChevronLeft, ChevronRight, Download, Lock, MessageCircle, MessageSquarePlus, MessageSquareText, Pencil, Play, Plus, SlidersHorizontal, SquarePen, Timer, Trash2, X } from "lucide-react";
+import { Check, ChevronLeft, ChevronRight, Download, Lock, MessageCircle, MessageSquarePlus, MessageSquareText, Pencil, Copy, Play, Plus, SlidersHorizontal, SquarePen, Timer, Trash2, X } from "lucide-react";
 import { blockTypeLabel } from "@/lib/blocks";
 import { currentWeekStartISO } from "@/lib/dates";
 import { appLocale, tr } from "@/lib/i18n";
@@ -42,7 +42,7 @@ const nextTmpId = () => `tmp-${++tmpSeq}`;
 //   el ejercicio o una serie que el alumno todavía no hizo (las ya hechas se corrigen con coachEdit)
 // onDeletePart / onDeleteBlock / onMoveBlock / onRemoveTimer = (solo con preview) el coach quita una rutina del
 //   día, un bloque o un reloj, y arrastra los bloques para cambiarles el orden (solo para este alumno)
-export function RoutineScreen({ routine, userId, pet = null, onClose, onToggle, onProgressChange, preview = false, onEditNote = null, onEditRoutineNote = null, onEditTimer = null, onEditExercise = null, coachEdit = false, liveTick = 0, onDeletePart = null, onDeleteBlock = null, onMoveBlock = null, onRemoveTimer = null, onDeleteRoutineNote = null, onDeleteNote = null }) {
+export function RoutineScreen({ routine, userId, pet = null, onClose, onToggle, onProgressChange, preview = false, onEditNote = null, onEditRoutineNote = null, onEditTimer = null, onEditExercise = null, coachEdit = false, liveTick = 0, onDeletePart = null, onDeleteBlock = null, onMoveBlock = null, onRemoveTimer = null, onDeleteRoutineNote = null, onDeleteNote = null, onAddExercise = null, onAddBlock = null, onDuplicateBlock = null }) {
   const [unit] = useWeightUnit();
   const [detailIndex, setDetailIndex] = useState(null);
   const [playing, setPlaying] = useState(false); // el video solo se carga cuando el alumno toca "Ver video"
@@ -489,6 +489,13 @@ export function RoutineScreen({ routine, userId, pet = null, onClose, onToggle, 
     );
   };
 
+  // "+ Agregar ejercicio" al final de un bloque (o de la lista): entra después del último
+  const addExerciseButton = (lastEx) => (
+    <button onClick={() => onAddExercise(lastEx)} className="w-full border border-dashed border-field-strong text-soft text-xs rounded-xl py-2.5 flex items-center justify-center gap-1.5 hover:text-accent hover:border-accent/50">
+      <Plus size={13} /> Agregar ejercicio
+    </button>
+  );
+
   // Un bloque de la rutina. handleProps = agarradera ⋮⋮ para arrastrarlo (vista del coach)
   const blockSection = (part, b, handleProps) => {
                       const items = routine.exercises.map((ex, i) => ({ ex, i })).filter(({ ex }) => ex.partIndex === part.partIndex && ex.blockId === b.id);
@@ -514,6 +521,11 @@ export function RoutineScreen({ routine, userId, pet = null, onClose, onToggle, 
                               )}
                               {items.length > 0 && <p className="text-muted text-[11px]">{doneCount}/{items.length} {tr("hechos")}</p>}
                             </div>
+                            {preview && onDuplicateBlock && (
+                              <button onClick={() => onDuplicateBlock(part, b)} aria-label="Duplicar bloque" title="Duplicar este bloque (solo para este alumno)" className="self-center shrink-0 w-9 h-9 rounded-lg bg-field text-soft flex items-center justify-center hover:text-accent">
+                                <Copy size={15} />
+                              </button>
+                            )}
                             {preview && onDeleteBlock && (
                               <button onClick={() => onDeleteBlock(part, b)} aria-label="Quitar bloque" title="Quitar este bloque (solo para este alumno)" className="self-center shrink-0 w-9 h-9 rounded-lg bg-field text-soft flex items-center justify-center hover:text-danger hover:bg-danger/15">
                                 <Trash2 size={15} />
@@ -524,6 +536,7 @@ export function RoutineScreen({ routine, userId, pet = null, onClose, onToggle, 
                           {timerChip(part, b)}
                           <div className="space-y-2">
                             {items.map(({ ex, i }) => exerciseRow(ex, i, [ex.rowLabel, formatWeight(ex.targetWeight, unit)].filter(Boolean).join(" · ")))}
+                            {preview && onAddExercise && items.length > 0 && addExerciseButton(items[items.length - 1].ex)}
                           </div>
                         </section>
                       );
@@ -637,8 +650,14 @@ export function RoutineScreen({ routine, userId, pet = null, onClose, onToggle, 
                     {timerChip(part, part)}
                     <div className="space-y-2">
                       {routine.exercises.map((ex, i) => ({ ex, i })).filter(({ ex }) => ex.partIndex === part.partIndex).map(({ ex, i }) => exerciseRow(ex, i, ex.sets))}
+                      {preview && onAddExercise && partItems.length > 0 && addExerciseButton(partItems[partItems.length - 1])}
                     </div>
                   </>
+                )}
+                {preview && onAddBlock && part.blocks?.length > 0 && (
+                  <button onClick={() => onAddBlock(part)} className="w-full mt-4 border border-dashed border-field-strong text-accent text-sm rounded-xl py-3 flex items-center justify-center gap-1.5 hover:bg-accent/10">
+                    <Plus size={15} /> Agregar bloque
+                  </button>
                 )}
               </div>
             );

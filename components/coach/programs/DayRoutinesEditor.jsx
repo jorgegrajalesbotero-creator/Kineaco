@@ -1,6 +1,8 @@
 "use client";
 
-import { X } from "lucide-react";
+import { useState } from "react";
+import { ChevronDown, ChevronRight, X } from "lucide-react";
+import { RoutinePeek } from "@/components/coach/programs/RoutinePeek";
 import { WEEK_DAYS } from "@/lib/dates";
 import { SearchSelect } from "@/components/ui/Search";
 import { DragHandle, SortableList, SortableRow, arrayMove } from "@/components/ui/Sortable";
@@ -17,6 +19,8 @@ export function DayRoutinesEditor({ days, routines, onChangeDay, savingDay, empt
   };
   const btn = "w-7 h-7 rounded-md text-soft flex items-center justify-center disabled:opacity-30 hover:text-accent";
   const { offer, toast } = useUndo();
+  const [open, setOpen] = useState({}); // rutinas desplegadas para ver sus ejercicios (por día y fila)
+  const toggle = (key) => setOpen((o) => ({ ...o, [key]: !o[key] }));
   return (
     <div className="bg-card rounded-xl">
       {toast}
@@ -43,11 +47,19 @@ export function DayRoutinesEditor({ days, routines, onChangeDay, savingDay, empt
             <SortableList ids={ids} onMove={moveTo} className="space-y-1.5 mb-2">
               {list.map((rid, i) => (
                 <SortableRow key={ids[i]} id={ids[i]} disabled={savingDay === day}>{(handle) => (
-                <div className="flex items-center gap-1 bg-field rounded-lg pl-2 pr-1 py-1">
+                <div className="bg-field rounded-lg">
+                <div className="flex items-center gap-1 pl-2 pr-1 py-1">
                   {list.length > 1 && <DragHandle {...handle} onKeyMove={(dir) => moveTo(i, i + dir)} label="Mover rutina (arrastre o use las flechas ↑ ↓)" />}
                   <span className="text-muted text-xs w-5 shrink-0">{i + 1}.</span>
-                  <span className="flex-1 min-w-0 text-ink text-sm truncate">{titleOf(rid)}</span>
+                  {/* Tocar el nombre despliega sus ejercicios, para saber qué rutina se le está poniendo */}
+                  <button type="button" onClick={() => toggle(`${day}|${ids[i]}`)} aria-expanded={!!open[`${day}|${ids[i]}`]} title="Ver los ejercicios de esta rutina"
+                    className="flex-1 min-w-0 flex items-center gap-1 text-left text-ink text-sm hover:text-accent">
+                    {open[`${day}|${ids[i]}`] ? <ChevronDown size={14} className="shrink-0 text-accent" /> : <ChevronRight size={14} className="shrink-0 text-muted" />}
+                    <span className="truncate">{titleOf(rid)}</span>
+                  </button>
                   <button type="button" onClick={() => remove(i)} className={`${btn} hover:text-danger`} aria-label="Quitar"><X size={14} /></button>
+                </div>
+                {open[`${day}|${ids[i]}`] && <RoutinePeek routineId={rid} />}
                 </div>
                 )}</SortableRow>
               ))}
