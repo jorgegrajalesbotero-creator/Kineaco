@@ -7,7 +7,8 @@ import { buildPoints, exerciseOptionsFrom, loadExerciseEntries } from "@/lib/exe
 import { ExerciseProgressView } from "@/components/progress/ExerciseProgressView";
 import { Skeleton } from "@/components/ui/Skeleton";
 import { Select } from "@/components/ui/Select";
-
+
+import { InfoNote } from "@/components/ui/InfoTip";
 // Progreso por ejercicio del alumno: su mejor registro de cada MES
 // (incluye el historial que su coach cargó de antes de la app)
 export function ExerciseProgressSection({ userId }) {
@@ -46,7 +47,7 @@ export function ExerciseProgressSection({ userId }) {
                 <option key={o.key} value={o.key}>{o.name}</option>
               ))}
             </Select>
-            <p className="text-muted text-[11px] mb-4">{tr("Vista por mes: se muestra su mejor registro de cada mes.")}</p>
+            <InfoNote className="mb-4" text={tr("Vista por mes: se muestra su mejor registro de cada mes.")} />
             {points.length < 2 ? (
               <>
                 <ExerciseProgressView points={points} t={tr} locale={appLocale()} />

@@ -7,7 +7,8 @@ import { WEEK_DAYS } from "@/lib/dates";
 import { matchesSearch } from "@/lib/search";
 import { SearchInput } from "@/components/ui/Search";
 import { useBackClose } from "@/lib/backStack";
-
+
+import { InfoNote } from "@/components/ui/InfoTip";
 // Ventana para asignar una rutina a un alumno en uno o varios días de la semana (días fijos)
 export function AssignRoutineModal({ routine, onClose }) {
   useBackClose(true, onClose); // "atrás" del celular cierra esta ventana (no la pantalla de atrás)
@@ -105,7 +106,7 @@ export function AssignRoutineModal({ routine, onClose }) {
                 </button>
               ))}
             </div>
-            <p className="text-muted text-[11px] mb-4">La rutina se suma a ese día (si ya tenía otra, quedan las dos en orden). No reemplaza un plan por semanas que esté activo.</p>
+            <InfoNote className="mb-4" text={"La rutina se suma a ese día (si ya tenía otra, quedan las dos en orden). No reemplaza un plan por semanas que esté activo."} />
 
             <button onClick={assign} disabled={saving} className="w-full bg-accent text-app font-semibold text-sm rounded-2xl py-3 disabled:opacity-60">
               {saving ? "Asignando..." : "Asignar"}

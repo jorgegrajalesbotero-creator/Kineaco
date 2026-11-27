@@ -10,7 +10,8 @@ import { WeightInput } from "@/components/ui/WeightInput";
 import { useWeightUnit } from "@/lib/weightUnits";
 import { editRoutineExercise, ensurePrivateRoutine, saveCustomWeight, savePlanChange, savePlanValues } from "./exerciseEdits";
 import { useBackClose } from "@/lib/backStack";
-
+
+import { InfoNote } from "@/components/ui/InfoTip";
 const num = (v) => {
   if (v === "" || v == null) return null;
   const n = Number(String(v).replace(",", "."));
@@ -153,7 +154,7 @@ export function ExerciseEditSheet({ student, routine, exercise, plan, planWeek, 
               <button type="button" onClick={() => setScope("week")} className={chip(scope === "week")}>Solo esta semana</button>
               <button type="button" onClick={() => setScope("from")} className={chip(scope === "from")}>Desde esta semana en adelante</button>
             </div>
-            {plan.model === "ondulante_diaria" && <p className="text-muted text-[11px] mt-1.5">En la ondulante diaria, el peso, las series y las reps escritos aquí valen para todos los días de la semana.</p>}
+            {plan.model === "ondulante_diaria" && <InfoNote className="mt-1.5" text={"En la ondulante diaria, el peso, las series y las reps escritos aquí valen para todos los días de la semana."} />}
           </div>
         )}
         {!inPlan && (
@@ -178,7 +179,7 @@ export function ExerciseEditSheet({ student, routine, exercise, plan, planWeek, 
             </label>
           </div>
         )}
-        {block && !inPlan && action !== "remove" && !addOnly && <p className="text-muted text-[11px] mb-1">Las series de un bloque son las mismas para todos sus ejercicios.</p>}
+        {block && !inPlan && action !== "remove" && !addOnly && <InfoNote className="mb-1" text={"Las series de un bloque son las mismas para todos sus ejercicios."} />}
 
         <div className="mt-4">
           {!addOnly && <p className="text-soft text-xs mb-1.5">Cambiar el ejercicio</p>}
@@ -218,7 +219,7 @@ export function ExerciseEditSheet({ student, routine, exercise, plan, planWeek, 
           </button>
           <button onClick={onClose} className="bg-field text-soft text-sm rounded-xl px-4 py-2.5">Cancelar</button>
         </div>
-        {inPlan && <p className="text-muted text-[11px] mt-3">Se guarda en su planeación (la rutina original no cambia). También lo podés ver y ajustar en Planeación → Cargas y ejercicios.</p>}
+        {inPlan && <InfoNote className="mt-3" text={"Se guarda en su planeación (la rutina original no cambia). También lo podés ver y ajustar en Planeación → Cargas y ejercicios."} />}
       </div>
     </div>
   );

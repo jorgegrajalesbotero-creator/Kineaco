@@ -7,7 +7,8 @@ import { BLOCK_TYPES, blockTypeLabel } from "@/lib/blocks";
 import { cleanInt } from "@/lib/numbers";
 import { SearchSelect } from "@/components/ui/Search";
 import { useBackClose } from "@/lib/backStack";
-
+
+import { InfoNote } from "@/components/ui/InfoTip";
 const field = "w-full bg-field text-ink text-sm rounded-lg px-3 py-2 outline-none focus:ring-1 focus:ring-accent";
 const sheet = "bg-deep border border-white/[0.06] w-full max-w-md rounded-t-2xl md:rounded-2xl p-5 pb-[calc(1.25rem+env(safe-area-inset-bottom))] md:pb-5 max-h-[90dvh] overflow-y-auto";
 
@@ -101,7 +102,7 @@ export function CopyDaySheet({ dayLabel, targets, onCopy, onClose }) {
         <div className="flex items-start justify-between gap-3 mb-3">
           <div className="min-w-0">
             <p className="text-accent text-xs font-semibold flex items-center gap-1.5"><Copy size={14} /> Copiar el {dayLabel.toLowerCase()}</p>
-            <p className="text-muted text-xs mt-1">Se copian sus rutinas (no los extras), solo para este alumno.</p>
+            <InfoNote className="mt-1" text={"Se copian sus rutinas (no los extras), solo para este alumno."} />
           </div>
           <button onClick={onClose} aria-label="Cerrar" className="text-muted shrink-0"><X size={20} /></button>
         </div>

@@ -5,7 +5,8 @@ import { AlertTriangle, Check, Trash2 } from "lucide-react";
 import { deleteAccount, getAccount, updateAccount } from "@/lib/account";
 import { Skeleton } from "@/components/ui/Skeleton";
 import { PanelLayout } from "./PanelLayout";
-
+
+import { InfoNote } from "@/components/ui/InfoTip";
 const field = "w-full bg-field text-ink text-sm rounded-lg px-3 py-2.5 outline-none focus:ring-1 focus:ring-accent";
 
 // Borra la cuenta de un alumno con TODO lo suyo (rutinas asignadas, progreso, fotos, mensajes...).
@@ -91,7 +92,7 @@ export function AccountPanel({ student, onClose, onChanged, onDeleted }) {
             <div>
               <p className="text-muted text-xs mb-1">Correo (con el que inicia sesión)</p>
               <input type="email" value={form.email} onChange={set("email")} className={field} />
-              <p className="text-muted text-[11px] mt-1">El cambio queda activo de una vez, sin correo de confirmación. Su contraseña no cambia.</p>
+              <InfoNote className="mt-1" text={"El cambio queda activo de una vez, sin correo de confirmación. Su contraseña no cambia."} />
             </div>
           </div>
           {error && <p className="text-danger text-xs bg-danger/10 rounded-lg px-3 py-2 mb-3">{error}</p>}

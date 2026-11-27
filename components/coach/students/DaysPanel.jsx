@@ -11,7 +11,8 @@ import { PanelLayout } from "./PanelLayout";
 import { UnitToggle } from "@/components/ui/WeightInput";
 import { formatWeight, kgToText, toKg, useWeightUnit } from "@/lib/weightUnits";
 import { currentOrNextPlan, planLastDay, planStart, planWeekOf } from "@/lib/trainingPlan";
-
+
+import { InfoNote } from "@/components/ui/InfoTip";
 // Rutinas asignadas por día + pesos personalizados del alumno
 export function DaysPanel({ student, onClose, onChanged, onOpenPanel }) {
   const [unit] = useWeightUnit();
@@ -108,7 +109,7 @@ export function DaysPanel({ student, onClose, onChanged, onOpenPanel }) {
           {planWeekOf(activePlan, new Date()) ? "Tiene un plan activo" : "Tiene un plan que empieza pronto"} ({planStart(activePlan).toLocaleDateString("es-CO", { day: "numeric", month: "short" })} – {planLastDay(activePlan).toLocaleDateString("es-CO", { day: "numeric", month: "short" })}). Mientras dure el plan, el alumno ve las rutinas del plan en vez de estos días fijos.
         </p>
       )}
-      <p className="text-muted text-xs mb-3">Puede poner varias rutinas el mismo día; el alumno las ve juntas, en este orden.</p>
+      <InfoNote className="mb-3" text={"Puede poner varias rutinas el mismo día; el alumno las ve juntas, en este orden."} />
       <DayRoutinesEditor days={dayAssignments} routines={routines} savingDay={savingDay} emptyLabel="Descanso" onChangeDay={setDayRoutines} />
 
       {studentExercises.length > 0 && (
@@ -117,7 +118,7 @@ export function DaysPanel({ student, onClose, onChanged, onOpenPanel }) {
             <h3 className="text-ink text-sm font-medium">Pesos personalizados</h3>
             <UnitToggle />
           </div>
-          <p className="text-muted text-xs mb-3">Opcional: pisa el peso sugerido de la rutina solo para este alumno. Dejalo vacío para usar el peso general.</p>
+          <InfoNote className="mb-3" text={"Opcional: pisa el peso sugerido de la rutina solo para este alumno. Dejalo vacío para usar el peso general."} />
           {studentExercises.length > 5 && (
             <SearchInput value={weightSearch} onChange={setWeightSearch} placeholder="Buscar ejercicio..." className="mb-2" />
           )}
