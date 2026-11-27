@@ -6,7 +6,7 @@ import { clampField, formatClock, parseClockInput, stepFor } from "@/lib/clock";
 
 const SIZES = {
   lg: { box: "bg-card rounded-xl px-3 py-2 gap-3", label: "text-soft text-sm", btn: "w-10 h-10 rounded-lg", icon: 16, value: "text-ink text-base font-semibold w-20 h-10 rounded-lg" },
-  sm: { box: "bg-card rounded-lg px-2 py-1.5 gap-1.5", label: "text-soft text-xs", btn: "w-8 h-8 rounded-md", icon: 13, value: "text-ink text-sm font-semibold w-16 h-8 rounded-md" },
+  sm: { box: "bg-card rounded-lg px-2 py-1.5 gap-1", label: "text-soft text-xs", btn: "w-8 h-8 rounded-md", icon: 13, value: "text-ink text-sm font-semibold w-16 h-8 rounded-md" },
 };
 
 const shown = (field, v) => (field.unit === "time" ? formatClock(v) : field.unit === "minutes" ? `${v} min` : String(v));
@@ -97,8 +97,11 @@ export function ClockField({ field, value, onChange, t = (x) => x, size = "lg" }
 
   const btnCls = `${sz.btn} bg-field text-ink flex items-center justify-center disabled:opacity-40 select-none touch-none`;
   return (
-    <div className={`${sz.box} flex items-center`}>
-      <span className={`${sz.label} flex-1 min-w-0`}>{t(field.label)}</span>
+    // En "sm" (columnas angostas) el nombre va arriba y − número + debajo, para que nunca se monten.
+    // En "lg" (una sola columna, reloj del alumno) va en la misma línea, y el nombre largo pasa a 2 líneas.
+    <div className={`${sz.box} flex min-w-0 ${size === "sm" ? "flex-col" : "items-center"}`}>
+      <span className={`${sz.label} leading-tight break-words ${size === "sm" ? "" : "flex-1 min-w-0"}`}>{t(field.label)}</span>
+      <div className={`flex items-center gap-1.5 ${size === "sm" ? "justify-between" : "shrink-0"}`}>
       <HoldButton onStep={onStepDown} disabled={value <= field.min} label={`${t("Menos")} ${t(field.label)}`} className={btnCls}>
         <Minus size={sz.icon} />
       </HoldButton>
@@ -131,6 +134,7 @@ export function ClockField({ field, value, onChange, t = (x) => x, size = "lg" }
       <HoldButton onStep={onStepUp} disabled={value >= field.max} label={`${t("Más")} ${t(field.label)}`} className={btnCls}>
         <Plus size={sz.icon} />
       </HoldButton>
+      </div>
     </div>
   );
 }

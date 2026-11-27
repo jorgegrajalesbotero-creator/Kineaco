@@ -31,7 +31,7 @@ export function TimerSettings({ value, onChange, compact = false }) {
         ))}
       </div>
       {t && CLOCK_FIELDS[mode].length > 0 && (
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+        <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
           {visibleFields(mode, t).map((f) => (
             <ClockField key={`${mode}-${f.key}`} field={f} value={t[f.key]} onChange={(v) => setField(f, v)} size="sm" />
           ))}

@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { useScrollMemory } from "@/lib/useScrollMemory";
 import { useBackClose } from "@/lib/backStack";
 import { rememberNav } from "@/lib/navMemory";
-import Link from "next/link";
+import { ReloadLink } from "@/components/ui/ReloadLink";
 import { Activity, ArrowLeft, Calendar, Camera, ChevronDown, ChevronRight, ClipboardCheck, Download, Dumbbell, Eye, TrendingUp, Lock, MessageCircle, PlusCircle, Ruler, UserCog, Utensils } from "lucide-react";
 import { supabase } from "@/lib/supabaseClient";
 import { buildReportPdf } from "@/lib/planPdf";
@@ -151,10 +151,10 @@ export function StudentDetail({ student, onClose, onChanged, initialPanel = null
       {/* 3. Accesos rápidos */}
       <div className="grid grid-cols-2 gap-2.5 mb-6">
         {student.isSelf ? (
-          <Link href="/" className={tile}>
+          <ReloadLink href="/" className={tile}>
             <span className="w-9 h-9 rounded-xl bg-accent/15 flex items-center justify-center"><Dumbbell size={17} className="text-accent" /></span>
             <span className="text-ink text-sm font-medium">Entrenar (mi vista)</span>
-          </Link>
+          </ReloadLink>
         ) : (
           <button onClick={() => setPanel("messages")} className={tile}>
             <span className="w-9 h-9 rounded-xl bg-accent/15 flex items-center justify-center"><MessageCircle size={17} className="text-accent" /></span>
