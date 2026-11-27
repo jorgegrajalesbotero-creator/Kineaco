@@ -9,7 +9,7 @@ import { PET_STATES } from "@/lib/chameleon";
 import { Chameleon } from "@/components/ui/Chameleon";
 import { Skeleton } from "@/components/ui/Skeleton";
 import { HIGHLIGHT_LABEL, PET_LEVELS, REACTIONS, challengePct, createPost, deletePost, loadChallenges, loadFeed, loadMembership, loadMyPet, loadPosts, react, setHighlight, setMembership, todayExercises } from "@/lib/community";
-import { PET_ITEMS, cleanOutfit, progressText } from "@/lib/petItems";
+import { PET_ITEMS, cleanOutfit, inSeason, progressText } from "@/lib/petItems";
 import { PetCloset } from "@/components/student/PetCloset";
 import { setMyOutfit } from "@/lib/myPet";
 import { ChallengeManager } from "@/components/coach/ChallengeManager";
@@ -190,6 +190,7 @@ function CommunityBody({ userId, coachMode = false, isStaff = false, header = nu
                 <div key={m.user_id} className="flex-1 min-w-0 text-center">
                   <Chameleon mood={m.pet_mood || 4} level={m.level || 0} outfit={outfitOf(m)} size={pos === 1 ? 92 : 74} animate={false} className="mx-auto" />
                   <p className="text-ink text-xs font-medium truncate mt-1">{nameOf(m)}</p>
+                  {m.pet_name && <p className="text-accent text-[10px] truncate">🦎 {m.pet_name}</p>}
                   <p className="text-muted text-[10px] mb-1">{tr("{p0} días esta semana", { p0: m.week_days })}</p>
                   <div className={`${h} ${color} rounded-t-xl flex items-start justify-center pt-1 text-sm font-semibold`}>{pos}</div>
                 </div>
@@ -301,7 +302,7 @@ function MyPetCard({ m, pet, outfit, name, onDress, todayList, onHighlight }) {
   const sleeping = !mood && !m.trained_today;
   const unlocked = new Set(pet?.unlocked || []);
   // Lo más cerca de desbloquear
-  const next = pet ? PET_ITEMS.filter((i) => i.metric && !unlocked.has(i.key))
+  const next = pet ? PET_ITEMS.filter((i) => i.metric && !unlocked.has(i.key) && inSeason(i))
     .map((i) => ({ i, pct: Math.min(1, (Number(pet[i.metric]) || 0) / i.need) }))
     .sort((a, b) => b.pct - a.pct)[0] : null;
   return (
@@ -370,7 +371,7 @@ function TerrariumCard({ m, name, outfit, onReact }) {
           <p className="text-ink text-xs font-semibold leading-tight line-clamp-2 min-w-0">{name}</p>
         </div>
         <p className="text-muted text-[11px] mt-1 truncate">
-          {m.pet_name ? `${m.pet_name} · ` : ""}{sleeping ? tr("Descansando") : tr(PET_STATES[mood || 3].name)}
+          {m.pet_name ? `🦎 ${m.pet_name} · ` : ""}{sleeping ? tr("Descansando") : tr(PET_STATES[mood || 3].name)}
         </p>
         <p className={`text-[11px] mt-0.5 ${m.trained_today ? "text-accent" : "text-muted"}`}>{m.trained_today ? tr("Entrenó hoy") : tr("Hoy no ha entrenado")}</p>
         {hl && (

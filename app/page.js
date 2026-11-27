@@ -33,6 +33,7 @@ import { CalendarScreen } from "@/components/student/CalendarScreen";
 import { ClockHost } from "@/components/student/ClockIsland";
 import { useBackClose, useBackTabs } from "@/lib/backStack";
 import { MessagesBubble } from "@/components/student/MessagesBubble";
+import { Skeleton } from "@/components/ui/Skeleton";
 import { loadMyPet } from "@/lib/community";
 import { setMyOutfit, startMyOutfit, stopMyOutfit } from "@/lib/myPet";
 import { recallNav, rememberNav } from "@/lib/navMemory";
@@ -59,6 +60,7 @@ export default function App() {
   useEffect(() => { rememberNav("student:tab", tab); }, [tab]);
   const [showRoutine, setShowRoutine] = useState(false);
   const [fullName, setFullName] = useState("");
+  const [profileReady, setProfileReady] = useState(false); // ya llegaron nombre, correo y foto
   const [routine, setRoutine] = useState(null);
   const [loadingRoutine, setLoadingRoutine] = useState(true);
 
@@ -472,6 +474,7 @@ export default function App() {
       }
       setAvatarUrl(await signedAvatarUrl(profile?.avatar_url));
       setUserEmail(user?.email || "");
+      setProfileReady(true);
 
       let healthOk = true;
       if (!isStaff) {
@@ -705,7 +708,10 @@ export default function App() {
   } else if (tab === "progress") {
     content = <ProgressScreen healthConsent={healthConsent} onOpenCheckin={() => setShowCheckin(true)} onOpenMeasure={() => setShowMeasure(true)} streak={streak} bestStreak={bestStreak} totalCompleted={totalCompleted} weekStats={weekStats} recentActivity={recentActivity} bodyWeightLogs={bodyWeightLogs} onAddWeight={addBodyWeight} onUpdateWeight={updateBodyWeight} onDeleteWeight={deleteBodyWeight} userId={userId} fullName={fullName} />;
   } else {
-    content = tab === "profile" ? (
+    content = tab === "profile" && !profileReady ? (
+      // Mientras llegan sus datos (por ejemplo, al volver desde el panel del coach) no se muestra vacío
+      <div className="flex-1 px-5 pt-6"><Skeleton rows={4} /></div>
+    ) : tab === "profile" ? (
       <ProfileScreen
         healthConsent={healthConsent}
         onHealthChange={setHealthConsent}

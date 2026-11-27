@@ -4,6 +4,7 @@ import { useState } from "react";
 import { ChevronRight, ShieldCheck, Trash2 } from "lucide-react";
 import { supabase } from "@/lib/supabaseClient";
 import { tr } from "@/lib/i18n";
+import { removeAllAvatars } from "@/lib/avatars";
 
 // Perfil → Privacidad: documentos, autorización de datos de salud y eliminar la cuenta
 export function PrivacySection({ userId, healthConsent, onHealthChange }) {
@@ -44,7 +45,7 @@ export function PrivacySection({ userId, healthConsent, onHealthChange }) {
     const { data: photos } = await supabase.from("progress_photos").select("storage_path").eq("user_id", userId);
     const paths = (photos || []).map((p) => p.storage_path).filter(Boolean);
     for (let i = 0; i < paths.length; i += 100) await supabase.storage.from("progress-photos").remove(paths.slice(i, i + 100));
-    await supabase.storage.from("avatars").remove([`${userId}/avatar.jpg`]);
+    await removeAllAvatars(userId);
     // 2) Datos y cuenta
     const { error: e } = await supabase.rpc("delete_my_account");
     if (e) {

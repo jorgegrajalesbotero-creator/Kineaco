@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { Camera, Check, User } from "lucide-react";
 import { shrinkAvatar } from "@/lib/images";
 import { supabase } from "@/lib/supabaseClient";
-import { signedAvatarUrl } from "@/lib/avatars";
+import { signedAvatarUrl, uploadAvatar } from "@/lib/avatars";
 import { updateAccount } from "@/lib/account";
 import { Skeleton } from "@/components/ui/Skeleton";
 import { ChangePassword } from "@/components/ui/ChangePassword";
@@ -56,24 +56,13 @@ export function ProfileView({ onProfileUpdate }) {
       setUploading(false);
       return;
     }
-    const path = `${userId}/avatar.jpg`;
-
-    const { error: uploadError } = await supabase.storage
-      .from("avatars")
-      .upload(path, blob, { upsert: true, contentType: "image/jpeg" });
-
-    if (uploadError) {
-      alert("No se pudo subir la foto: ");
+    // Cada foto con nombre propio: así nunca vuelve a aparecer la anterior (ver lib/avatars.js)
+    const { error, display } = await uploadAvatar(userId, blob);
+    if (error) {
+      alert("No se pudo guardar la foto. Revisá la conexión e intentá de nuevo.");
       setUploading(false);
       return;
     }
-
-    // Guardamos la RUTA (no una URL pública) porque el bucket es privado.
-    await supabase.from("profiles").update({ avatar_url: path }).eq("id", userId);
-
-    // Para mostrarla de inmediato, firmamos la URL y rompemos la caché del navegador.
-    const signed = await signedAvatarUrl(path);
-    const display = signed ? `${signed}&t=${Date.now()}` : signed;
 
     setForm((f) => ({ ...f, avatarUrl: display }));
     setUploading(false);
