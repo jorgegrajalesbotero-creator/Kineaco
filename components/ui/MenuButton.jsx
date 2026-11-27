@@ -9,6 +9,7 @@ import { MoreHorizontal } from "lucide-react";
 export function MenuButton({ actions, label = "Más opciones", className = "" }) {
   const list = (actions || []).filter(Boolean);
   const btn = useRef(null);
+  const menu = useRef(null);
   const [pos, setPos] = useState(null);
   const open = (e) => {
     e.stopPropagation();
@@ -22,7 +23,8 @@ export function MenuButton({ actions, label = "Más opciones", className = "" })
   };
   useEffect(() => {
     if (!pos) return undefined;
-    const close = (e) => { if (!btn.current?.contains(e.target)) setPos(null); };
+    // Tocar fuera cierra; tocar DENTRO del menú no (si no, se cerraba antes de que la opción se ejecutara)
+    const close = (e) => { if (!btn.current?.contains(e.target) && !menu.current?.contains(e.target)) setPos(null); };
     const onKey = (e) => { if (e.key === "Escape") { e.preventDefault(); setPos(null); } };
     const onScroll = () => setPos(null);
     document.addEventListener("pointerdown", close, true);
@@ -43,7 +45,7 @@ export function MenuButton({ actions, label = "Más opciones", className = "" })
         <MoreHorizontal size={16} />
       </button>
       {pos && typeof document !== "undefined" && createPortal(
-        <div role="menu" onPointerDown={(e) => e.stopPropagation()} style={{ position: "fixed", left: pos.left, top: pos.top, width: pos.width }}
+        <div ref={menu} role="menu" style={{ position: "fixed", left: pos.left, top: pos.top, width: pos.width }}
           className="z-[460] p-1.5 bg-panel border border-white/[0.08] rounded-xl shadow-[0_18px_40px_-12px_rgba(0,0,0,0.85)] animate-fade-in">
           {list.map((a) => (
             <button key={a.label} type="button" role="menuitem" onClick={() => run(a)}

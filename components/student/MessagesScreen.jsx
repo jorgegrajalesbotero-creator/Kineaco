@@ -5,7 +5,8 @@ import { fetchAllRows } from "@/lib/fetchAll";
 import { appLocale, tr } from "@/lib/i18n";
 import { supabase } from "@/lib/supabaseClient";
 import { Skeleton } from "@/components/ui/Skeleton";
-import { X } from "lucide-react";
+import { Check, CheckCheck, X } from "lucide-react";
+import { chatWhen, firstName } from "@/lib/chatMeta";
 
 // onClose: cuando se abre como ventana (burbuja flotante) muestra la X para cerrarla
 export function MessagesScreen({ userId, onMessagesRead, onClose, initialText = "" }) {
@@ -14,6 +15,7 @@ export function MessagesScreen({ userId, onMessagesRead, onClose, initialText = 
   const [loading, setLoading] = useState(true);
   const [newMessage, setNewMessage] = useState(initialText);
   const [sending, setSending] = useState(false);
+  const [names, setNames] = useState({}); // nombre de quien escribe del lado del coach (si se puede leer)
 
   const topics = [
     { key: "general", get label() { return tr("General"); } },
@@ -27,14 +29,34 @@ export function MessagesScreen({ userId, onMessagesRead, onClose, initialText = 
     const data = await fetchAllRows(() =>
       supabase
         .from("messages")
-        .select("id, sender_id, topic, content, created_at")
+        .select("id, sender_id, topic, content, created_at, read_by_coach")
         .eq("user_id", userId)
         .eq("topic", t)
         .order("created_at", { ascending: true })
     );
     setMessages(data);
     setLoading(false);
+    // Nombre de su coach en cada mensaje (si no se puede leer, dice "Su coach")
+    const ids = [...new Set(data.map((m) => m.sender_id).filter((id) => id && id !== userId))].filter((id) => !(id in names));
+    if (ids.length) {
+      const { data: ps } = await supabase.from("profiles").select("id, full_name").in("id", ids);
+      setNames((n) => ({ ...n, ...Object.fromEntries((ps || []).map((p) => [p.id, firstName(p.full_name)])) }));
+    }
   };
+
+  // Mientras está abierto, revisa cada 15 s si llegó algo nuevo o si su coach ya leyó
+  useEffect(() => {
+    if (!userId) return undefined;
+    const timer = setInterval(async () => {
+      if (document.visibilityState !== "visible") return;
+      const data = await fetchAllRows(() =>
+        supabase.from("messages").select("id, sender_id, topic, content, created_at, read_by_coach").eq("user_id", userId).eq("topic", topic).order("created_at", { ascending: true })
+      );
+      setMessages(data);
+      await supabase.from("messages").update({ read_by_alumno: true }).eq("user_id", userId).eq("read_by_alumno", false);
+    }, 15000);
+    return () => clearInterval(timer);
+  }, [userId, topic]);
 
   useEffect(() => {
     if (!userId) return;
@@ -103,10 +125,14 @@ export function MessagesScreen({ userId, onMessagesRead, onClose, initialText = 
           messages.map((m) => {
             const fromMe = m.sender_id === userId;
             return (
-              <div key={m.id} className={`max-w-[75%] rounded-xl px-3 py-2 text-sm ${fromMe ? "self-end bg-accent text-app" : "self-start bg-field text-ink"}`}>
-                {m.content}
-                <p className={`text-[10px] mt-1 ${fromMe ? "text-app/60" : "text-muted"}`}>
-                  {new Date(m.created_at).toLocaleString(appLocale(), { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" })}
+              <div key={m.id} className={`max-w-[80%] rounded-xl px-3 py-2 text-sm ${fromMe ? "self-end bg-accent text-app" : "self-start bg-field text-ink"}`}>
+                {!fromMe && <p className="text-accent text-[11px] font-semibold mb-0.5">{names[m.sender_id] || tr("Su coach")}</p>}
+                <span className="whitespace-pre-wrap break-words">{m.content}</span>
+                <p className={`text-[10px] mt-1 flex items-center justify-end gap-1 ${fromMe ? "text-app/70" : "text-muted"}`}>
+                  {chatWhen(m.created_at, { locale: appLocale(), today: tr("Hoy"), yesterday: tr("Ayer") })}
+                  {fromMe && (m.read_by_coach
+                    ? <span className="inline-flex items-center gap-0.5 font-semibold"><CheckCheck size={12} /> {tr("Visto")}</span>
+                    : <span className="inline-flex items-center gap-0.5"><Check size={12} /> {tr("Enviado")}</span>)}
                 </p>
               </div>
             );
