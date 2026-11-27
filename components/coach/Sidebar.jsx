@@ -1,6 +1,6 @@
 "use client";
 
-import Link from "next/link";
+import { ReloadLink } from "@/components/ui/ReloadLink";
 import { BrandMark } from "@/components/ui/BrandMark";
 import { Calendar, ClipboardList, Dumbbell, HeartHandshake, LayoutDashboard, Megaphone, MessageCircle, Search, User, UserCog, Users } from "lucide-react";
 
@@ -74,9 +74,9 @@ export function Sidebar({ active, onSelect, email, fullName, onLogout, bell, isA
         ))}
       </nav>
       <div className="px-3 pb-[max(1rem,env(safe-area-inset-bottom))] space-y-1">
-        <Link href="/" className="block w-full text-left px-3 py-2.5 rounded-lg text-sm text-accent bg-card hover:bg-field">
+        <ReloadLink href="/" className="block w-full text-left px-3 py-2.5 rounded-lg text-sm text-accent bg-card hover:bg-field">
           Mi entrenamiento (vista de alumno)
-        </Link>
+        </ReloadLink>
         <button onClick={onLogout} className="w-full text-left px-3 py-2.5 rounded-lg text-sm text-danger hover:bg-card/60">
           Cerrar sesión
         </button>
