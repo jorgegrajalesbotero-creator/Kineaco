@@ -15,7 +15,8 @@ import { defaultBlockTitle, listToBlocks, loadRoutineContent, tmpKey, writeRouti
 import { SearchSelect } from "@/components/ui/Search";
 import { Skeleton } from "@/components/ui/Skeleton";
 import { PanelLayout } from "./PanelLayout";
-
+
+import { InfoNote } from "@/components/ui/InfoTip";
 const DAY_SHORT = ["L", "M", "X", "J", "V", "S", "D"];
 const QUICK_TYPES = [
   ["remate", "Remate"],
@@ -192,7 +193,7 @@ export function ExtrasPanel({ student, onClose, onOpenPanel }) {
   if (form) {
     return (
       <PanelLayout title={form.id ? "Editar extra" : "Nuevo extra"} subtitle={student.isSelf ? "Mi entrenamiento" : student.name} onClose={() => setForm(null)} width="max-w-2xl">
-        <p className="text-muted text-xs mb-4">Se suma al final del día del alumno. Su planeación (fases, cargas, series y ejercicios del ATR) no cambia.</p>
+        <InfoNote className="mb-4" text={"Se suma al final del día del alumno. Su planeación (fases, cargas, series y ejercicios del ATR) no cambia."} />
 
         <div className="flex gap-1 bg-card rounded-xl p-1 mb-4">
           <button type="button" onClick={() => setForm((f) => ({ ...f, source: "quick", blocks: f.blocks.length ? f.blocks : [newQuickBlock("remate")] }))} className={tab(form.source === "quick")}><Wrench size={14} /> Armarlo aquí</button>
@@ -208,7 +209,7 @@ export function ExtrasPanel({ student, onClose, onOpenPanel }) {
               onChange={(id) => setForm((f) => ({ ...f, routineId: id }))}
               placeholder="Buscar rutina..."
             />
-            <p className="text-muted text-[11px] mt-1.5">Se usa tal como está en la biblioteca (con su reloj programado, si tiene). Las cargas del ATR no se aplican.</p>
+            <InfoNote className="mt-1.5" text={"Se usa tal como está en la biblioteca (con su reloj programado, si tiene). Las cargas del ATR no se aplican."} />
             {form.routineId && (
               <button type="button" onClick={() => copyFromLibrary(form.routineId)} disabled={copying} className="mt-3 w-full flex items-center justify-center gap-1.5 bg-card border border-accent/30 text-accent text-sm font-medium rounded-xl py-2.5 disabled:opacity-60">
                 <Pencil size={14} /> {copying ? "Trayendo..." : "Editarla solo para este alumno"}
@@ -226,7 +227,7 @@ export function ExtrasPanel({ student, onClose, onOpenPanel }) {
               disabled={copying}
               placeholder={copying ? "Trayendo..." : "Buscar en la biblioteca para copiar y editar..."}
             />
-            <p className="text-muted text-[11px] mt-1.5 mb-4">Se copia solo para este alumno: podés cambiar ejercicios, series, reps y reloj sin tocar la de la biblioteca.</p>
+            <InfoNote className="mt-1.5 mb-4" text={"Se copia solo para este alumno: podés cambiar ejercicios, series, reps y reloj sin tocar la de la biblioteca."} />
             <p className="text-soft text-xs mb-1.5">Nombre (lo ve el alumno)</p>
             <input value={form.title} onChange={(e) => setForm((f) => ({ ...f, title: e.target.value }))} placeholder="Ej: Remate de core" className={`${input} w-full mb-4`} />
             <BlockEditor blocks={form.blocks} setBlocks={(fn) => setForm((f) => ({ ...f, blocks: typeof fn === "function" ? fn(f.blocks) : fn }))} catalog={catalog} onCreateExercise={createExercise} />
@@ -271,7 +272,7 @@ export function ExtrasPanel({ student, onClose, onOpenPanel }) {
 
   return (
     <PanelLayout title="Extras" subtitle={student.isSelf ? "Mi entrenamiento" : student.name} onClose={onClose} width="max-w-2xl">
-      <p className="text-muted text-xs mb-4">Remates, intermitentes o entrenos adicionales que se suman a su día, en los días y fechas que elijas. No cambian su planeación (ATR): ni semanas, ni cargas, ni ejercicios.</p>
+      <InfoNote className="mb-4" text={"Remates, intermitentes o entrenos adicionales que se suman a su día, en los días y fechas que elijas. No cambian su planeación (ATR): ni semanas, ni cargas, ni ejercicios."} />
       {onOpenPanel && (
         <button onClick={() => onOpenPanel("routine")} className="w-full mb-4 bg-card border border-accent/30 text-accent text-sm font-medium rounded-xl py-2.5 flex items-center justify-center gap-1.5">
           <Eye size={15} /> Ver y editar como el alumno (peso, series, ejercicios, observaciones, comentarios y reloj)

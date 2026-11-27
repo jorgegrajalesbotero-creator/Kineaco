@@ -4,7 +4,8 @@ import { useState } from "react";
 import { MessageSquareText, Trash2, X } from "lucide-react";
 import { NOTE_MAX } from "@/lib/exerciseNotes";
 import { useBackClose } from "@/lib/backStack";
-
+
+import { InfoNote } from "@/components/ui/InfoTip";
 // Ventana para escribir la observación de un ejercicio para UN alumno.
 // onSave(texto) guarda (texto vacío = borrar) y devuelve true si salió bien.
 export function ExerciseNoteEditor({ exerciseName, routineTitle, initial = "", onSave, onClose }) {
@@ -40,7 +41,7 @@ export function ExerciseNoteEditor({ exerciseName, routineTitle, initial = "", o
           className="w-full mt-3 bg-field text-ink text-[15px] rounded-xl px-3.5 py-3 outline-none focus:ring-1 focus:ring-accent resize-y"
         />
         <div className="flex items-center justify-between mt-1 mb-3">
-          <p className="text-muted text-[11px]">Solo la ve este alumno, vale todas las semanas y no cambia la rutina ni la planeación.</p>
+          <InfoNote text={"Solo la ve este alumno, vale todas las semanas y no cambia la rutina ni la planeación."} />
           <span className="text-muted text-[11px] tabular-nums shrink-0 ml-2">{text.length}/{NOTE_MAX}</span>
         </div>
         <div className="flex gap-2">

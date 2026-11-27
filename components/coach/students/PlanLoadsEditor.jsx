@@ -21,7 +21,8 @@ import { Select } from "@/components/ui/Select";
 import { SearchSelect } from "@/components/ui/Search";
 import { UnitToggle, WeightInput } from "@/components/ui/WeightInput";
 import { fromKg, roundingStep, useWeightUnit } from "@/lib/weightUnits";
-
+
+import { InfoNote } from "@/components/ui/InfoTip";
 const CELL_W = 76;
 const KG_TYPES = ["rm", "work"];
 // Forma de progresar de un ejercicio según sus bases
@@ -386,7 +387,7 @@ export function PlanLoadsEditor({ userId, model = "atr", dayGoals = {}, startDat
             )}
           </div>
         ))}
-        {repsOnly && <p className="text-muted text-[11px] mb-2">Sin peso: toma las series y reps de cada fase. Podés cambiar cualquier semana.</p>}
+        {repsOnly && <InfoNote className="mb-2" text={"Sin peso: toma las series y reps de cada fase. Podés cambiar cualquier semana."} />}
         {mode === "double" && special && (
           <div className="mb-2">
             <div className="flex flex-wrap items-center gap-2">
@@ -400,7 +401,7 @@ export function PlanLoadsEditor({ userId, model = "atr", dayGoals = {}, startDat
               <input inputMode="decimal" value={special.increment ?? ""} onChange={(e) => updateLoad(special, { increment: cleanDecimal(e.target.value, 2).slice(0, 5) })} placeholder={fmtNum(Number(rounding) || 2.5)} aria-label="Incremento en kg" className={`${field} w-16 py-1.5 text-center`} />
               <span className="text-muted text-xs">kg</span>
             </div>
-            <p className="text-muted text-[11px] mt-1">Cuando el alumno hace el tope del rango en todas las series con ese peso, la siguiente sesión sube solo. Las semanas que ya pasaron muestran lo que logró.</p>
+            <InfoNote className="mt-1" text={"Cuando el alumno hace el tope del rango en todas las series con ese peso, la siguiente sesión sube solo. Las semanas que ya pasaron muestran lo que logró."} />
           </div>
         )}
         {mode === "rir" && special && (
@@ -410,7 +411,7 @@ export function PlanLoadsEditor({ userId, model = "atr", dayGoals = {}, startDat
               <WeightInput toggle={false} valueKg={special.weight_kg} onChangeKg={(kg) => updateLoad(special, { weight_kg: kg })} placeholder={unit} wrapperClassName="w-20" className={`${field} w-full py-1.5`} />
               <span className="text-muted text-xs">{unit}</span>
             </div>
-            <p className="text-muted text-[11px] mt-1">Sin RM: el alumno elige el peso que le deja el RIR de la semana. Desde su primer registro, la app le sugiere el peso con lo que hizo la última vez (peso × reps + RIR).</p>
+            <InfoNote className="mt-1" text={"Sin RM: el alumno elige el peso que le deja el RIR de la semana. Desde su primer registro, la app le sugiere el peso con lo que hizo la última vez (peso × reps + RIR)."} />
           </div>
         )}
 
@@ -466,7 +467,7 @@ export function PlanLoadsEditor({ userId, model = "atr", dayGoals = {}, startDat
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
           <input autoFocus value={form.newName || ""} maxLength={80} onChange={(e) => setForm((f) => ({ ...f, newName: e.target.value }))} placeholder="Nombre del ejercicio nuevo" className={`${field} sm:col-span-2`} />
           <input value={form.newGroup || ""} maxLength={40} onChange={(e) => setForm((f) => ({ ...f, newGroup: e.target.value }))} placeholder="Grupo muscular (opcional)" className={field} />
-          <p className="text-muted text-[11px] sm:col-span-3">Queda guardado en Ejercicios para usarlo en cualquier rutina. El video se agrega después desde Ejercicios.</p>
+          <InfoNote className="sm:col-span-3" text={"Queda guardado en Ejercicios para usarlo en cualquier rutina. El video se agrega después desde Ejercicios."} />
         </div>
       )}
       <div className="flex flex-wrap items-center gap-2">
@@ -601,7 +602,7 @@ export function PlanLoadsEditor({ userId, model = "atr", dayGoals = {}, startDat
                 {d} · {dayGoal(dayGoals[d]).label}
               </button>
             ))}
-            <span className="text-muted text-[11px] w-full mt-1">Un peso escrito a mano en una semana vale para todos sus días.</span>
+            <InfoNote className="w-full mt-1" text={"Un peso escrito a mano en una semana vale para todos sus días."} />
           </div>
         )
       )}

@@ -10,7 +10,8 @@ import { addDays, currentOrNextPlan, dayLabelOf, loadSchedule, mondayOf, planFor
 import { buildReportPdf, buildRoutinePdf, loadPlanChanges, loadRoutineDetails } from "@/lib/planPdf";
 import { usePdfPreview } from "@/components/ui/PdfPreview";
 import { formatWeight, useWeightUnit } from "@/lib/weightUnits";
-
+
+import { InfoNote } from "@/components/ui/InfoTip";
 const card = "rounded-2xl bg-gradient-to-b from-card to-deep border border-white/[0.06]";
 
 // Calendario del alumno: el mes con los días de entreno (del plan o de sus días fijos), lo que ya hizo y el detalle de cada día
@@ -122,7 +123,7 @@ export function CalendarScreen({ userId, studentName, healthConsent, onClose, on
         <button onClick={reportPdf} disabled={busy === "plan"} className="w-full flex items-center justify-center gap-2 bg-accent text-app text-sm font-semibold rounded-xl py-3 disabled:opacity-60">
           <Download size={16} /> {busy === "plan" ? tr("Generando PDF...") : tr("Descargar todo en PDF")}
         </button>
-        <p className="text-muted text-[11px] mt-2 text-center">{tr("Incluye su progreso, medidas, nutrición y sus entrenamientos.")}</p>
+        <InfoNote className="mt-2 justify-center" text={tr("Incluye su progreso, medidas, nutrición y sus entrenamientos.")} />
       </div>
 
       {plan && (

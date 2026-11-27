@@ -14,7 +14,8 @@ import { PanelLayout } from "./PanelLayout";
 import { Select } from "@/components/ui/Select";
 import { UnitToggle, useWeightText } from "@/components/ui/WeightInput";
 import { formatWeight, useWeightUnit, weightStep } from "@/lib/weightUnits";
-
+
+import { InfoNote } from "@/components/ui/InfoTip";
 const MONTHS = ["Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio", "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre"];
 const THIS_YEAR = new Date().getFullYear();
 const YEARS = Array.from({ length: THIS_YEAR - 1989 }, (_, i) => THIS_YEAR - i);
@@ -321,13 +322,13 @@ export function ExerciseHistoryPanel({ student, onClose }) {
                   })}
                 </div>
               )}
-              <p className="text-muted text-[11px] mt-2">Verde: hizo el sugerido o más · rojo: menos. Toque un ejercicio para ver su gráfico y cada sesión.</p>
+              <InfoNote className="mt-2" text={"Verde: hizo el sugerido o más · rojo: menos. Toque un ejercicio para ver su gráfico y cada sesión."} />
             </>
           ) : (
           <>
           <button type="button" onClick={() => setExerciseKey(null)} className="text-soft text-xs flex items-center gap-1 mb-3 hover:text-ink"><ChevronLeft size={14} /> Resumen de las últimas 2 semanas</button>
           <div className="bg-card rounded-2xl p-4 mb-5">
-            <p className="text-muted text-[11px] mb-3">Vista día a día. El alumno ve lo mismo resumido por mes.</p>
+            <InfoNote className="mb-3" text={"Vista día a día. El alumno ve lo mismo resumido por mes."} />
             <ExerciseProgressView points={points} showSource />
           </div>
 
@@ -365,7 +366,7 @@ export function ExerciseHistoryPanel({ student, onClose }) {
               </div>
             ))}
           </div>
-          <p className="text-muted text-[11px] mt-2">Los registros &quot;App&quot; los cargó el alumno al entrenar (verde: hizo el sugerido o más; rojo: menos); se corrigen desde su entreno. Los de &quot;Historial&quot; los podés corregir o borrar acá.</p>
+          <InfoNote className="mt-2" text={"Los registros \"App\" los cargó el alumno al entrenar (verde: hizo el sugerido o más; rojo: menos); se corrigen desde su entreno. Los de \"Historial\" los podés corregir o borrar acá."} />
           </>
           )}
         </>

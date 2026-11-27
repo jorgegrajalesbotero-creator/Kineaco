@@ -7,7 +7,8 @@ import { supabase } from "@/lib/supabaseClient";
 import { matchesSearch } from "@/lib/search";
 import { SearchInput } from "@/components/ui/Search";
 import { Skeleton } from "@/components/ui/Skeleton";
-
+
+import { InfoNote } from "@/components/ui/InfoTip";
 const GOALS = [["deficit", "Déficit"], ["mantener", "Mantener"], ["superavit", "Superávit"]];
 const PLACES = [["casa", "Casa"], ["gym", "Gym"]];
 
@@ -163,7 +164,7 @@ export function AnnouncementsView() {
                       {PLACES.map(([v, l]) => <button key={v} onClick={() => setPlace(v)} className={chip(place === v)}>{l}</button>)}
                     </div>
                   </div>
-                  <p className="text-muted text-[11px]">Los alumnos sin datos de nutrición no entran en los filtros.</p>
+                  <InfoNote text={"Los alumnos sin datos de nutrición no entran en los filtros."} />
                 </div>
               )}
 

@@ -15,7 +15,8 @@ import { CheckinHistory } from "@/components/student/progress/CheckinHistory";
 import { MeasurementsSection } from "@/components/student/progress/MeasurementsSection";
 import { ProgressPhotosSection } from "@/components/student/progress/ProgressPhotosSection";
 import { ExerciseProgressSection } from "@/components/student/progress/ExerciseProgressSection";
-
+
+import { InfoNote } from "@/components/ui/InfoTip";
 export function ProgressScreen({ streak, bestStreak, totalCompleted, weekStats, recentActivity, bodyWeightLogs, onAddWeight, onUpdateWeight, onDeleteWeight, userId, fullName, onOpenCheckin, onOpenMeasure, healthConsent = true }) {
   const [unit] = useWeightUnit();
   const maxCount = Math.max(1, ...weekStats.map((d) => d.count));
@@ -43,7 +44,7 @@ export function ProgressScreen({ streak, bestStreak, totalCompleted, weekStats, 
       <button onClick={downloadReport} disabled={pdfBusy} className="w-full flex items-center justify-center gap-2 bg-accent text-app text-sm font-semibold rounded-2xl py-3 mb-2 disabled:opacity-60">
         <Download size={16} /> {pdfBusy ? tr("Generando PDF...") : tr("Descargar todo en PDF")}
       </button>
-      <p className="text-muted text-[11px] text-center mb-7">{tr("Incluye su progreso, medidas, nutrición y sus entrenamientos.")}</p>
+      <InfoNote className="mb-7 justify-center" text={tr("Incluye su progreso, medidas, nutrición y sus entrenamientos.")} />
 
       <div className="grid grid-cols-3 gap-2.5 mb-7">
         {[

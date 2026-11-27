@@ -26,7 +26,8 @@ import { FilterBar } from "@/components/ui/FilterBar";
 import { Select } from "@/components/ui/Select";
 import { WeightInput } from "@/components/ui/WeightInput";
 import { formatWeight, useWeightUnit } from "@/lib/weightUnits";
-
+
+import { InfoNote } from "@/components/ui/InfoTip";
 const ROUTINE_SORTS = [
   { id: "recientes", label: "Más recientes", compare: (a, b) => String(b.created_at || "").localeCompare(String(a.created_at || "")) },
   { id: "az", label: "Nombre (A-Z)", compare: (a, b) => (a.title || "").localeCompare(b.title || "") },
@@ -783,7 +784,7 @@ export function RoutinesView({ initialOpenId = null, onInitialOpenDone } = {}) {
           ) : (
             <div className="space-y-2">
               <p className="text-ink text-sm font-medium flex items-center gap-2"><GitMerge size={15} className="text-accent" /> Fusionar con otra rutina</p>
-              <p className="text-muted text-xs">Los ejercicios de la rutina que elijas se agregan al final de esta. Revisá el resultado y tocá &quot;Guardar cambios&quot;.</p>
+              <InfoNote text={"Los ejercicios de la rutina que elijas se agregan al final de esta. Revisá el resultado y tocá \"Guardar cambios\"."} />
               <SearchSelect
                 options={routines
                   .filter((r) => r.id !== viewingId && !mergedFrom.some((m) => m.id === r.id))
@@ -827,7 +828,7 @@ export function RoutinesView({ initialOpenId = null, onInitialOpenDone } = {}) {
                 <span className="block text-xs text-soft">El cambio les llega a todos, incluida su planeación ATR.</span>
               </button>
               <button onClick={() => setSaveChoice(null)} className="w-full text-muted text-sm py-2">Cancelar</button>
-              <p className="text-muted text-[11px] mt-2">Para cambiar algo a un solo alumno, usá su Planeación (quitar, sustituir o agregar ejercicios) o las observaciones de su rutina.</p>
+              <InfoNote className="mt-2" text={"Para cambiar algo a un solo alumno, usá su Planeación (quitar, sustituir o agregar ejercicios) o las observaciones de su rutina."} />
             </div>
           </div>
         )}

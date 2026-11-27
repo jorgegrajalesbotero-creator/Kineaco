@@ -3,7 +3,8 @@
 import { Timer } from "lucide-react";
 import { CLOCK_DEFAULTS, CLOCK_FIELDS, normalizeConfig, normalizeTimer, visibleFields } from "@/lib/clock";
 import { ClockField } from "@/components/ui/ClockField";
-
+
+import { InfoNote } from "@/components/ui/InfoTip";
 const MODES = [
   ["", "Sin reloj programado"],
   ["tabata", "Tabata / intermitentes"],
@@ -37,7 +38,7 @@ export function TimerSettings({ value, onChange, compact = false }) {
         </div>
       )}
       {t && CLOCK_FIELDS[mode].some((f) => f.unit === "time") && (
-        <p className="text-muted text-[11px] mt-1.5">Tocá el tiempo para escribirlo exacto (7, 0:08, 1:30…). Mantené − o + para ir más rápido.</p>
+        <InfoNote className="mt-1.5" text={"Tocá el tiempo para escribirlo exacto (7, 0:08, 1:30…). Mantené − o + para ir más rápido."} />
       )}
       {!t && !compact && (
         <p className="text-muted text-[11px] flex items-center gap-1"><Timer size={12} /> Sin reloj programado, el alumno usa el reloj normal.</p>

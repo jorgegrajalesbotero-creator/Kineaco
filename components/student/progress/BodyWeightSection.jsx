@@ -6,7 +6,8 @@ import { appLocale, tr } from "@/lib/i18n";
 import { toNumber } from "@/lib/numbers";
 import { WeightInput } from "@/components/ui/WeightInput";
 import { useWeightUnit, weightLabel, weightNumber } from "@/lib/weightUnits";
-
+
+import { InfoNote } from "@/components/ui/InfoTip";
 const fmtDate = (iso) => new Date(iso).toLocaleDateString(appLocale(), { day: "2-digit", month: "short", year: "numeric" });
 
 // Línea del peso en el tiempo (sin librerías)
@@ -169,7 +170,7 @@ export function BodyWeightSection({ logs, onAdd, onUpdate, onDelete }) {
             )}
           </>
         )}
-        <p className="text-muted text-[11px] mt-3">{tr("También se actualiza cuando registra su peso en Nutrición, Medidas, Check-in o Fotos.")}</p>
+        <InfoNote className="mt-3" text={tr("También se actualiza cuando registra su peso en Nutrición, Medidas, Check-in o Fotos.")} />
       </div>
     </div>
   );
