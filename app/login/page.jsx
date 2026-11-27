@@ -7,6 +7,7 @@ import { PasswordInput } from "@/components/ui/PasswordInput";
 import { friendlyAuthError } from "@/lib/authErrors";
 import { EMPTY_CONSENT, consentRecord, validateConsent } from "@/lib/legal";
 import { ConsentFields } from "@/components/legal/ConsentFields";
+import { InstallAppButton } from "@/components/ui/InstallAppButton";
 
 export default function LoginPage() {
   const [mode, setMode] = useState("login"); // "login" | "signup" | "reset"
@@ -183,6 +184,7 @@ export default function LoginPage() {
             {mode === "login" ? tr("¿No tiene cuenta? Regístrese") : mode === "signup" ? tr("¿Ya tiene cuenta? Inicie sesión") : tr("Volver a iniciar sesión")}
           </button>
         </form>
+        <InstallAppButton className="mt-4" />
         <p className="text-center text-muted text-[11px] mt-5 space-x-3">
           <a href="/terminos" className="hover:text-soft">{tr("Términos y Condiciones")}</a>
           <span>·</span>

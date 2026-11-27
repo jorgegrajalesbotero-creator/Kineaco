@@ -1,12 +1,13 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Camera, ChevronRight, User } from "lucide-react";
 import { appLocale, tr } from "@/lib/i18n";
 import { colombiaDateISO } from "@/lib/accessNotice";
 import { shrinkAvatar } from "@/lib/images";
 import { supabase } from "@/lib/supabaseClient";
-import { signedAvatarUrl } from "@/lib/avatars";
+import { uploadAvatar } from "@/lib/avatars";
+import { InstallAppButton } from "@/components/ui/InstallAppButton";
 import { updateAccount } from "@/lib/account";
 import { Chameleon } from "@/components/ui/Chameleon";
 import { PET_NAME_MAX } from "@/lib/chameleon";
@@ -39,6 +40,12 @@ export function ProfileScreen({ fullName, email, avatarUrl, userId, onProfileUpd
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
   const [localAvatarUrl, setLocalAvatarUrl] = useState(avatarUrl);
+  // Si la pantalla se abrió antes de que llegaran los datos (por ejemplo, al volver desde el panel del
+  // coach), se llenan apenas llegan, sin pisar lo que la persona ya esté escribiendo.
+  const touched = useRef({ name: false, email: false });
+  useEffect(() => { if (!touched.current.name) setNameDraft(fullName || ""); }, [fullName]);
+  useEffect(() => { if (!touched.current.email) setEmailDraft(email || ""); }, [email]);
+  useEffect(() => { if (avatarUrl) setLocalAvatarUrl(avatarUrl); }, [avatarUrl]);
 
   const handlePhotoChange = async (e) => {
     const file = e.target.files[0];
@@ -53,24 +60,13 @@ export function ProfileScreen({ fullName, email, avatarUrl, userId, onProfileUpd
       setUploading(false);
       return;
     }
-    const path = `${userId}/avatar.jpg`;
-
-    const { error: uploadError } = await supabase.storage
-      .from("avatars")
-      .upload(path, blob, { upsert: true, contentType: "image/jpeg" });
-
-    if (uploadError) {
-      alert(tr("No se pudo subir la foto: "));
+    // Cada foto con nombre propio: así nunca vuelve a aparecer la anterior (ver lib/avatars.js)
+    const { error, display } = await uploadAvatar(userId, blob);
+    if (error) {
+      alert(tr("No se pudo guardar la foto. Revise su conexión e intente de nuevo."));
       setUploading(false);
       return;
     }
-
-    // Guardamos la RUTA (no una URL pública) porque el bucket es privado.
-    await supabase.from("profiles").update({ avatar_url: path }).eq("id", userId);
-
-    // Para mostrarla de inmediato, firmamos la URL y rompemos la caché del navegador.
-    const signed = await signedAvatarUrl(path);
-    const display = signed ? `${signed}&t=${Date.now()}` : signed;
 
     setLocalAvatarUrl(display);
     setUploading(false);
@@ -132,7 +128,7 @@ export function ProfileScreen({ fullName, email, avatarUrl, userId, onProfileUpd
           <p className="text-muted text-xs mb-1">{tr("Nombre completo")}</p>
           <input
             value={nameDraft}
-            onChange={(e) => setNameDraft(e.target.value)}
+            onChange={(e) => { touched.current.name = true; setNameDraft(e.target.value); }}
             className="block w-full bg-field text-ink text-sm rounded-lg px-3 py-2 outline-none focus:ring-1 focus:ring-accent"
           />
         </div>
@@ -142,7 +138,7 @@ export function ProfileScreen({ fullName, email, avatarUrl, userId, onProfileUpd
             type="email"
             autoComplete="email"
             value={emailDraft}
-            onChange={(e) => setEmailDraft(e.target.value)}
+            onChange={(e) => { touched.current.email = true; setEmailDraft(e.target.value); }}
             className="block w-full bg-field text-ink text-sm rounded-lg px-3 py-2 outline-none focus:ring-1 focus:ring-accent"
           />
           <p className="text-muted text-[11px] mt-1">{tr("Es el correo con el que inicia sesión.")}</p>
@@ -205,6 +201,8 @@ export function ProfileScreen({ fullName, email, avatarUrl, userId, onProfileUpd
           <ChevronRight size={16} className="text-accent" />
         </a>
       )}
+
+      <InstallAppButton className="mb-4" />
 
       {!isCoach && accessUntil && (
         <div className="w-full flex items-center justify-between bg-card rounded-2xl px-4 py-3 mb-4">

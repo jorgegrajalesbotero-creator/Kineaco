@@ -32,6 +32,20 @@ describe("accesorios del camaleón", () => {
     expect(progressText(gorra, { trainings: 4 })).toBe("4 de 6 entrenamientos");
   });
 
+  it("las de temporada solo se desbloquean en diciembre", () => {
+    const nov = computeUnlocks({ trainings: 1 }, new Date("2026-11-27T15:00:00Z"));
+    const dic = computeUnlocks({ trainings: 1 }, new Date("2026-12-05T15:00:00Z"));
+    expect(nov).not.toContain("gorro_navidad");
+    ["gorro_navidad", "reno", "nieve"].forEach((k) => expect(dic).toContain(k));
+    expect(computeUnlocks({}, new Date("2026-12-05T15:00:00Z"))).not.toContain("nieve");
+  });
+
+  it("cada prenda tiene un lugar que existe y una clave única", () => {
+    const slots = new Set(["bg", "head", "eyes", "body", "neck", "waist", "back", "feet", "aura"]);
+    PET_ITEMS.forEach((i) => expect(slots.has(i.slot)).toBe(true));
+    expect(new Set(PET_ITEMS.map((i) => i.key)).size).toBe(PET_ITEMS.length);
+  });
+
   it("la rama sube con 10 entrenamientos o 2 semanas", () => {
     expect(branchLevel({ trainings: 9 })).toBe(0);
     expect(branchLevel({ trainings: 10 })).toBe(1);
